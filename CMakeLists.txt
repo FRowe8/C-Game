@@ -224,37 +224,40 @@ elseif(PLATFORM_WEB)
         OUTPUT_NAME "QuantumIdle"
     )
 
+    # Emscripten compile flags (MUST include SDL2 flag for compilation)
+    target_compile_options(${PROJECT_NAME} PRIVATE
+        "-sUSE_SDL=2"
+    )
+
     # Emscripten linker flags
     set(EMSCRIPTEN_LINK_FLAGS
-        "-s USE_SDL=2"
-        "-s USE_WEBGL2=1"
-        "-s FULL_ES3=1"
-        "-s ALLOW_MEMORY_GROWTH=1"
-        "-s INITIAL_MEMORY=67108864"  # 64MB
-        "-s MAXIMUM_MEMORY=268435456"  # 256MB max
-        "-s STACK_SIZE=5242880"  # 5MB stack
-        "-s ASSERTIONS=0"
-        "-s GL_ASSERTIONS=0"
-        "-s DISABLE_EXCEPTION_CATCHING=1"
-        "-s EXPORTED_RUNTIME_METHODS=['ccall','cwrap']"
-        "-s EXPORTED_FUNCTIONS=['_main']"
+        "-sUSE_SDL=2"
+        "-sUSE_WEBGL2=1"
+        "-sFULL_ES3=1"
+        "-sALLOW_MEMORY_GROWTH=1"
+        "-sINITIAL_MEMORY=67108864"  # 64MB
+        "-sMAXIMUM_MEMORY=268435456"  # 256MB max
+        "-sSTACK_SIZE=5242880"  # 5MB stack
+        "-sASSERTIONS=0"
+        "-sGL_ASSERTIONS=0"
+        "-sDISABLE_EXCEPTION_CATCHING=1"
+        "-sEXPORTED_RUNTIME_METHODS=['ccall','cwrap']"
+        "-sEXPORTED_FUNCTIONS=['_main']"
         "--shell-file ${CMAKE_SOURCE_DIR}/web/index.html"
-        "-s FETCH=1"
-        "--preload-file ${CMAKE_SOURCE_DIR}/assets@/assets"
     )
 
     # Optimization flags for release
     if(CMAKE_BUILD_TYPE STREQUAL "Release")
         list(APPEND EMSCRIPTEN_LINK_FLAGS
             "-O3"
-            "-s AGGRESSIVE_VARIABLE_ELIMINATION=1"
-            "--closure 1"
+            "-sAGGRESSIVE_VARIABLE_ELIMINATION=1"
+            "--closure=1"
         )
     else()
         list(APPEND EMSCRIPTEN_LINK_FLAGS
             "-O0"
             "-g"
-            "-s SAFE_HEAP=1"
+            "-sSAFE_HEAP=1"
         )
     endif()
 
