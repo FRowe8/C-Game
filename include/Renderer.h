@@ -43,14 +43,9 @@ public:
 
 private:
     void InitializeShaders();
-    void SetupQuad();
 
     int m_Width = 0;
     int m_Height = 0;
-
-    u32 m_QuadVAO = 0;
-    u32 m_QuadVBO = 0;
-    u32 m_BasicShader = 0;
 
     std::vector<Particle> m_Particles;
 

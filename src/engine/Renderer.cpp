@@ -9,6 +9,17 @@
 #define M_PI 3.14159265358979323846
 #endif
 
+// Undefine Windows macros that conflict with our code
+#ifdef near
+#undef near
+#endif
+#ifdef far
+#undef far
+#endif
+#ifdef DrawText
+#undef DrawText
+#endif
+
 Renderer::Renderer() {
 }
 
@@ -30,7 +41,6 @@ bool Renderer::Initialize(int width, int height) {
     glDisable(GL_DEPTH_TEST);
     glDisable(GL_CULL_FACE);
 
-    SetupQuad();
     UpdateProjectionMatrix();
 
     Log::Info("Renderer initialized successfully");
@@ -38,36 +48,7 @@ bool Renderer::Initialize(int width, int height) {
 }
 
 void Renderer::Shutdown() {
-    if (m_QuadVAO) {
-        glDeleteVertexArrays(1, &m_QuadVAO);
-        m_QuadVAO = 0;
-    }
-    if (m_QuadVBO) {
-        glDeleteBuffers(1, &m_QuadVBO);
-        m_QuadVBO = 0;
-    }
-}
-
-void Renderer::SetupQuad() {
-    // Simple vertex format: position only, we'll transform in immediate mode
-    f32 vertices[] = {
-        0.0f, 0.0f,
-        1.0f, 0.0f,
-        1.0f, 1.0f,
-        0.0f, 1.0f
-    };
-
-    glGenVertexArrays(1, &m_QuadVAO);
-    glGenBuffers(1, &m_QuadVBO);
-
-    glBindVertexArray(m_QuadVAO);
-    glBindBuffer(GL_ARRAY_BUFFER, m_QuadVBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(f32), (void*)0);
-
-    glBindVertexArray(0);
+    // Using immediate mode rendering, no resources to clean up
 }
 
 void Renderer::UpdateProjectionMatrix() {
