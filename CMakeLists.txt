@@ -53,20 +53,73 @@ include_directories(
 find_package(OpenGL REQUIRED)
 
 # SDL2 - cross-platform windowing and input
-if(PLATFORM_ANDROID OR PLATFORM_IOS)
-    # Mobile platforms - handle differently
+set(SDL2_FOUND FALSE)
+
+if(PLATFORM_WINDOWS)
+    # Windows: Look for SDL2 in common locations
+    if(DEFINED ENV{SDL2_DIR})
+        set(SDL2_DIR $ENV{SDL2_DIR})
+    endif()
+
+    # Search paths
+    set(SDL2_SEARCH_PATHS
+        ${SDL2_DIR}
+        "C:/SDL2"
+        "C:/Program Files/SDL2"
+        "C:/Program Files (x86)/SDL2"
+        "${CMAKE_SOURCE_DIR}/external/SDL2"
+    )
+
+    # Find include directory
+    find_path(SDL2_INCLUDE_DIR SDL.h
+        PATH_SUFFIXES include SDL2
+        PATHS ${SDL2_SEARCH_PATHS}
+    )
+
+    # Find library
+    find_library(SDL2_LIBRARY
+        NAMES SDL2
+        PATH_SUFFIXES lib lib/x64 lib/x86
+        PATHS ${SDL2_SEARCH_PATHS}
+    )
+
+    find_library(SDL2MAIN_LIBRARY
+        NAMES SDL2main
+        PATH_SUFFIXES lib lib/x64 lib/x86
+        PATHS ${SDL2_SEARCH_PATHS}
+    )
+
+    if(SDL2_INCLUDE_DIR AND SDL2_LIBRARY)
+        set(SDL2_FOUND TRUE)
+        set(SDL2_LIBRARIES ${SDL2_LIBRARY} ${SDL2MAIN_LIBRARY})
+        set(SDL2_INCLUDE_DIRS ${SDL2_INCLUDE_DIR})
+        message(STATUS "Found SDL2: ${SDL2_LIBRARY}")
+    else()
+        message(WARNING "SDL2 not found! Please set SDL2_DIR or download from https://github.com/libsdl-org/SDL/releases")
+        message(WARNING "See WINDOWS_BUILD.md for instructions")
+    endif()
+
+elseif(PLATFORM_ANDROID OR PLATFORM_IOS)
+    # Mobile platforms
     if(PLATFORM_ANDROID)
         find_library(SDL2_LIBRARY SDL2)
+        set(SDL2_FOUND TRUE)
     endif()
 else()
-    # Desktop platforms
+    # Linux/macOS: Try find_package first, then pkg-config
     find_package(SDL2 QUIET)
     if(NOT SDL2_FOUND)
-        # Try pkg-config
         find_package(PkgConfig)
         if(PkgConfig_FOUND)
-            pkg_check_modules(SDL2 REQUIRED sdl2)
+            pkg_check_modules(SDL2 sdl2)
+            if(SDL2_FOUND)
+                message(STATUS "Found SDL2 via pkg-config")
+            endif()
         endif()
+    endif()
+
+    if(NOT SDL2_FOUND)
+        message(FATAL_ERROR "SDL2 not found! Install with: sudo apt-get install libsdl2-dev (Ubuntu) or brew install sdl2 (macOS)")
     endif()
 endif()
 
@@ -94,15 +147,19 @@ else()
 endif()
 
 # Link libraries
-if(SDL2_FOUND OR SDL2_LIBRARY)
+if(SDL2_FOUND)
+    target_include_directories(${PROJECT_NAME} PRIVATE ${SDL2_INCLUDE_DIRS})
+
     if(TARGET SDL2::SDL2)
         target_link_libraries(${PROJECT_NAME} SDL2::SDL2)
-    elseif(SDL2_LIBRARIES)
-        target_include_directories(${PROJECT_NAME} PRIVATE ${SDL2_INCLUDE_DIRS})
+    else()
         target_link_libraries(${PROJECT_NAME} ${SDL2_LIBRARIES})
-    elseif(SDL2_LIBRARY)
-        target_link_libraries(${PROJECT_NAME} ${SDL2_LIBRARY})
     endif()
+
+    message(STATUS "SDL2 include dirs: ${SDL2_INCLUDE_DIRS}")
+    message(STATUS "SDL2 libraries: ${SDL2_LIBRARIES}")
+else()
+    message(FATAL_ERROR "SDL2 is required but was not found!")
 endif()
 
 target_link_libraries(${PROJECT_NAME} OpenGL::GL)

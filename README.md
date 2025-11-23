@@ -25,47 +25,61 @@ A custom C++ game engine designed for creating engaging idle games across multip
 
 ## Building
 
+### 🚀 Quick Start
+
+Choose your platform:
+
+#### **Windows** (Easiest!)
+```cmd
+build.bat
+```
+The script will automatically offer to download SDL2 for you!
+
+**👉 See [QUICKSTART_WINDOWS.md](QUICKSTART_WINDOWS.md) for detailed Windows instructions**
+
+#### **Linux**
+```bash
+sudo apt-get install libsdl2-dev cmake build-essential  # Ubuntu/Debian
+# OR
+sudo dnf install SDL2-devel cmake gcc-c++               # Fedora
+
+./build.sh
+./build/QuantumIdle
+```
+
+#### **macOS**
+```bash
+brew install sdl2 cmake
+
+./build.sh
+./build/QuantumIdle
+```
+
+---
+
 ### Prerequisites
-- CMake 3.15+
-- C++17 compatible compiler
-- SDL2
-- OpenGL 3.0+
 
-### Desktop Build
+- **CMake** 3.15+ ([Download](https://cmake.org/download/))
+- **C++17 compiler**
+  - Windows: Visual Studio Build Tools 2019+ ([Download](https://visualstudio.microsoft.com/downloads/))
+  - Linux: GCC 7+ or Clang 5+
+  - macOS: Xcode Command Line Tools
+- **SDL2** ([Download](https://github.com/libsdl-org/SDL/releases) or use package manager)
+- **OpenGL** 2.1+ (included with graphics drivers)
 
+### Detailed Build Instructions
+
+#### Windows (Manual Method)
+See [WINDOWS_BUILD.md](WINDOWS_BUILD.md) for detailed instructions including:
+- Manual SDL2 installation
+- MSYS2 alternative
+- Troubleshooting tips
+
+#### All Platforms
 ```bash
-# Clone repository
-git clone <repository-url>
-cd C-Game
-
-# Create build directory
 mkdir build && cd build
-
-# Configure
 cmake ..
-
-# Build
-cmake --build .
-
-# Run
-./QuantumIdle
-```
-
-### Platform-Specific Notes
-
-#### Windows
-- Install SDL2 via vcpkg: `vcpkg install sdl2`
-- Or download from https://www.libsdl.org/
-
-#### Linux
-```bash
-sudo apt-get install libsdl2-dev  # Debian/Ubuntu
-sudo dnf install SDL2-devel        # Fedora
-```
-
-#### macOS
-```bash
-brew install sdl2
+cmake --build . --config Release
 ```
 
 ## Architecture
