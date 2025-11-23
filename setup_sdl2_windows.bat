@@ -28,11 +28,11 @@ mkdir temp_sdl2 2>nul
 cd temp_sdl2
 
 echo.
-echo Downloading SDL2...
+echo Downloading SDL2 (MinGW version)...
 echo.
 
-REM Download SDL2 using PowerShell
-powershell -Command "& {Invoke-WebRequest -Uri 'https://github.com/libsdl-org/SDL/releases/download/release-2.30.0/SDL2-devel-2.30.0-VC.zip' -OutFile 'SDL2.zip'}"
+REM Download SDL2 MinGW version using PowerShell
+powershell -Command "& {Invoke-WebRequest -Uri 'https://github.com/libsdl-org/SDL/releases/download/release-2.30.0/SDL2-devel-2.30.0-mingw.tar.gz' -OutFile 'SDL2-mingw.tar.gz'}"
 
 if not exist SDL2.zip (
     echo ERROR: Failed to download SDL2
