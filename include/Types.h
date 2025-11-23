@@ -81,6 +81,9 @@ struct Color {
     Color() : r(1), g(1), b(1), a(1) {}
     Color(f32 r, f32 g, f32 b, f32 a = 1.0f) : r(r), g(g), b(b), a(a) {}
 
+    // Operators for color manipulation
+    Color operator*(f32 scalar) const { return Color(r * scalar, g * scalar, b * scalar, a); }
+
     static Color White() { return Color(1, 1, 1, 1); }
     static Color Black() { return Color(0, 0, 0, 1); }
     static Color Red() { return Color(1, 0, 0, 1); }
