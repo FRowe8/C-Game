@@ -6,6 +6,10 @@
 #ifdef PLATFORM_WINDOWS
 #include <windows.h>
 #include <shlobj.h>
+// Undefine Windows macros that conflict with our function names
+#ifdef CreateDirectory
+#undef CreateDirectory
+#endif
 #elif defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS)
 #include <unistd.h>
 #include <pwd.h>
