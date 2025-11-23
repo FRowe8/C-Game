@@ -1,6 +1,7 @@
 // Define SDL_MAIN_HANDLED to avoid SDL2main.lib dependency
 // This is needed when using MinGW with MSVC-compiled SDL2 libraries
 #define SDL_MAIN_HANDLED
+#include <SDL.h>
 
 #include "Application.h"
 #include "Logger.h"
@@ -8,6 +9,9 @@
 #include <ctime>
 
 int main(int argc, char* argv[]) {
+    // Initialize SDL's main handling
+    SDL_SetMainReady();
+
     // Seed random number generator
     srand(static_cast<unsigned int>(time(nullptr)));
 
