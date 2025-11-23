@@ -31,7 +31,9 @@ Choose your platform:
 
 #### **Windows**
 
-**First time?** You need CMake and Visual Studio Build Tools:
+**Choose your compiler:**
+
+**Option A: Visual Studio / MSVC (Recommended)**
 - **CMake**: https://cmake.org/download/ (Choose "Windows x64 Installer", enable "Add to PATH")
 - **Build Tools**: https://visualstudio.microsoft.com/downloads/ (Choose "Build Tools for Visual Studio 2022")
 
@@ -41,8 +43,14 @@ check_setup.bat   (optional - checks if everything is installed)
 build.bat         (builds the game, auto-downloads SDL2)
 ```
 
-**👉 See [QUICKSTART_WINDOWS.md](QUICKSTART_WINDOWS.md) for step-by-step instructions**
-**👉 See [INSTALL_CMAKE.md](INSTALL_CMAKE.md) if you get "cmake not recognized"**
+**Option B: CLion / MinGW**
+- **👉 See [MINGW_BUILD.md](MINGW_BUILD.md) for MinGW-specific instructions**
+- You need the MinGW version of SDL2, not the MSVC version!
+
+**More Help:**
+- **👉 [QUICKSTART_WINDOWS.md](QUICKSTART_WINDOWS.md)** - Step-by-step for MSVC
+- **👉 [MINGW_BUILD.md](MINGW_BUILD.md)** - Instructions for MinGW/CLion
+- **👉 [INSTALL_CMAKE.md](INSTALL_CMAKE.md)** - If you get "cmake not recognized"
 
 #### **Linux**
 ```bash
