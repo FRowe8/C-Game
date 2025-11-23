@@ -88,12 +88,26 @@ if(PLATFORM_WINDOWS)
         PATHS ${SDL2_SEARCH_PATHS}
     )
 
+    # Find SDL2main for MinGW
+    find_library(SDL2MAIN_LIBRARY
+        NAMES SDL2main
+        PATH_SUFFIXES lib lib/x64 lib/x86
+        PATHS ${SDL2_SEARCH_PATHS}
+    )
+
     if(SDL2_INCLUDE_DIR AND SDL2_LIBRARY)
         set(SDL2_FOUND TRUE)
-        # Don't link SDL2main - we use SDL_MAIN_HANDLED for MinGW compatibility
-        set(SDL2_LIBRARIES ${SDL2_LIBRARY})
+        # Link both SDL2 and SDL2main for proper MinGW support
+        if(SDL2MAIN_LIBRARY)
+            set(SDL2_LIBRARIES ${SDL2MAIN_LIBRARY} ${SDL2_LIBRARY})
+        else()
+            set(SDL2_LIBRARIES ${SDL2_LIBRARY})
+        endif()
         set(SDL2_INCLUDE_DIRS ${SDL2_INCLUDE_DIR})
         message(STATUS "Found SDL2: ${SDL2_LIBRARY}")
+        if(SDL2MAIN_LIBRARY)
+            message(STATUS "Found SDL2main: ${SDL2MAIN_LIBRARY}")
+        endif()
     else()
         message(WARNING "SDL2 not found! Please set SDL2_DIR or download from https://github.com/libsdl-org/SDL/releases")
         message(WARNING "See WINDOWS_BUILD.md for instructions")
