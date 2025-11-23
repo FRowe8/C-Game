@@ -70,61 +70,29 @@ endif()
 
 # If vcpkg didn't find it, use platform-specific methods
 if(NOT SDL2_FOUND AND PLATFORM_WINDOWS)
-    # Windows: Look for SDL2 in common locations
-    if(DEFINED ENV{SDL2_DIR})
-        set(SDL2_DIR $ENV{SDL2_DIR})
-    endif()
+    # --- FIX: Point specifically to the 64-bit MinGW folder ---
+    set(SDL2_ROOT_PATH "C:/SDL2/x86_64-w64-mingw32")
 
-    # Search paths
-    set(SDL2_SEARCH_PATHS
-        ${SDL2_DIR}
-        "C:/SDL2"
-        "C:/Program Files/SDL2"
-        "C:/Program Files (x86)/SDL2"
-        "${CMAKE_SOURCE_DIR}/external/SDL2"
-    )
+    # 1. Set Include Paths explicitly
+    set(SDL2_INCLUDE_DIR "${SDL2_ROOT_PATH}/include/SDL2")
 
-    # Find include directory
-    find_path(SDL2_INCLUDE_DIR SDL.h
-        PATH_SUFFIXES include SDL2
-        PATHS ${SDL2_SEARCH_PATHS}
-    )
+    # 2. Set Library Paths explicitly
+    set(SDL2_LIBRARY "${SDL2_ROOT_PATH}/lib/libSDL2.dll.a")
+    set(SDL2MAIN_LIBRARY "${SDL2_ROOT_PATH}/lib/libSDL2main.a")
 
-    # For MinGW, directly use the library files we know exist
-    if(MINGW)
-        message(STATUS "MinGW detected - using hardcoded SDL2 paths")
-        set(SDL2_LIBRARY "C:/SDL2/lib/libSDL2.dll.a")
-        set(SDL2MAIN_LIBRARY "C:/SDL2/lib/libSDL2main.a")
-        message(STATUS "SDL2_LIBRARY set to: ${SDL2_LIBRARY}")
-        message(STATUS "SDL2MAIN_LIBRARY set to: ${SDL2MAIN_LIBRARY}")
-    else()
-        # For MSVC, use find_library
-        find_library(SDL2_LIBRARY
-            NAMES SDL2
-            PATH_SUFFIXES lib lib/x64 lib/x86
-            PATHS ${SDL2_SEARCH_PATHS}
-        )
-    endif()
-
-    if(SDL2_INCLUDE_DIR AND SDL2_LIBRARY)
+    # 3. Verify they exist to prevent vague errors
+    if(EXISTS "${SDL2_INCLUDE_DIR}" AND EXISTS "${SDL2_LIBRARY}")
         set(SDL2_FOUND TRUE)
-        # MinGW needs SDL2main linked FIRST
-        if(MINGW AND SDL2MAIN_LIBRARY)
-            message(STATUS "Adding SDL2main to libraries for MinGW")
-            set(SDL2_LIBRARIES ${SDL2MAIN_LIBRARY} ${SDL2_LIBRARY})
-        else()
-            message(STATUS "Using SDL2 without SDL2main")
-            set(SDL2_LIBRARIES ${SDL2_LIBRARY})
-        endif()
         set(SDL2_INCLUDE_DIRS ${SDL2_INCLUDE_DIR})
-        message(STATUS "Found SDL2: ${SDL2_LIBRARY}")
-        message(STATUS "SDL2_LIBRARIES final value: ${SDL2_LIBRARIES}")
-        if(SDL2MAIN_LIBRARY)
-            message(STATUS "Found SDL2main: ${SDL2MAIN_LIBRARY}")
-        endif()
+
+        # Link Order is crucial for MinGW: SDL2main -> SDL2
+        set(SDL2_LIBRARIES ${SDL2MAIN_LIBRARY} ${SDL2_LIBRARY})
+
+        message(STATUS "SUCCESS: Found SDL2 at ${SDL2_ROOT_PATH}")
+        message(STATUS "  Include: ${SDL2_INCLUDE_DIR}")
+        message(STATUS "  Libraries: ${SDL2_LIBRARIES}")
     else()
-        message(WARNING "SDL2 not found! Please set SDL2_DIR or download from https://github.com/libsdl-org/SDL/releases")
-        message(WARNING "See WINDOWS_BUILD.md for instructions")
+        message(FATAL_ERROR "Could not find SDL2 at ${SDL2_ROOT_PATH}. \nPlease check that C:/SDL2/x86_64-w64-mingw32 exists.\nSee MINGW_BUILD.md for instructions.")
     endif()
 
 elseif(PLATFORM_ANDROID OR PLATFORM_IOS)
@@ -178,32 +146,23 @@ endif()
 # Correct order for MinGW: mingw32 -> SDL2main -> SDL2 -> winmm -> opengl32
 
 if(PLATFORM_WINDOWS)
-    # SDL2 must come BEFORE winmm on MinGW!
     if(SDL2_FOUND)
-        # vcpkg provides clean targets
-        if(TARGET SDL2::SDL2main)
-            message(STATUS "Linking SDL2 via vcpkg targets")
-            target_link_libraries(${PROJECT_NAME} SDL2::SDL2main SDL2::SDL2)
-        else()
-            # Manual SDL2: MinGW needs mingw32 linked FIRST
-            if(MINGW)
-                target_link_libraries(${PROJECT_NAME} mingw32)
-            endif()
+        # 1. Link Mingw32 FIRST (required for proper WinMain handling)
+        target_link_libraries(${PROJECT_NAME} mingw32)
 
-            target_include_directories(${PROJECT_NAME} PRIVATE ${SDL2_INCLUDE_DIRS})
-            target_link_libraries(${PROJECT_NAME} ${SDL2_LIBRARIES})
+        # 2. Include Directories
+        target_include_directories(${PROJECT_NAME} PRIVATE ${SDL2_INCLUDE_DIRS})
 
-            message(STATUS "SDL2 include dirs: ${SDL2_INCLUDE_DIRS}")
-            message(STATUS "SDL2 libraries: ${SDL2_LIBRARIES}")
-        endif()
+        # 3. Link SDL2Main and SDL2 (in this order!)
+        target_link_libraries(${PROJECT_NAME} ${SDL2_LIBRARIES})
     else()
         message(FATAL_ERROR "SDL2 is required but was not found!")
     endif()
 
-    # Now link Windows libraries
-    target_link_libraries(${PROJECT_NAME} winmm)
+    # 4. Windows system libraries
+    target_link_libraries(${PROJECT_NAME} winmm imm32 version setupapi)
 
-    # OpenGL
+    # 5. OpenGL
     target_link_libraries(${PROJECT_NAME} OpenGL::GL)
 
 elseif(PLATFORM_LINUX)
