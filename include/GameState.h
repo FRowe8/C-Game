@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Types.h"
+#include "Research.h"
 #include <vector>
 #include <string>
 #include <functional>
@@ -200,6 +201,12 @@ public:
     // Statistics
     GameStatistics& GetStatistics() { return m_Statistics; }
 
+    // Research Tree
+    ResearchTree& GetResearchTree() { return m_ResearchTree; }
+    bool CanAffordResearch(ResearchID id) const;
+    bool PurchaseResearch(ResearchID id);
+    void UpdateResearchBonuses();
+
 private:
     void InitializeStations();
     void InitializeUI();
@@ -214,6 +221,7 @@ private:
     void RenderStatistics(Renderer* renderer);
     void RenderActiveEvent(Renderer* renderer);
     void RenderAchievementNotifications(Renderer* renderer);
+    void RenderResearchTree(Renderer* renderer);
 
     // Particle system helpers
     void SpawnParticle(const Vec2& position, const Color& color, f64 lifetime = 1.0);
@@ -241,6 +249,9 @@ private:
     // Statistics
     GameStatistics m_Statistics;
 
+    // Research Tree
+    ResearchTree m_ResearchTree;
+
     // Offline progress
     i64 m_LastSaveTimestamp;
 
@@ -249,6 +260,7 @@ private:
     Vec2 m_ScrollOffset;
     bool m_ShowAchievements;
     bool m_ShowStats;
+    bool m_ShowResearch;
 
     // Game time
     f64 m_TotalTimePlayed;

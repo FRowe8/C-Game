@@ -141,7 +141,7 @@ GameState::GameState()
     : m_TotalTimePlayed(0), m_TimeSinceLastSave(0),
       m_Coherence(100), m_MaxCoherence(100), m_CoherenceDecayRate(1.0),
       m_CurrentEvent(nullptr), m_TimeSinceLastEvent(0), m_EventCooldown(120.0),
-      m_LastSaveTimestamp(0), m_ShowAchievements(false), m_ShowStats(false) {
+      m_LastSaveTimestamp(0), m_ShowAchievements(false), m_ShowStats(false), m_ShowResearch(false) {
 
     for (int i = 0; i < 3; i++) {
         m_Resources[i] = 0;
@@ -202,6 +202,10 @@ void GameState::Initialize() {
     m_Resources[static_cast<int>(QuantumResource::Qubits)] = 10.0;
     m_Resources[static_cast<int>(QuantumResource::Coherence)] = 50.0;
     m_Resources[static_cast<int>(QuantumResource::Entanglement)] = 0.0;
+
+    // Initialize Research Tree
+    m_ResearchTree.Initialize();
+    Log::Info("Research tree initialized");
 
     // Try to load save file
     std::string savePath = Platform::GetSaveDirectory() + "quantum_save.json";
@@ -357,11 +361,27 @@ void GameState::UpdateUI(Input* input) {
     Vec2 mousePos = input->GetMousePosition();
     bool mousePressed = input->IsMouseButtonPressed(MouseButton::Left);
 
-    // Keyboard shortcuts (if Input system supports key presses)
-    // 'A' key - toggle achievements
-    // 'S' key - toggle statistics
-    // ESC key - close all panels
-    // These would need to be implemented with IsKeyPressed() if available
+    // Keyboard shortcuts
+    // SDL_SCANCODE_A = 4, R = 15, S = 16, ESCAPE = 41
+    const int KEY_A = 4;
+    const int KEY_R = 15;
+    const int KEY_S = 16;
+    const int KEY_ESCAPE = 41;
+
+    if (input->IsKeyPressed(KEY_A)) {
+        m_ShowAchievements = !m_ShowAchievements;
+    }
+    if (input->IsKeyPressed(KEY_S)) {
+        m_ShowStats = !m_ShowStats;
+    }
+    if (input->IsKeyPressed(KEY_R)) {
+        m_ShowResearch = !m_ShowResearch;
+    }
+    if (input->IsKeyPressed(KEY_ESCAPE)) {
+        m_ShowAchievements = false;
+        m_ShowStats = false;
+        m_ShowResearch = false;
+    }
 
     // Update buttons
     for (auto& button : m_Buttons) {
@@ -380,6 +400,7 @@ void GameState::Render(Renderer* renderer) {
     RenderUI(renderer);
     RenderAchievements(renderer);
     RenderStatistics(renderer);
+    RenderResearchTree(renderer);
     RenderParticleEffects(renderer, 1.0/60.0); // Assume 60 FPS for particles
     RenderAchievementNotifications(renderer);
 }
@@ -708,6 +729,16 @@ bool GameState::Save(const std::string& filepath) {
         if (i < m_Achievements.size() - 1) file << ",";
         file << "\n";
     }
+    file << "  ],\n";
+
+    // Research Tree
+    file << "  \"research\": [\n";
+    auto researchedNodes = m_ResearchTree.GetResearchedNodes();
+    for (size_t i = 0; i < researchedNodes.size(); i++) {
+        file << "    " << static_cast<i32>(researchedNodes[i]->id);
+        if (i < researchedNodes.size() - 1) file << ",";
+        file << "\n";
+    }
     file << "  ]\n";
 
     file << "}\n";
@@ -728,21 +759,30 @@ bool GameState::Load(const std::string& filepath) {
         std::string line;
         bool inStatistics = false;
         bool inAchievements = false;
+        bool inResearch = false;
 
         while (std::getline(file, line)) {
             // Track sections
             if (line.find("\"statistics\"") != std::string::npos) {
                 inStatistics = true;
                 inAchievements = false;
+                inResearch = false;
                 continue;
             } else if (line.find("\"achievements\"") != std::string::npos) {
                 inStatistics = false;
                 inAchievements = true;
+                inResearch = false;
+                continue;
+            } else if (line.find("\"research\"") != std::string::npos) {
+                inStatistics = false;
+                inAchievements = false;
+                inResearch = true;
                 continue;
             } else if (line.find("}") != std::string::npos || line.find("]") != std::string::npos) {
                 if (line.find("},") == std::string::npos) {
                     inStatistics = false;
                     inAchievements = false;
+                    inResearch = false;
                 }
             }
 
@@ -762,6 +802,28 @@ bool GameState::Load(const std::string& filepath) {
                 if (achId >= 0 && achId < static_cast<i32>(m_Achievements.size())) {
                     m_Achievements[achId].unlocked = GameUtils::ParseJsonBool(line, "unlocked");
                     m_Achievements[achId].progress = GameUtils::ParseJsonNumber(line, "progress");
+                }
+            } else if (inResearch) {
+                // Parse research IDs (simple number per line)
+                // Remove whitespace and commas
+                std::string trimmed = line;
+                trimmed.erase(std::remove_if(trimmed.begin(), trimmed.end(),
+                    [](char c) { return std::isspace(c) || c == ','; }), trimmed.end());
+
+                if (!trimmed.empty() && std::isdigit(trimmed[0])) {
+                    try {
+                        i32 researchId = std::stoi(trimmed);
+                        if (researchId >= 0 && researchId < static_cast<i32>(ResearchID::COUNT)) {
+                            ResearchID id = static_cast<ResearchID>(researchId);
+                            ResearchNode* node = m_ResearchTree.GetNode(id);
+                            if (node) {
+                                node->unlocked = true;
+                                node->researched = true;
+                            }
+                        }
+                    } catch (...) {
+                        // Ignore parse errors
+                    }
                 }
             } else {
                 // Parse main game state
@@ -794,6 +856,13 @@ bool GameState::Load(const std::string& filepath) {
         }
 
         file.close();
+
+        // After loading, unlock available research based on current prestige level
+        m_ResearchTree.UnlockAvailableResearch(m_Timeline.completedResets, m_ResearchTree.GetResearchedCount());
+
+        // Apply research bonuses to all stations
+        UpdateResearchBonuses();
+
         Log::Infof("Game loaded from ", filepath);
         return true;
     } catch (const std::exception& e) {
@@ -1260,5 +1329,224 @@ void GameState::RenderAchievementNotifications(Renderer* renderer) {
     // Clear old notifications (keep last 3)
     while (m_RecentUnlocks.size() > 3) {
         m_RecentUnlocks.erase(m_RecentUnlocks.begin());
+    }
+}
+
+// Research Tree UI Rendering
+void GameState::RenderResearchTree(Renderer* renderer) {
+    if (!m_ShowResearch) return;
+
+    // Background overlay
+    Rect bg(0, 0, static_cast<f32>(renderer->GetWidth()), static_cast<f32>(renderer->GetHeight()));
+    renderer->DrawRect(bg, Color(0.0f, 0.0f, 0.0f, 0.8f), true);
+
+    // Research panel
+    f32 panelWidth = 900.0f;
+    f32 panelHeight = 650.0f;
+    f32 panelX = (renderer->GetWidth() - panelWidth) / 2.0f;
+    f32 panelY = (renderer->GetHeight() - panelHeight) / 2.0f;
+
+    Rect panel(panelX, panelY, panelWidth, panelHeight);
+    renderer->DrawRect(panel, Color(0.1f, 0.1f, 0.15f, 1.0f), true);
+    renderer->DrawRect(panel, Color::QuantumBlue(), false);
+
+    // Title
+    Vec2 titlePos(panelX + 20.0f, panelY + 15.0f);
+    renderer->DrawText("🔬 Research Tree", titlePos, Color::QuantumBlue(), 24.0f);
+
+    // Close button hint
+    Vec2 closeHintPos(panelX + panelWidth - 120.0f, panelY + 18.0f);
+    renderer->DrawText("[R to Close]", closeHintPos, Color(0.7f, 0.7f, 0.7f, 1.0f), 12.0f);
+
+    // Research count
+    i32 researched = m_ResearchTree.GetResearchedCount();
+    i32 total = static_cast<i32>(ResearchID::COUNT);
+    std::string countText = "Researched: " + std::to_string(researched) + "/" + std::to_string(total);
+    Vec2 countPos(panelX + 20.0f, panelY + 45.0f);
+    renderer->DrawText(countText, countPos, Color(0.9f, 0.9f, 1.0f, 1.0f), 14.0f);
+
+    // Available research nodes
+    f32 nodeStartY = panelY + 80.0f;
+    f32 nodeX = panelX + 20.0f;
+    f32 nodeWidth = panelWidth - 40.0f;
+    f32 nodeHeight = 100.0f;
+    f32 nodeSpacing = 10.0f;
+
+    auto availableNodes = m_ResearchTree.GetAvailableResearch(m_Timeline.completedResets);
+    auto researchedNodes = m_ResearchTree.GetResearchedNodes();
+
+    // Show available research first
+    i32 displayedCount = 0;
+    i32 maxDisplay = 5;
+
+    for (const ResearchNode* node : availableNodes) {
+        if (displayedCount >= maxDisplay) break;
+
+        f32 nodeY = nodeStartY + (nodeHeight + nodeSpacing) * displayedCount;
+
+        // Node background
+        bool canAfford = CanAffordResearch(node->id);
+        Color nodeBg = canAfford ? Color(0.2f, 0.3f, 0.2f, 1.0f) : Color(0.2f, 0.2f, 0.25f, 1.0f);
+        Color nodeBorder = canAfford ? Color::CoherenceGreen() : Color::QuantumBlue();
+
+        Rect nodeRect(nodeX, nodeY, nodeWidth, nodeHeight);
+        renderer->DrawRect(nodeRect, nodeBg, true);
+        renderer->DrawRect(nodeRect, nodeBorder, false);
+
+        // Node name
+        Vec2 namePos(nodeX + 10.0f, nodeY + 10.0f);
+        renderer->DrawText(node->name, namePos, Color::White(), 16.0f);
+
+        // Node description
+        Vec2 descPos(nodeX + 10.0f, nodeY + 32.0f);
+        renderer->DrawText(node->description, descPos, Color(0.8f, 0.8f, 0.9f, 1.0f), 12.0f);
+
+        // Costs
+        f32 costY = nodeY + 55.0f;
+        std::string costText = "Cost: ";
+        if (node->qubitCost > 0) {
+            costText += GameUtils::FormatNumber(node->qubitCost) + " Qubits  ";
+        }
+        if (node->coherenceCost > 0) {
+            costText += GameUtils::FormatNumber(node->coherenceCost) + " Coherence  ";
+        }
+        if (node->entanglementCost > 0) {
+            costText += GameUtils::FormatNumber(node->entanglementCost) + " Entanglement  ";
+        }
+        if (node->photonCost > 0) {
+            costText += std::to_string(node->photonCost) + " Photons";
+        }
+
+        Vec2 costPos(nodeX + 10.0f, costY);
+        Color costColor = canAfford ? Color::CoherenceGreen() : Color::QuantumPurple();
+        renderer->DrawText(costText, costPos, costColor, 11.0f);
+
+        // Prerequisites
+        if (!node->prerequisites.empty()) {
+            std::string prereqText = "Requires: ";
+            for (size_t i = 0; i < node->prerequisites.size(); i++) {
+                const ResearchNode* prereq = m_ResearchTree.GetNode(node->prerequisites[i]);
+                if (prereq) {
+                    prereqText += prereq->name;
+                    if (i < node->prerequisites.size() - 1) prereqText += ", ";
+                }
+            }
+            Vec2 prereqPos(nodeX + 10.0f, costY + 18.0f);
+            renderer->DrawText(prereqText, prereqPos, Color(0.7f, 0.7f, 0.7f, 1.0f), 10.0f);
+        }
+
+        displayedCount++;
+    }
+
+    // Show researched nodes count if no available research
+    if (availableNodes.empty()) {
+        Vec2 noResearchPos(panelX + panelWidth / 2.0f - 150.0f, panelY + 200.0f);
+        renderer->DrawText("No research available at current prestige level!", noResearchPos,
+                          Color(0.7f, 0.7f, 0.7f, 1.0f), 14.0f);
+
+        // Show some completed research
+        Vec2 completedTitlePos(panelX + 20.0f, panelY + 250.0f);
+        renderer->DrawText("Completed Research:", completedTitlePos, Color::CoherenceGreen(), 14.0f);
+
+        i32 completedCount = 0;
+        for (const ResearchNode* node : researchedNodes) {
+            if (completedCount >= 8) break;
+
+            Vec2 completedPos(panelX + 30.0f, panelY + 280.0f + completedCount * 20.0f);
+            std::string completedText = "✓ " + node->name;
+            renderer->DrawText(completedText, completedPos, Color(0.8f, 0.9f, 0.8f, 1.0f), 12.0f);
+
+            completedCount++;
+        }
+    }
+
+    // Bonuses summary
+    f32 bonusY = panelY + panelHeight - 60.0f;
+    Vec2 bonusTitle(panelX + 20.0f, bonusY);
+    renderer->DrawText("Active Bonuses:", bonusTitle, Color::QuantumBlue(), 14.0f);
+
+    f64 prodMult = m_ResearchTree.GetTotalProductionMultiplier();
+    f64 obsMult = m_ResearchTree.GetTotalObservationBonus();
+    f64 cohMult = m_ResearchTree.GetTotalCoherenceBonus();
+
+    std::string bonusText = "Production: +" + std::to_string(static_cast<i32>((prodMult - 1.0) * 100.0)) + "%  ";
+    bonusText += "Observation: +" + std::to_string(static_cast<i32>(obsMult * 100.0)) + "%  ";
+    bonusText += "Coherence: +" + std::to_string(static_cast<i32>(cohMult * 100.0)) + "%";
+
+    Vec2 bonusPos(panelX + 20.0f, bonusY + 22.0f);
+    renderer->DrawText(bonusText, bonusPos, Color::CoherenceGreen(), 12.0f);
+}
+
+// Research Tree Methods
+bool GameState::CanAffordResearch(ResearchID id) const {
+    const ResearchNode* node = m_ResearchTree.GetNode(id);
+    if (!node) return false;
+
+    // Check resource costs
+    if (GetResource(QuantumResource::Qubits) < node->qubitCost) return false;
+    if (GetResource(QuantumResource::Coherence) < node->coherenceCost) return false;
+    if (GetResource(QuantumResource::Entanglement) < node->entanglementCost) return false;
+
+    // Check photon cost
+    if (m_Timeline.photons < node->photonCost) return false;
+
+    // Check if can be researched
+    if (!m_ResearchTree.CanResearch(id, m_Timeline.completedResets)) return false;
+
+    return true;
+}
+
+bool GameState::PurchaseResearch(ResearchID id) {
+    if (!CanAffordResearch(id)) return false;
+
+    ResearchNode* node = m_ResearchTree.GetNode(id);
+    if (!node) return false;
+
+    // Spend resources
+    SpendResource(QuantumResource::Qubits, node->qubitCost);
+    SpendResource(QuantumResource::Coherence, node->coherenceCost);
+    SpendResource(QuantumResource::Entanglement, node->entanglementCost);
+    m_Timeline.photons -= node->photonCost;
+
+    // Research it
+    m_ResearchTree.Research(id);
+
+    // Update bonuses
+    UpdateResearchBonuses();
+
+    // Unlock new research
+    m_ResearchTree.UnlockAvailableResearch(m_Timeline.completedResets, m_ResearchTree.GetResearchedCount());
+
+    // Spawn celebration particles
+    SpawnParticleBurst(Vec2(640.0f, 360.0f), Color::QuantumPurple(), 20);
+
+    Log::Info("Researched: " + node->name);
+
+    return true;
+}
+
+void GameState::UpdateResearchBonuses() {
+    // Apply research bonuses to all stations
+    f64 productionMult = m_ResearchTree.GetTotalProductionMultiplier();
+
+    for (auto& station : m_Stations) {
+        if (station.unlocked && station.level > 0) {
+            station.currentProduction = station.baseProduction * station.level * productionMult;
+        }
+    }
+
+    // Update photon bonus multiplier with research
+    m_Timeline.photonBonus = 1.0 + (m_Timeline.photons * 0.1);
+
+    // Check for PhotonMultiplier research
+    if (m_ResearchTree.IsResearched(ResearchID::PhotonMultiplier)) {
+        m_Timeline.photonBonus *= 1.5; // +50% photon effectiveness
+    }
+
+    // Apply production multiplier from timeline photons
+    for (auto& station : m_Stations) {
+        if (station.unlocked && station.level > 0) {
+            station.currentProduction *= m_Timeline.photonBonus;
+        }
     }
 }
