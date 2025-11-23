@@ -58,9 +58,18 @@ include_directories(
 find_package(OpenGL REQUIRED)
 
 # SDL2 - cross-platform windowing and input
-set(SDL2_FOUND FALSE)
+# Try vcpkg first (if using CLion with vcpkg integration)
+find_package(SDL2 CONFIG QUIET)
 
-if(PLATFORM_WINDOWS)
+if(SDL2_FOUND)
+    message(STATUS "Found SDL2 via vcpkg/find_package")
+    # vcpkg provides SDL2::SDL2 and SDL2::SDL2main targets
+    set(SDL2_LIBRARIES SDL2::SDL2main SDL2::SDL2)
+    set(SDL2_FOUND TRUE)
+endif()
+
+# If vcpkg didn't find it, use platform-specific methods
+if(NOT SDL2_FOUND AND PLATFORM_WINDOWS)
     # Windows: Look for SDL2 in common locations
     if(DEFINED ENV{SDL2_DIR})
         set(SDL2_DIR $ENV{SDL2_DIR})
@@ -169,23 +178,24 @@ endif()
 # Correct order for MinGW: mingw32 -> SDL2main -> SDL2 -> winmm -> opengl32
 
 if(PLATFORM_WINDOWS)
-    # MinGW needs mingw32 linked FIRST for proper startup
-    if(MINGW)
-        target_link_libraries(${PROJECT_NAME} mingw32)
-    endif()
-
     # SDL2 must come BEFORE winmm on MinGW!
     if(SDL2_FOUND)
-        target_include_directories(${PROJECT_NAME} PRIVATE ${SDL2_INCLUDE_DIRS})
-
-        if(TARGET SDL2::SDL2)
-            target_link_libraries(${PROJECT_NAME} SDL2::SDL2)
+        # vcpkg provides clean targets
+        if(TARGET SDL2::SDL2main)
+            message(STATUS "Linking SDL2 via vcpkg targets")
+            target_link_libraries(${PROJECT_NAME} SDL2::SDL2main SDL2::SDL2)
         else()
-            target_link_libraries(${PROJECT_NAME} ${SDL2_LIBRARIES})
-        endif()
+            # Manual SDL2: MinGW needs mingw32 linked FIRST
+            if(MINGW)
+                target_link_libraries(${PROJECT_NAME} mingw32)
+            endif()
 
-        message(STATUS "SDL2 include dirs: ${SDL2_INCLUDE_DIRS}")
-        message(STATUS "SDL2 libraries: ${SDL2_LIBRARIES}")
+            target_include_directories(${PROJECT_NAME} PRIVATE ${SDL2_INCLUDE_DIRS})
+            target_link_libraries(${PROJECT_NAME} ${SDL2_LIBRARIES})
+
+            message(STATUS "SDL2 include dirs: ${SDL2_INCLUDE_DIRS}")
+            message(STATUS "SDL2 libraries: ${SDL2_LIBRARIES}")
+        endif()
     else()
         message(FATAL_ERROR "SDL2 is required but was not found!")
     endif()
@@ -201,11 +211,10 @@ elseif(PLATFORM_LINUX)
 
     # SDL2 for Linux
     if(SDL2_FOUND)
-        target_include_directories(${PROJECT_NAME} PRIVATE ${SDL2_INCLUDE_DIRS})
-
         if(TARGET SDL2::SDL2)
             target_link_libraries(${PROJECT_NAME} SDL2::SDL2)
         else()
+            target_include_directories(${PROJECT_NAME} PRIVATE ${SDL2_INCLUDE_DIRS})
             target_link_libraries(${PROJECT_NAME} ${SDL2_LIBRARIES})
         endif()
     else()
@@ -227,11 +236,10 @@ elseif(PLATFORM_MACOS)
 
     # SDL2 for macOS
     if(SDL2_FOUND)
-        target_include_directories(${PROJECT_NAME} PRIVATE ${SDL2_INCLUDE_DIRS})
-
         if(TARGET SDL2::SDL2)
             target_link_libraries(${PROJECT_NAME} SDL2::SDL2)
         else()
+            target_include_directories(${PROJECT_NAME} PRIVATE ${SDL2_INCLUDE_DIRS})
             target_link_libraries(${PROJECT_NAME} ${SDL2_LIBRARIES})
         endif()
     else()
