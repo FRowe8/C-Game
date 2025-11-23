@@ -41,6 +41,11 @@ else()
     else()
         add_compile_options(-O3)
     endif()
+
+    # MinGW specific: Use console subsystem to allow regular main() entry point
+    if(WIN32)
+        add_link_options(-mconsole)
+    endif()
 endif()
 
 # Include directories
@@ -141,7 +146,28 @@ else()
     )
 endif()
 
-# Link libraries
+# Link libraries - ORDER MATTERS for MinGW!
+# Platform-specific libraries first
+if(PLATFORM_WINDOWS)
+    # MinGW needs mingw32 linked FIRST for proper startup
+    if(MINGW)
+        target_link_libraries(${PROJECT_NAME} mingw32)
+    endif()
+    target_link_libraries(${PROJECT_NAME} winmm)
+elseif(PLATFORM_LINUX)
+    target_link_libraries(${PROJECT_NAME} pthread dl)
+elseif(PLATFORM_MACOS)
+    find_library(COCOA_LIBRARY Cocoa)
+    find_library(IOKIT_LIBRARY IOKit)
+    find_library(COREVIDEO_LIBRARY CoreVideo)
+    target_link_libraries(${PROJECT_NAME}
+        ${COCOA_LIBRARY}
+        ${IOKIT_LIBRARY}
+        ${COREVIDEO_LIBRARY}
+    )
+endif()
+
+# SDL2 libraries
 if(SDL2_FOUND)
     target_include_directories(${PROJECT_NAME} PRIVATE ${SDL2_INCLUDE_DIRS})
 
@@ -157,23 +183,8 @@ else()
     message(FATAL_ERROR "SDL2 is required but was not found!")
 endif()
 
+# OpenGL
 target_link_libraries(${PROJECT_NAME} OpenGL::GL)
-
-# Platform-specific libraries
-if(PLATFORM_WINDOWS)
-    target_link_libraries(${PROJECT_NAME} winmm)
-elseif(PLATFORM_LINUX)
-    target_link_libraries(${PROJECT_NAME} pthread dl)
-elseif(PLATFORM_MACOS)
-    find_library(COCOA_LIBRARY Cocoa)
-    find_library(IOKIT_LIBRARY IOKit)
-    find_library(COREVIDEO_LIBRARY CoreVideo)
-    target_link_libraries(${PROJECT_NAME}
-        ${COCOA_LIBRARY}
-        ${IOKIT_LIBRARY}
-        ${COREVIDEO_LIBRARY}
-    )
-endif()
 
 # Install rules
 install(TARGETS ${PROJECT_NAME}
