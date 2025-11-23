@@ -1,3 +1,7 @@
+// Define SDL_MAIN_HANDLED to avoid SDL2main.lib dependency
+// This is needed when using MinGW with MSVC-compiled SDL2 libraries
+#define SDL_MAIN_HANDLED
+
 #include "Application.h"
 #include "Logger.h"
 #include <cstdlib>

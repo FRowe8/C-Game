@@ -83,15 +83,10 @@ if(PLATFORM_WINDOWS)
         PATHS ${SDL2_SEARCH_PATHS}
     )
 
-    find_library(SDL2MAIN_LIBRARY
-        NAMES SDL2main
-        PATH_SUFFIXES lib lib/x64 lib/x86
-        PATHS ${SDL2_SEARCH_PATHS}
-    )
-
     if(SDL2_INCLUDE_DIR AND SDL2_LIBRARY)
         set(SDL2_FOUND TRUE)
-        set(SDL2_LIBRARIES ${SDL2_LIBRARY} ${SDL2MAIN_LIBRARY})
+        # Don't link SDL2main - we use SDL_MAIN_HANDLED for MinGW compatibility
+        set(SDL2_LIBRARIES ${SDL2_LIBRARY})
         set(SDL2_INCLUDE_DIRS ${SDL2_INCLUDE_DIR})
         message(STATUS "Found SDL2: ${SDL2_LIBRARY}")
     else()
