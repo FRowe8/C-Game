@@ -166,15 +166,55 @@ else()
 endif()
 
 # Link libraries - ORDER MATTERS for MinGW!
-# Platform-specific libraries first
+# Correct order for MinGW: mingw32 -> SDL2main -> SDL2 -> winmm -> opengl32
+
 if(PLATFORM_WINDOWS)
     # MinGW needs mingw32 linked FIRST for proper startup
     if(MINGW)
         target_link_libraries(${PROJECT_NAME} mingw32)
     endif()
+
+    # SDL2 must come BEFORE winmm on MinGW!
+    if(SDL2_FOUND)
+        target_include_directories(${PROJECT_NAME} PRIVATE ${SDL2_INCLUDE_DIRS})
+
+        if(TARGET SDL2::SDL2)
+            target_link_libraries(${PROJECT_NAME} SDL2::SDL2)
+        else()
+            target_link_libraries(${PROJECT_NAME} ${SDL2_LIBRARIES})
+        endif()
+
+        message(STATUS "SDL2 include dirs: ${SDL2_INCLUDE_DIRS}")
+        message(STATUS "SDL2 libraries: ${SDL2_LIBRARIES}")
+    else()
+        message(FATAL_ERROR "SDL2 is required but was not found!")
+    endif()
+
+    # Now link Windows libraries
     target_link_libraries(${PROJECT_NAME} winmm)
+
+    # OpenGL
+    target_link_libraries(${PROJECT_NAME} OpenGL::GL)
+
 elseif(PLATFORM_LINUX)
     target_link_libraries(${PROJECT_NAME} pthread dl)
+
+    # SDL2 for Linux
+    if(SDL2_FOUND)
+        target_include_directories(${PROJECT_NAME} PRIVATE ${SDL2_INCLUDE_DIRS})
+
+        if(TARGET SDL2::SDL2)
+            target_link_libraries(${PROJECT_NAME} SDL2::SDL2)
+        else()
+            target_link_libraries(${PROJECT_NAME} ${SDL2_LIBRARIES})
+        endif()
+    else()
+        message(FATAL_ERROR "SDL2 is required but was not found!")
+    endif()
+
+    # OpenGL
+    target_link_libraries(${PROJECT_NAME} OpenGL::GL)
+
 elseif(PLATFORM_MACOS)
     find_library(COCOA_LIBRARY Cocoa)
     find_library(IOKIT_LIBRARY IOKit)
@@ -184,26 +224,23 @@ elseif(PLATFORM_MACOS)
         ${IOKIT_LIBRARY}
         ${COREVIDEO_LIBRARY}
     )
-endif()
 
-# SDL2 libraries
-if(SDL2_FOUND)
-    target_include_directories(${PROJECT_NAME} PRIVATE ${SDL2_INCLUDE_DIRS})
+    # SDL2 for macOS
+    if(SDL2_FOUND)
+        target_include_directories(${PROJECT_NAME} PRIVATE ${SDL2_INCLUDE_DIRS})
 
-    if(TARGET SDL2::SDL2)
-        target_link_libraries(${PROJECT_NAME} SDL2::SDL2)
+        if(TARGET SDL2::SDL2)
+            target_link_libraries(${PROJECT_NAME} SDL2::SDL2)
+        else()
+            target_link_libraries(${PROJECT_NAME} ${SDL2_LIBRARIES})
+        endif()
     else()
-        target_link_libraries(${PROJECT_NAME} ${SDL2_LIBRARIES})
+        message(FATAL_ERROR "SDL2 is required but was not found!")
     endif()
 
-    message(STATUS "SDL2 include dirs: ${SDL2_INCLUDE_DIRS}")
-    message(STATUS "SDL2 libraries: ${SDL2_LIBRARIES}")
-else()
-    message(FATAL_ERROR "SDL2 is required but was not found!")
+    # OpenGL
+    target_link_libraries(${PROJECT_NAME} OpenGL::GL)
 endif()
-
-# OpenGL
-target_link_libraries(${PROJECT_NAME} OpenGL::GL)
 
 # Install rules
 install(TARGETS ${PROJECT_NAME}
