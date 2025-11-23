@@ -2,18 +2,36 @@
 
 ## Super Easy Method (Recommended)
 
+### Step 0: Check What You Need (Optional)
+Run this to see what's missing:
+```cmd
+check_setup.bat
+```
+
 ### Step 1: Install CMake
-Download and install CMake from: https://cmake.org/download/
-- Choose "Windows x64 Installer"
-- During installation, select "Add CMake to system PATH"
+**Download**: https://cmake.org/download/
+- Choose **"Windows x64 Installer"** (cmake-3.x.x-windows-x86_64.msi)
+- Run the installer
+- **⚠️ CRITICAL**: Select **"Add CMake to system PATH"** during installation
+
+**Detailed instructions**: See [INSTALL_CMAKE.md](INSTALL_CMAKE.md)
 
 ### Step 2: Install Visual Studio Build Tools
-Download and install: https://visualstudio.microsoft.com/downloads/
+**Download**: https://visualstudio.microsoft.com/downloads/
 - Scroll to "Tools for Visual Studio"
-- Download "Build Tools for Visual Studio 2022" (FREE)
-- During installation, select "Desktop development with C++"
+- Download **"Build Tools for Visual Studio 2022"** (FREE)
+- During installation, select **"Desktop development with C++"**
 
-### Step 3: Build the Game
+### Step 3: Verify Installation (Recommended)
+Close and reopen Command Prompt, then test:
+```cmd
+cmake --version
+```
+Should show: `cmake version 3.x.x`
+
+If it says "not recognized", see [INSTALL_CMAKE.md](INSTALL_CMAKE.md) for troubleshooting.
+
+### Step 4: Build the Game
 1. Open Command Prompt (cmd)
 2. Navigate to the game folder:
    ```cmd
@@ -27,11 +45,12 @@ Download and install: https://visualstudio.microsoft.com/downloads/
 5. Answer "Y" when prompted
 6. After SDL2 installs, open a NEW terminal and run `build.bat` again
 
-### Step 4: Play!
+### Step 5: Play!
 ```cmd
 cd build\Release
 QuantumIdle.exe
 ```
+Or just double-click: `build\Release\QuantumIdle.exe`
 
 ---
 

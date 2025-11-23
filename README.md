@@ -29,13 +29,20 @@ A custom C++ game engine designed for creating engaging idle games across multip
 
 Choose your platform:
 
-#### **Windows** (Easiest!)
-```cmd
-build.bat
-```
-The script will automatically offer to download SDL2 for you!
+#### **Windows**
 
-**👉 See [QUICKSTART_WINDOWS.md](QUICKSTART_WINDOWS.md) for detailed Windows instructions**
+**First time?** You need CMake and Visual Studio Build Tools:
+- **CMake**: https://cmake.org/download/ (Choose "Windows x64 Installer", enable "Add to PATH")
+- **Build Tools**: https://visualstudio.microsoft.com/downloads/ (Choose "Build Tools for Visual Studio 2022")
+
+Then run:
+```cmd
+check_setup.bat   (optional - checks if everything is installed)
+build.bat         (builds the game, auto-downloads SDL2)
+```
+
+**👉 See [QUICKSTART_WINDOWS.md](QUICKSTART_WINDOWS.md) for step-by-step instructions**
+**👉 See [INSTALL_CMAKE.md](INSTALL_CMAKE.md) if you get "cmake not recognized"**
 
 #### **Linux**
 ```bash
