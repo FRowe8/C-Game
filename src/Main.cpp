@@ -4,8 +4,11 @@
 #include <cstdlib>
 #include <ctime>
 
-// Use SDL's main macro for cross-platform compatibility
-#undef main
+// On Windows with MinGW, we need to undef SDL's main macro
+// On Emscripten, we need to keep it for proper initialization
+#if defined(_WIN32) && !defined(__EMSCRIPTEN__)
+    #undef main
+#endif
 
 int main(int argc, char* argv[]) {
 
