@@ -81,30 +81,35 @@ if(PLATFORM_WINDOWS)
         PATHS ${SDL2_SEARCH_PATHS}
     )
 
-    # Find library
-    find_library(SDL2_LIBRARY
-        NAMES SDL2
-        PATH_SUFFIXES lib lib/x64 lib/x86
-        PATHS ${SDL2_SEARCH_PATHS}
-    )
-
-    # Find SDL2main for MinGW
-    find_library(SDL2MAIN_LIBRARY
-        NAMES SDL2main
-        PATH_SUFFIXES lib lib/x64 lib/x86
-        PATHS ${SDL2_SEARCH_PATHS}
-    )
+    # For MinGW, directly use the library files we know exist
+    if(MINGW)
+        message(STATUS "MinGW detected - using hardcoded SDL2 paths")
+        set(SDL2_LIBRARY "C:/SDL2/lib/libSDL2.dll.a")
+        set(SDL2MAIN_LIBRARY "C:/SDL2/lib/libSDL2main.a")
+        message(STATUS "SDL2_LIBRARY set to: ${SDL2_LIBRARY}")
+        message(STATUS "SDL2MAIN_LIBRARY set to: ${SDL2MAIN_LIBRARY}")
+    else()
+        # For MSVC, use find_library
+        find_library(SDL2_LIBRARY
+            NAMES SDL2
+            PATH_SUFFIXES lib lib/x64 lib/x86
+            PATHS ${SDL2_SEARCH_PATHS}
+        )
+    endif()
 
     if(SDL2_INCLUDE_DIR AND SDL2_LIBRARY)
         set(SDL2_FOUND TRUE)
-        # Link both SDL2 and SDL2main for proper MinGW support
-        if(SDL2MAIN_LIBRARY)
+        # MinGW needs SDL2main linked FIRST
+        if(MINGW AND SDL2MAIN_LIBRARY)
+            message(STATUS "Adding SDL2main to libraries for MinGW")
             set(SDL2_LIBRARIES ${SDL2MAIN_LIBRARY} ${SDL2_LIBRARY})
         else()
+            message(STATUS "Using SDL2 without SDL2main")
             set(SDL2_LIBRARIES ${SDL2_LIBRARY})
         endif()
         set(SDL2_INCLUDE_DIRS ${SDL2_INCLUDE_DIR})
         message(STATUS "Found SDL2: ${SDL2_LIBRARY}")
+        message(STATUS "SDL2_LIBRARIES final value: ${SDL2_LIBRARIES}")
         if(SDL2MAIN_LIBRARY)
             message(STATUS "Found SDL2main: ${SDL2MAIN_LIBRARY}")
         endif()
