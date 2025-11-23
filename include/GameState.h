@@ -210,6 +210,15 @@ private:
     void RenderResources(Renderer* renderer);
     void RenderStations(Renderer* renderer);
     void RenderParticleEffects(Renderer* renderer, f64 deltaTime);
+    void RenderAchievements(Renderer* renderer);
+    void RenderStatistics(Renderer* renderer);
+    void RenderActiveEvent(Renderer* renderer);
+    void RenderAchievementNotifications(Renderer* renderer);
+
+    // Particle system helpers
+    void SpawnParticle(const Vec2& position, const Color& color, f64 lifetime = 1.0);
+    void SpawnParticleBurst(const Vec2& position, const Color& color, i32 count = 10);
+    void UpdateParticles(f64 deltaTime);
 
     // Resources
     f64 m_Resources[3]; // Qubits, Coherence, Entanglement
