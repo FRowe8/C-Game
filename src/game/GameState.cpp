@@ -8,6 +8,42 @@
 #include <cmath>
 #include <algorithm>
 
+// Achievement implementation
+Achievement::Achievement()
+    : id(AchievementID::FirstQubit), unlocked(false),
+      progress(0), target(1), rewardQubits(0), rewardPhotons(0) {
+}
+
+// GameStatistics implementation
+GameStatistics::GameStatistics()
+    : totalQubitsEarned(0), totalCoherenceEarned(0), totalEntanglementEarned(0),
+      totalObservations(0), totalUpgrades(0), totalPrestigesPerformed(0),
+      sessionQubits(0), sessionTime(0), sessionObservations(0),
+      highestQubits(0), fastestPrestige(99999.0), longestStreak(0),
+      currentStreak(0), lastLoginTimestamp(0) {
+}
+
+void GameStatistics::Reset() {
+    sessionQubits = 0;
+    sessionTime = 0;
+    sessionObservations = 0;
+}
+
+void GameStatistics::UpdateSession(f64 deltaTime) {
+    sessionTime += deltaTime;
+}
+
+// QuantumEvent implementation
+QuantumEvent::QuantumEvent()
+    : type(QuantumEventType::WaveCollapse), duration(30.0),
+      timeRemaining(0), multiplier(2.0), active(false) {
+}
+
+// QuantumTimeline implementation
+QuantumTimeline::QuantumTimeline()
+    : completedResets(0), photons(0), photonBonus(1.0) {
+}
+
 // ResearchStation implementation
 ResearchStation::ResearchStation()
     : baseProduction(0), currentProduction(0), level(0),
@@ -37,18 +73,32 @@ void ResearchStation::Observe(GameState* state) {
     f64 roll = static_cast<f64>(rand()) / RAND_MAX;
     f64 collapsedValue = superpositionValue;
 
+    // Check for lucky observation event
+    QuantumEvent* activeEvent = state->GetActiveEvent();
+    f64 observeBonus = 1.0;
+    if (activeEvent && activeEvent->type == QuantumEventType::LuckyObservation) {
+        superpositionProbability = 1.0; // Guaranteed success
+    } else if (activeEvent && activeEvent->type == QuantumEventType::WaveCollapse) {
+        observeBonus = activeEvent->multiplier;
+    }
+
     if (roll < superpositionProbability) {
         // Success - full value
-        collapsedValue *= 1.0;
+        collapsedValue *= 1.0 * observeBonus;
     } else {
         // Partial collapse
-        collapsedValue *= (0.5 + roll * 0.5);
+        collapsedValue *= (0.5 + roll * 0.5) * observeBonus;
     }
 
     state->AddResource(resourceType, collapsedValue);
     superpositionValue = 0;
 
-    // Spawn particles
+    // Update statistics
+    auto& stats = state->GetStatistics();
+    stats.totalObservations++;
+    stats.sessionObservations++;
+
+    // Spawn particles for visual feedback
     // (Will be called from GameState with renderer access)
 }
 
@@ -88,15 +138,13 @@ bool UIButton::WasClicked(const Vec2& mousePos, bool mousePressed) {
 // GameState implementation
 GameState::GameState()
     : m_TotalTimePlayed(0), m_TimeSinceLastSave(0),
-      m_Coherence(100), m_MaxCoherence(100), m_CoherenceDecayRate(1.0) {
+      m_Coherence(100), m_MaxCoherence(100), m_CoherenceDecayRate(1.0),
+      m_CurrentEvent(nullptr), m_TimeSinceLastEvent(0), m_EventCooldown(120.0),
+      m_LastSaveTimestamp(0), m_ShowAchievements(false), m_ShowStats(false) {
 
     for (int i = 0; i < 3; i++) {
         m_Resources[i] = 0;
     }
-
-    m_Timeline.completedResets = 0;
-    m_Timeline.photons = 0;
-    m_Timeline.photonBonus = 1.0;
 }
 
 GameState::~GameState() {
@@ -108,6 +156,47 @@ void GameState::Initialize() {
     InitializeStations();
     InitializeUI();
 
+    // Initialize Achievements
+    struct AchievementDef {
+        AchievementID id;
+        const char* name;
+        const char* desc;
+        f64 target;
+        f64 rewardQ;
+        f64 rewardP;
+    };
+
+    AchievementDef achDefs[] = {
+        {AchievementID::FirstQubit, "First Steps", "Earn your first qubit", 1, 10, 0},
+        {AchievementID::Observe100Times, "Observer", "Observe 100 times", 100, 100, 1},
+        {AchievementID::Reach1Million, "Millionaire", "Reach 1 million qubits", 1000000, 5000, 5},
+        {AchievementID::FirstPrestige, "Quantum Leap", "Perform your first prestige", 1, 0, 10},
+        {AchievementID::TenStations, "Industrialist", "Own 10 research stations", 10, 1000, 2},
+        {AchievementID::MaxCoherence, "Perfect Stability", "Reach maximum coherence", 1, 500, 1},
+        {AchievementID::Entangle5Pairs, "Entangled", "Create 5 entanglement pairs", 5, 2000, 3},
+        {AchievementID::OfflineMillionaire, "Passive Income", "Earn 1M qubits offline", 1000000, 10000, 5},
+        {AchievementID::SpeedRunner, "Speed Runner", "Prestige within 10 minutes", 1, 5000, 10},
+        {AchievementID::Hoarder, "Hoarder", "Save 100M qubits", 100000000, 50000, 20},
+        {AchievementID::QuantumMaster, "Quantum Master", "Reach prestige level 10", 10, 100000, 50},
+        {AchievementID::Collector, "Collector", "Unlock all station types", 5, 10000, 10},
+        {AchievementID::EventHunter, "Event Hunter", "Experience 50 events", 50, 5000, 5},
+        {AchievementID::WeekStreak, "Dedicated", "Play 7 days in a row", 7, 20000, 15},
+    };
+
+    m_Achievements.clear();
+    for (const auto& def : achDefs) {
+        Achievement ach;
+        ach.id = def.id;
+        ach.name = def.name;
+        ach.description = def.desc;
+        ach.target = def.target;
+        ach.rewardQubits = def.rewardQ;
+        ach.rewardPhotons = def.rewardP;
+        ach.unlocked = false;
+        ach.progress = 0;
+        m_Achievements.push_back(ach);
+    }
+
     // Give starting resources
     m_Resources[static_cast<int>(QuantumResource::Qubits)] = 10.0;
     m_Resources[static_cast<int>(QuantumResource::Coherence)] = 50.0;
@@ -118,6 +207,7 @@ void GameState::Initialize() {
     if (Platform::FileExists(savePath)) {
         if (Load(savePath)) {
             Log::Info("Save file loaded successfully");
+            CalculateOfflineProgress(); // Calculate what happened while away
         }
     }
 
@@ -204,12 +294,33 @@ void GameState::InitializeUI() {
 void GameState::Update(f64 deltaTime, Input* input, Renderer* renderer) {
     m_TotalTimePlayed += deltaTime;
     m_TimeSinceLastSave += deltaTime;
+    m_TimeSinceLastEvent += deltaTime;
+
+    // Update statistics
+    m_Statistics.UpdateSession(deltaTime);
 
     // Update stations
     UpdateStations(deltaTime);
 
     // Update coherence
     UpdateCoherence(deltaTime);
+
+    // Update quantum events
+    UpdateEvents(deltaTime);
+
+    // Random event chance (every 2 minutes on average)
+    if (m_TimeSinceLastEvent >= m_EventCooldown) {
+        f64 eventChance = 0.3; // 30% chance when cooldown expires
+        if (static_cast<f64>(rand()) / RAND_MAX < eventChance) {
+            TriggerRandomEvent();
+            m_TimeSinceLastEvent = 0;
+        } else {
+            m_TimeSinceLastEvent = m_EventCooldown * 0.8; // Retry sooner
+        }
+    }
+
+    // Check achievements
+    CheckAchievements();
 
     // Update UI
     UpdateUI(input);
@@ -454,6 +565,23 @@ void GameState::RenderUI(Renderer* renderer) {
 
 void GameState::AddResource(QuantumResource type, f64 amount) {
     m_Resources[static_cast<int>(type)] += amount;
+
+    // Track statistics
+    switch (type) {
+        case QuantumResource::Qubits:
+            m_Statistics.totalQubitsEarned += amount;
+            m_Statistics.sessionQubits += amount;
+            if (m_Resources[0] > m_Statistics.highestQubits) {
+                m_Statistics.highestQubits = m_Resources[0];
+            }
+            break;
+        case QuantumResource::Coherence:
+            m_Statistics.totalCoherenceEarned += amount;
+            break;
+        case QuantumResource::Entanglement:
+            m_Statistics.totalEntanglementEarned += amount;
+            break;
+    }
 }
 
 bool GameState::SpendResource(QuantumResource type, f64 amount) {
@@ -579,4 +707,215 @@ bool GameState::Load(const std::string& filepath) {
     file.close();
     Log::Infof("Game loaded from ", filepath);
     return true;
+}
+
+// Achievement System
+void GameState::CheckAchievements() {
+    // Update achievement progress
+    for (auto& ach : m_Achievements) {
+        if (ach.unlocked) continue;
+
+        switch (ach.id) {
+            case AchievementID::FirstQubit:
+                ach.progress = m_Statistics.totalQubitsEarned >= 1 ? 1 : 0;
+                break;
+            case AchievementID::Observe100Times:
+                ach.progress = m_Statistics.totalObservations;
+                break;
+            case AchievementID::Reach1Million:
+                ach.progress = m_Resources[0];
+                break;
+            case AchievementID::FirstPrestige:
+                ach.progress = m_Timeline.completedResets;
+                break;
+            case AchievementID::TenStations:
+                ach.progress = 0;
+                for (const auto& s : m_Stations) {
+                    if (s.unlocked) ach.progress++;
+                }
+                break;
+            case AchievementID::MaxCoherence:
+                ach.progress = (m_Coherence >= m_MaxCoherence) ? 1 : 0;
+                break;
+            case AchievementID::Hoarder:
+                ach.progress = m_Resources[0];
+                break;
+            case AchievementID::QuantumMaster:
+                ach.progress = m_Timeline.completedResets;
+                break;
+            case AchievementID::Collector:
+                ach.progress = 0;
+                for (const auto& s : m_Stations) {
+                    if (s.unlocked) ach.progress++;
+                }
+                break;
+            default:
+                break;
+        }
+
+        // Check if unlocked
+        if (ach.progress >= ach.target && !ach.unlocked) {
+            UnlockAchievement(ach.id);
+        }
+    }
+}
+
+void GameState::UnlockAchievement(AchievementID id) {
+    Achievement* ach = GetAchievement(id);
+    if (!ach || ach->unlocked) return;
+
+    ach->unlocked = true;
+    m_RecentUnlocks.push_back(id);
+
+    // Grant rewards
+    if (ach->rewardQubits > 0) {
+        AddResource(QuantumResource::Qubits, ach->rewardQubits);
+    }
+    if (ach->rewardPhotons > 0) {
+        m_Timeline.photons += ach->rewardPhotons;
+        m_Timeline.photonBonus = 1.0 + (m_Timeline.photons * 0.1);
+    }
+
+    Log::Infof("Achievement Unlocked: ", ach->name);
+}
+
+Achievement* GameState::GetAchievement(AchievementID id) {
+    for (auto& ach : m_Achievements) {
+        if (ach.id == id) return &ach;
+    }
+    return nullptr;
+}
+
+// Quantum Events System
+void GameState::TriggerRandomEvent() {
+    if (m_CurrentEvent && m_CurrentEvent->active) return; // Already has active event
+
+    // Pick random event type
+    int eventType = rand() % static_cast<int>(QuantumEventType::COUNT);
+
+    QuantumEvent event;
+    event.type = static_cast<QuantumEventType>(eventType);
+    event.active = true;
+    event.duration = 30.0 + (rand() % 30); // 30-60 seconds
+    event.timeRemaining = event.duration;
+    event.multiplier = 1.5 + (static_cast<f64>(rand()) / RAND_MAX); // 1.5-2.5x
+
+    switch (event.type) {
+        case QuantumEventType::WaveCollapse:
+            event.name = "Wave Collapse Bonus";
+            event.description = "Observations yield more resources!";
+            break;
+        case QuantumEventType::CoherenceBoost:
+            event.name = "Coherence Surge";
+            event.description = "Coherence decay paused!";
+            m_Coherence = m_MaxCoherence;
+            break;
+        case QuantumEventType::QuantumFluctuation:
+            event.name = "Quantum Fluctuation";
+            event.description = "Random resource bonus!";
+            AddResource(QuantumResource::Qubits, m_Resources[0] * 0.1);
+            AddResource(QuantumResource::Coherence, 50);
+            break;
+        case QuantumEventType::EntanglementSurge:
+            event.name = "Entanglement Surge";
+            event.description = "Free entanglements!";
+            AddResource(QuantumResource::Entanglement, 10);
+            break;
+        case QuantumEventType::TimeDialation:
+            event.name = "Time Dilation";
+            event.description = "Production doubled!";
+            event.multiplier = 2.0;
+            break;
+        case QuantumEventType::LuckyObservation:
+            event.name = "Lucky Observation";
+            event.description = "Next observation guaranteed!";
+            break;
+        case QuantumEventType::ResourceRain:
+            event.name = "Resource Rain";
+            event.description = "Resources falling from the sky!";
+            for (int i = 0; i < 50; i++) {
+                AddResource(QuantumResource::Qubits, 10);
+            }
+            break;
+        default:
+            break;
+    }
+
+    m_Events.push_back(event);
+    m_CurrentEvent = &m_Events.back();
+
+    Log::Infof("Quantum Event: ", event.name);
+}
+
+void GameState::UpdateEvents(f64 deltaTime) {
+    if (m_CurrentEvent && m_CurrentEvent->active) {
+        m_CurrentEvent->timeRemaining -= deltaTime;
+
+        // Apply event effects
+        if (m_CurrentEvent->type == QuantumEventType::TimeDialation) {
+            // Time dilation handled in UpdateStations
+        }
+        if (m_CurrentEvent->type == QuantumEventType::CoherenceBoost) {
+            // Prevent coherence decay
+            if (m_Coherence < m_MaxCoherence) {
+                m_Coherence = m_MaxCoherence;
+            }
+        }
+
+        // End event
+        if (m_CurrentEvent->timeRemaining <= 0) {
+            m_CurrentEvent->active = false;
+            m_CurrentEvent = nullptr;
+        }
+    }
+}
+
+QuantumEvent* GameState::GetActiveEvent() {
+    return m_CurrentEvent;
+}
+
+// Offline Progress
+void GameState::CalculateOfflineProgress() {
+    i64 currentTime = static_cast<i64>(Platform::GetTime());
+    if (m_LastSaveTimestamp == 0) {
+        m_LastSaveTimestamp = currentTime;
+        return;
+    }
+
+    i64 timeOffline = currentTime - m_LastSaveTimestamp;
+    if (timeOffline < 10) return; // Less than 10 seconds, ignore
+
+    f64 secondsOffline = static_cast<f64>(timeOffline);
+    f64 maxOfflineTime = 3600.0 * 4; // 4 hours max
+
+    if (secondsOffline > maxOfflineTime) {
+        secondsOffline = maxOfflineTime;
+    }
+
+    Log::Infof("You were away for ", secondsOffline / 60.0, " minutes");
+
+    // Calculate offline production at reduced rate
+    f64 offlineMultiplier = 0.5; // 50% efficiency while offline
+    f64 offlineQubits = 0;
+
+    for (const auto& station : m_Stations) {
+        if (station.unlocked && station.level > 0) {
+            f64 production = station.currentProduction * secondsOffline * offlineMultiplier;
+            production *= m_Timeline.photonBonus;
+            offlineQubits += production;
+        }
+    }
+
+    if (offlineQubits > 0) {
+        AddResource(QuantumResource::Qubits, offlineQubits);
+        Log::Infof("Offline Progress: +", offlineQubits, " qubits");
+
+        // Check offline millionaire achievement
+        Achievement* offlineAch = GetAchievement(AchievementID::OfflineMillionaire);
+        if (offlineAch && !offlineAch->unlocked && offlineQubits >= 1000000) {
+            UnlockAchievement(AchievementID::OfflineMillionaire);
+        }
+    }
+
+    m_LastSaveTimestamp = currentTime;
 }

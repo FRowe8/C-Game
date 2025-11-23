@@ -51,6 +51,91 @@ struct EntanglementPair {
     bool active;
 };
 
+// Achievement system
+enum class AchievementID {
+    FirstQubit,           // Earn your first qubit
+    Observe100Times,      // Observe 100 times
+    Reach1Million,        // Reach 1 million qubits
+    FirstPrestige,        // Perform first prestige
+    TenStations,          // Own 10 research stations
+    MaxCoherence,         // Reach maximum coherence
+    Entangle5Pairs,       // Create 5 entanglement pairs
+    OfflineMillionaire,   // Earn 1M qubits offline
+    SpeedRunner,          // Prestige within 10 minutes
+    Hoarder,              // Save 100M qubits without spending
+    QuantumMaster,        // Reach prestige level 10
+    Collector,            // Unlock all station types
+    EventHunter,          // Experience 50 quantum events
+    WeekStreak,           // Play 7 days in a row
+    TotalCount            // Keep this last
+};
+
+struct Achievement {
+    AchievementID id;
+    std::string name;
+    std::string description;
+    bool unlocked;
+    f64 progress;         // For incremental achievements
+    f64 target;           // Target value for completion
+    f64 rewardQubits;     // Qubit reward
+    f64 rewardPhotons;    // Photon reward
+
+    Achievement();
+};
+
+// Statistics tracking
+struct GameStatistics {
+    // Lifetime stats
+    f64 totalQubitsEarned;
+    f64 totalCoherenceEarned;
+    f64 totalEntanglementEarned;
+    i32 totalObservations;
+    i32 totalUpgrades;
+    i32 totalPrestigesPerformed;
+
+    // Session stats
+    f64 sessionQubits;
+    f64 sessionTime;
+    i32 sessionObservations;
+
+    // Records
+    f64 highestQubits;
+    f64 fastestPrestige;
+    i32 longestStreak;
+
+    // Daily login tracking
+    i32 currentStreak;
+    i64 lastLoginTimestamp;
+
+    GameStatistics();
+    void Reset();
+    void UpdateSession(f64 deltaTime);
+};
+
+// Random quantum events
+enum class QuantumEventType {
+    WaveCollapse,         // Bonus observation probability
+    CoherenceBoost,       // Temporary coherence boost
+    QuantumFluctuation,   // Random resource bonus
+    EntanglementSurge,    // Temporarily free entanglements
+    TimeDialation,        // 2x production for 30 seconds
+    LuckyObservation,     // Next observation guaranteed success
+    ResourceRain,         // All resources rain from sky
+    COUNT
+};
+
+struct QuantumEvent {
+    QuantumEventType type;
+    std::string name;
+    std::string description;
+    f64 duration;         // How long the event lasts
+    f64 timeRemaining;    // Time left on current event
+    f64 multiplier;       // Effect strength
+    bool active;
+
+    QuantumEvent();
+};
+
 // Prestige currency and bonuses
 struct QuantumTimeline {
     i32 completedResets;
@@ -58,6 +143,8 @@ struct QuantumTimeline {
     f64 photonBonus; // Global multiplier from photons
 
     std::vector<bool> permanentUpgrades;
+
+    QuantumTimeline();
 };
 
 // UI Button
@@ -97,6 +184,22 @@ public:
     void PerformPrestige();
     f64 CalculatePhotonsOnPrestige() const;
 
+    // Achievements
+    void CheckAchievements();
+    void UnlockAchievement(AchievementID id);
+    Achievement* GetAchievement(AchievementID id);
+
+    // Quantum Events
+    void TriggerRandomEvent();
+    void UpdateEvents(f64 deltaTime);
+    QuantumEvent* GetActiveEvent();
+
+    // Offline Progress
+    void CalculateOfflineProgress();
+
+    // Statistics
+    GameStatistics& GetStatistics() { return m_Statistics; }
+
 private:
     void InitializeStations();
     void InitializeUI();
@@ -116,9 +219,27 @@ private:
     std::vector<EntanglementPair> m_Entanglements;
     QuantumTimeline m_Timeline;
 
+    // Achievements
+    std::vector<Achievement> m_Achievements;
+    std::vector<AchievementID> m_RecentUnlocks; // For UI notifications
+
+    // Random Events
+    std::vector<QuantumEvent> m_Events;
+    QuantumEvent* m_CurrentEvent;
+    f64 m_TimeSinceLastEvent;
+    f64 m_EventCooldown;
+
+    // Statistics
+    GameStatistics m_Statistics;
+
+    // Offline progress
+    i64 m_LastSaveTimestamp;
+
     // UI
     std::vector<UIButton> m_Buttons;
     Vec2 m_ScrollOffset;
+    bool m_ShowAchievements;
+    bool m_ShowStats;
 
     // Game time
     f64 m_TotalTimePlayed;
@@ -128,4 +249,14 @@ private:
     f64 m_Coherence;
     f64 m_MaxCoherence;
     f64 m_CoherenceDecayRate;
+
+    // Particle effects for visual feedback
+    struct Particle {
+        Vec2 position;
+        Vec2 velocity;
+        Color color;
+        f32 lifetime;
+        f32 maxLifetime;
+    };
+    std::vector<Particle> m_Particles;
 };
