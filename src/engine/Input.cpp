@@ -1,5 +1,6 @@
 #include "Input.h"
 #include <SDL.h>
+#include <algorithm>
 
 Input::Input() {
     m_MousePosition = Vec2(0, 0);
