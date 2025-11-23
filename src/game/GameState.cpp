@@ -141,7 +141,7 @@ GameState::GameState()
     : m_TotalTimePlayed(0), m_TimeSinceLastSave(0),
       m_Coherence(100), m_MaxCoherence(100), m_CoherenceDecayRate(1.0),
       m_CurrentEvent(nullptr), m_TimeSinceLastEvent(0), m_EventCooldown(120.0),
-      m_LastSaveTimestamp(0), m_ShowAchievements(false), m_ShowStats(false), m_ShowResearch(false) {
+      m_LastSaveTimestamp(0), m_ShowAchievements(false), m_ShowStats(false), m_ShowResearch(false), m_ShowMilestones(false) {
 
     for (int i = 0; i < 3; i++) {
         m_Resources[i] = 0;
@@ -206,6 +206,10 @@ void GameState::Initialize() {
     // Initialize Research Tree
     m_ResearchTree.Initialize();
     Log::Info("Research tree initialized");
+
+    // Initialize Milestone System
+    m_MilestoneSystem.Initialize();
+    Log::Info("Milestone system initialized");
 
     // Try to load save file
     std::string savePath = Platform::GetSaveDirectory() + "quantum_save.json";
@@ -327,6 +331,9 @@ void GameState::Update(f64 deltaTime, Input* input, Renderer* renderer) {
     // Check achievements
     CheckAchievements();
 
+    // Check milestones
+    CheckMilestones();
+
     // Update UI
     UpdateUI(input);
 
@@ -362,8 +369,9 @@ void GameState::UpdateUI(Input* input) {
     bool mousePressed = input->IsMouseButtonPressed(MouseButton::Left);
 
     // Keyboard shortcuts
-    // SDL_SCANCODE_A = 4, R = 15, S = 16, ESCAPE = 41
+    // SDL_SCANCODE_A = 4, M = 13, R = 15, S = 16, ESCAPE = 41
     const int KEY_A = 4;
+    const int KEY_M = 13;
     const int KEY_R = 15;
     const int KEY_S = 16;
     const int KEY_ESCAPE = 41;
@@ -377,10 +385,14 @@ void GameState::UpdateUI(Input* input) {
     if (input->IsKeyPressed(KEY_R)) {
         m_ShowResearch = !m_ShowResearch;
     }
+    if (input->IsKeyPressed(KEY_M)) {
+        m_ShowMilestones = !m_ShowMilestones;
+    }
     if (input->IsKeyPressed(KEY_ESCAPE)) {
         m_ShowAchievements = false;
         m_ShowStats = false;
         m_ShowResearch = false;
+        m_ShowMilestones = false;
     }
 
     // Update buttons
@@ -401,8 +413,10 @@ void GameState::Render(Renderer* renderer) {
     RenderAchievements(renderer);
     RenderStatistics(renderer);
     RenderResearchTree(renderer);
+    RenderMilestones(renderer);
     RenderParticleEffects(renderer, 1.0/60.0); // Assume 60 FPS for particles
     RenderAchievementNotifications(renderer);
+    RenderMilestoneNotifications(renderer);
 }
 
 void GameState::RenderResources(Renderer* renderer) {
@@ -1529,6 +1543,10 @@ void GameState::UpdateResearchBonuses() {
     // Apply research bonuses to all stations
     f64 productionMult = m_ResearchTree.GetTotalProductionMultiplier();
 
+    // Apply milestone production bonuses
+    f64 milestoneBonus = 1.0 + m_MilestoneSystem.GetTotalProductionBonus();
+    productionMult *= milestoneBonus;
+
     for (auto& station : m_Stations) {
         if (station.unlocked && station.level > 0) {
             station.currentProduction = station.baseProduction * station.level * productionMult;
@@ -1547,6 +1565,289 @@ void GameState::UpdateResearchBonuses() {
     for (auto& station : m_Stations) {
         if (station.unlocked && station.level > 0) {
             station.currentProduction *= m_Timeline.photonBonus;
+        }
+    }
+}
+
+// Milestone System Methods
+void GameState::AddPhotons(f64 amount) {
+    m_Timeline.photons += amount;
+    m_Timeline.photonBonus = 1.0 + (m_Timeline.photons * 0.1);
+    
+    // Apply PhotonMultiplier research bonus
+    if (m_ResearchTree.IsResearched(ResearchID::PhotonMultiplier)) {
+        m_Timeline.photonBonus *= 1.5;
+    }
+}
+
+void GameState::CheckMilestones() {
+    // This is a simplified version - full implementation would be in Milestones.cpp
+    // But we need to update progress here since we have access to GameState data
+    
+    for (auto milestone : m_MilestoneSystem.GetActiveMilestones()) {
+        // Update progress based on milestone type
+        switch (milestone->id) {
+            case MilestoneID::FirstThousand:
+            case MilestoneID::FirstMillion:
+            case MilestoneID::FirstBillion:
+            case MilestoneID::FirstTrillion:
+                milestone->progress = m_Statistics.highestQubits;
+                break;
+
+            case MilestoneID::FiveStations:
+            case MilestoneID::TenStations: {
+                i32 count = 0;
+                for (const auto& s : m_Stations) {
+                    if (s.unlocked && s.level > 0) count++;
+                }
+                milestone->progress = static_cast<f64>(count);
+                break;
+            }
+
+            case MilestoneID::MaxedStation: {
+                f64 maxLevel = 0;
+                for (const auto& s : m_Stations) {
+                    if (s.level > maxLevel) maxLevel = static_cast<f64>(s.level);
+                }
+                milestone->progress = maxLevel;
+                break;
+            }
+
+            case MilestoneID::AllStationsMaxed: {
+                bool allMaxed = true;
+                for (const auto& s : m_Stations) {
+                    if (s.unlocked && s.level < 100) {
+                        allMaxed = false;
+                        break;
+                    }
+                }
+                milestone->progress = allMaxed ? 100.0 : 0.0;
+                break;
+            }
+
+            case MilestoneID::FirstPrestige:
+            case MilestoneID::TenPrestiges:
+            case MilestoneID::FiftyPrestiges:
+                milestone->progress = static_cast<f64>(m_Statistics.totalPrestigesPerformed);
+                break;
+
+            case MilestoneID::HundredPhotons:
+                milestone->progress = m_Timeline.photons;
+                break;
+
+            case MilestoneID::OneHourPlayed:
+            case MilestoneID::OneDayPlayed:
+            case MilestoneID::OneWeekPlayed:
+                milestone->progress = m_TotalTimePlayed;
+                break;
+
+            case MilestoneID::HalfAchievements:
+            case MilestoneID::AllAchievements: {
+                i32 unlocked = 0;
+                for (const auto& ach : m_Achievements) {
+                    if (ach.unlocked) unlocked++;
+                }
+                f64 percentage = static_cast<f64>(unlocked) / static_cast<f64>(m_Achievements.size());
+                milestone->progress = percentage;
+                break;
+            }
+
+            case MilestoneID::FirstResearch:
+            case MilestoneID::TenResearch:
+            case MilestoneID::AllResearch:
+                milestone->progress = static_cast<f64>(m_ResearchTree.GetResearchedCount());
+                break;
+
+            case MilestoneID::QuantumMaster:
+                if (m_Timeline.completedResets >= 50 && m_Timeline.photons >= 500.0) {
+                    milestone->progress = 1.0;
+                }
+                break;
+
+            case MilestoneID::TrueEnding:
+                if (m_ResearchTree.IsResearched(ResearchID::QuantumSingularity)) {
+                    milestone->progress = 1.0;
+                }
+                break;
+
+            default:
+                break;
+        }
+
+        // Check if completed
+        if (milestone->progress >= milestone->target && !milestone->completed) {
+            m_MilestoneSystem.CompleteMilestone(milestone->id, this);
+            
+            // Spawn celebration particles
+            SpawnParticleBurst(Vec2(640.0f, 200.0f), Color::QuantumBlue(), 30);
+        }
+    }
+}
+
+void GameState::RenderMilestones(Renderer* renderer) {
+    if (!m_ShowMilestones) return;
+
+    // Background overlay
+    Rect bg(0, 0, static_cast<f32>(renderer->GetWidth()), static_cast<f32>(renderer->GetHeight()));
+    renderer->DrawRect(bg, Color(0.0f, 0.0f, 0.0f, 0.8f), true);
+
+    // Milestones panel
+    f32 panelWidth = 950.0f;
+    f32 panelHeight = 670.0f;
+    f32 panelX = (renderer->GetWidth() - panelWidth) / 2.0f;
+    f32 panelY = (renderer->GetHeight() - panelHeight) / 2.0f;
+
+    Rect panel(panelX, panelY, panelWidth, panelHeight);
+    renderer->DrawRect(panel, Color(0.1f, 0.1f, 0.15f, 1.0f), true);
+    renderer->DrawRect(panel, Color::QuantumBlue(), false);
+
+    // Title
+    Vec2 titlePos(panelX + 20.0f, panelY + 15.0f);
+    renderer->DrawText("🎯 Milestones", titlePos, Color::QuantumBlue(), 24.0f);
+
+    // Close button hint
+    Vec2 closeHintPos(panelX + panelWidth - 120.0f, panelY + 18.0f);
+    renderer->DrawText("[M to Close]", closeHintPos, Color(0.7f, 0.7f, 0.7f, 1.0f), 12.0f);
+
+    // Completion stats
+    auto completedMilestones = m_MilestoneSystem.GetCompletedMilestones();
+    i32 totalMilestones = static_cast<i32>(MilestoneID::COUNT);
+    std::string statsText = "Completed: " + std::to_string(completedMilestones.size()) + "/" + std::to_string(totalMilestones);
+    Vec2 statsPos(panelX + 20.0f, panelY + 45.0f);
+    renderer->DrawText(statsText, statsPos, Color::CoherenceGreen(), 14.0f);
+
+    // Production bonus from milestones
+    f64 prodBonus = m_MilestoneSystem.GetTotalProductionBonus() * 100.0;
+    std::string bonusText = "Total Production Bonus: +" + std::to_string(static_cast<i32>(prodBonus)) + "%";
+    Vec2 bonusPos(panelX + panelWidth - 350.0f, panelY + 45.0f);
+    renderer->DrawText(bonusText, bonusPos, Color::QuantumPurple(), 14.0f);
+
+    // Active milestones
+    f32 milestoneStartY = panelY + 80.0f;
+    f32 milestoneX = panelX + 20.0f;
+    f32 milestoneWidth = panelWidth - 40.0f;
+    f32 milestoneHeight = 85.0f;
+    f32 milestoneSpacing = 8.0f;
+
+    auto activeMilestones = m_MilestoneSystem.GetActiveMilestones();
+    
+    i32 displayCount = 0;
+    i32 maxDisplay = 6;
+
+    for (const Milestone* milestone : activeMilestones) {
+        if (displayCount >= maxDisplay) break;
+
+        f32 milestoneY = milestoneStartY + (milestoneHeight + milestoneSpacing) * displayCount;
+
+        // Milestone background
+        Color milestoneBg = Color(0.15f, 0.15f, 0.2f, 1.0f);
+        Rect milestoneRect(milestoneX, milestoneY, milestoneWidth, milestoneHeight);
+        renderer->DrawRect(milestoneRect, milestoneBg, true);
+        renderer->DrawRect(milestoneRect, Color::QuantumBlue() * 0.6f, false);
+
+        // Milestone name
+        Vec2 namePos(milestoneX + 10.0f, milestoneY + 10.0f);
+        renderer->DrawText(milestone->name, namePos, Color::White(), 16.0f);
+
+        // Milestone description
+        Vec2 descPos(milestoneX + 10.0f, milestoneY + 32.0f);
+        renderer->DrawText(milestone->description, descPos, Color(0.8f, 0.8f, 0.9f, 1.0f), 12.0f);
+
+        // Progress bar
+        f32 barWidth = milestoneWidth - 20.0f;
+        f32 barHeight = 14.0f;
+        f32 barY = milestoneY + 55.0f;
+
+        Rect progressBg(milestoneX + 10.0f, barY, barWidth, barHeight);
+        renderer->DrawRect(progressBg, Color(0.2f, 0.2f, 0.25f, 1.0f), true);
+
+        f64 progressPercent = GameUtils::Clamp(milestone->progress / milestone->target, 0.0, 1.0);
+        f32 fillWidth = barWidth * static_cast<f32>(progressPercent);
+        Rect progressFill(milestoneX + 10.0f, barY, fillWidth, barHeight);
+        
+        // Color based on progress
+        Color barColor = progressPercent >= 1.0 ? Color::CoherenceGreen() : Color::QuantumBlue();
+        renderer->DrawRect(progressFill, barColor, true);
+
+        // Progress text
+        std::string progressText = GameUtils::FormatNumber(milestone->progress) + " / " + GameUtils::FormatNumber(milestone->target);
+        if (milestone->id == MilestoneID::HalfAchievements || milestone->id == MilestoneID::AllAchievements) {
+            progressText = std::to_string(static_cast<i32>(progressPercent * 100.0)) + "%";
+        }
+        Vec2 progressPos(milestoneX + 15.0f, barY + 1.0f);
+        renderer->DrawText(progressText, progressPos, Color::White(), 11.0f);
+
+        // Reward text (right side)
+        Vec2 rewardPos(milestoneX + milestoneWidth - 280.0f, barY + 1.0f);
+        renderer->DrawText(milestone->rewardDescription, rewardPos, Color(0.9f, 0.9f, 0.5f, 1.0f), 10.0f);
+
+        displayCount++;
+    }
+
+    // If no active milestones, show completed ones
+    if (activeMilestones.empty()) {
+        Vec2 nonePos(panelX + panelWidth / 2.0f - 150.0f, panelY + 200.0f);
+        renderer->DrawText("🎉 All Milestones Completed! 🎉", nonePos, Color::CoherenceGreen(), 18.0f);
+
+        // Show completed list
+        Vec2 completedTitlePos(panelX + 20.0f, panelY + 260.0f);
+        renderer->DrawText("Completed Milestones:", completedTitlePos, Color::QuantumBlue(), 14.0f);
+
+        i32 completedCount = 0;
+        for (const Milestone* m : completedMilestones) {
+            if (completedCount >= 10) break;
+
+            Vec2 completedPos(panelX + 30.0f, panelY + 290.0f + completedCount * 22.0f);
+            std::string completedText = "✓ " + m->name;
+            renderer->DrawText(completedText, completedPos, Color::CoherenceGreen(), 12.0f);
+
+            completedCount++;
+        }
+    }
+}
+
+void GameState::RenderMilestoneNotifications(Renderer* renderer) {
+    auto recentCompletions = m_MilestoneSystem.GetRecentCompletions();
+    if (recentCompletions.empty()) return;
+
+    // Display recent milestone completions as notifications
+    f32 notifWidth = 400.0f;
+    f32 notifHeight = 90.0f;
+    f32 notifX = renderer->GetWidth() - notifWidth - 20.0f;
+    f32 notifY = renderer->GetHeight() - notifHeight - 100.0f; // Above achievement notifications
+
+    // Only show the most recent
+    const Milestone* recent = recentCompletions.back();
+
+    // Animated background
+    f32 pulse = static_cast<f32>(0.9 + 0.1 * std::sin(m_TotalTimePlayed * 4.0));
+    Color bgColor = Color::QuantumBlue() * pulse;
+    bgColor.a = 0.95f;
+
+    Rect notifBg(notifX, notifY, notifWidth, notifHeight);
+    renderer->DrawRect(notifBg, bgColor, true);
+    renderer->DrawRect(notifBg, Color::CoherenceGreen(), false);
+
+    // Title
+    Vec2 titlePos(notifX + 15.0f, notifY + 12.0f);
+    renderer->DrawText("🎯 Milestone Completed!", titlePos, Color::CoherenceGreen(), 16.0f);
+
+    // Milestone name
+    Vec2 namePos(notifX + 15.0f, notifY + 35.0f);
+    renderer->DrawText(recent->name, namePos, Color::White(), 18.0f);
+
+    // Reward
+    Vec2 rewardPos(notifX + 15.0f, notifY + 60.0f);
+    renderer->DrawText(recent->rewardDescription, rewardPos, Color(1.0f, 1.0f, 0.6f, 1.0f), 12.0f);
+
+    // Clear old notifications after a delay (would need time tracking for animation)
+    // For now, keep last 2
+    if (m_TotalTimePlayed - static_cast<i32>(m_TotalTimePlayed) > 0.98) {
+        // Clear once per second
+        static f64 lastClear = 0;
+        if (m_TotalTimePlayed - lastClear > 5.0) {
+            m_MilestoneSystem.ClearRecentCompletions();
+            lastClear = m_TotalTimePlayed;
         }
     }
 }
