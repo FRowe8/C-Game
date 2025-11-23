@@ -6,7 +6,11 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 # Platform detection
-if(WIN32)
+if(EMSCRIPTEN OR PLATFORM_WEB)
+    set(PLATFORM_WEB TRUE)
+    add_definitions(-DPLATFORM_WEB)
+    message(STATUS "Building for Web (Emscripten)")
+elseif(WIN32)
     set(PLATFORM_WINDOWS TRUE)
     add_definitions(-DPLATFORM_WINDOWS)
 elseif(APPLE)
@@ -94,6 +98,11 @@ if(NOT SDL2_FOUND AND PLATFORM_WINDOWS)
     else()
         message(FATAL_ERROR "Could not find SDL2 at ${SDL2_ROOT_PATH}. \nPlease check that C:/SDL2/x86_64-w64-mingw32 exists.\nSee MINGW_BUILD.md for instructions.")
     endif()
+
+elseif(PLATFORM_WEB)
+    # Emscripten has SDL2 built-in
+    set(SDL2_FOUND TRUE)
+    message(STATUS "Using Emscripten's built-in SDL2")
 
 elseif(PLATFORM_ANDROID OR PLATFORM_IOS)
     # Mobile platforms
@@ -207,6 +216,56 @@ elseif(PLATFORM_MACOS)
 
     # OpenGL
     target_link_libraries(${PROJECT_NAME} OpenGL::GL)
+
+elseif(PLATFORM_WEB)
+    # Emscripten-specific settings
+    set_target_properties(${PROJECT_NAME} PROPERTIES
+        SUFFIX ".html"
+        OUTPUT_NAME "QuantumIdle"
+    )
+
+    # Emscripten linker flags
+    set(EMSCRIPTEN_LINK_FLAGS
+        "-s USE_SDL=2"
+        "-s USE_WEBGL2=1"
+        "-s FULL_ES3=1"
+        "-s ALLOW_MEMORY_GROWTH=1"
+        "-s INITIAL_MEMORY=67108864"  # 64MB
+        "-s MAXIMUM_MEMORY=268435456"  # 256MB max
+        "-s STACK_SIZE=5242880"  # 5MB stack
+        "-s ASSERTIONS=0"
+        "-s GL_ASSERTIONS=0"
+        "-s DISABLE_EXCEPTION_CATCHING=1"
+        "-s EXPORTED_RUNTIME_METHODS=['ccall','cwrap']"
+        "-s EXPORTED_FUNCTIONS=['_main']"
+        "--shell-file ${CMAKE_SOURCE_DIR}/web/index.html"
+        "-s FETCH=1"
+        "--preload-file ${CMAKE_SOURCE_DIR}/assets@/assets"
+    )
+
+    # Optimization flags for release
+    if(CMAKE_BUILD_TYPE STREQUAL "Release")
+        list(APPEND EMSCRIPTEN_LINK_FLAGS
+            "-O3"
+            "-s AGGRESSIVE_VARIABLE_ELIMINATION=1"
+            "--closure 1"
+        )
+    else()
+        list(APPEND EMSCRIPTEN_LINK_FLAGS
+            "-O0"
+            "-g"
+            "-s SAFE_HEAP=1"
+        )
+    endif()
+
+    # Join flags and apply
+    string(REPLACE ";" " " EMSCRIPTEN_LINK_FLAGS_STR "${EMSCRIPTEN_LINK_FLAGS}")
+    set_target_properties(${PROJECT_NAME} PROPERTIES
+        LINK_FLAGS "${EMSCRIPTEN_LINK_FLAGS_STR}"
+    )
+
+    message(STATUS "Emscripten link flags: ${EMSCRIPTEN_LINK_FLAGS_STR}")
+
 endif()
 
 # Install rules
