@@ -242,6 +242,7 @@ elseif(PLATFORM_WEB)
         "-sGL_ASSERTIONS=0"
         "-sDISABLE_EXCEPTION_CATCHING=1"
         "-sEXPORTED_RUNTIME_METHODS=['ccall','cwrap']"
+        "-sINVOKE_RUN=1"  # Automatically call main() after module loads
         "--shell-file ${CMAKE_SOURCE_DIR}/web/index.html"
     )
 
