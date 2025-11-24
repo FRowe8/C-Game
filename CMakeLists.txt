@@ -62,44 +62,8 @@ include_directories(
 find_package(OpenGL REQUIRED)
 
 # SDL2 - cross-platform windowing and input
-# Try vcpkg first (if using CLion with vcpkg integration)
-find_package(SDL2 CONFIG QUIET)
-
-if(SDL2_FOUND)
-    message(STATUS "Found SDL2 via vcpkg/find_package")
-    # vcpkg provides SDL2::SDL2 and SDL2::SDL2main targets
-    set(SDL2_LIBRARIES SDL2::SDL2main SDL2::SDL2)
-    set(SDL2_FOUND TRUE)
-endif()
-
-# If vcpkg didn't find it, use platform-specific methods
-if(NOT SDL2_FOUND AND PLATFORM_WINDOWS)
-    # --- FIX: Point specifically to the 64-bit MinGW folder ---
-    set(SDL2_ROOT_PATH "C:/SDL2/x86_64-w64-mingw32")
-
-    # 1. Set Include Paths explicitly
-    set(SDL2_INCLUDE_DIR "${SDL2_ROOT_PATH}/include/SDL2")
-
-    # 2. Set Library Paths explicitly
-    set(SDL2_LIBRARY "${SDL2_ROOT_PATH}/lib/libSDL2.dll.a")
-    set(SDL2MAIN_LIBRARY "${SDL2_ROOT_PATH}/lib/libSDL2main.a")
-
-    # 3. Verify they exist to prevent vague errors
-    if(EXISTS "${SDL2_INCLUDE_DIR}" AND EXISTS "${SDL2_LIBRARY}")
-        set(SDL2_FOUND TRUE)
-        set(SDL2_INCLUDE_DIRS ${SDL2_INCLUDE_DIR})
-
-        # Link Order is crucial for MinGW: SDL2main -> SDL2
-        set(SDL2_LIBRARIES ${SDL2MAIN_LIBRARY} ${SDL2_LIBRARY})
-
-        message(STATUS "SUCCESS: Found SDL2 at ${SDL2_ROOT_PATH}")
-        message(STATUS "  Include: ${SDL2_INCLUDE_DIR}")
-        message(STATUS "  Libraries: ${SDL2_LIBRARIES}")
-    else()
-        message(FATAL_ERROR "Could not find SDL2 at ${SDL2_ROOT_PATH}. \nPlease check that C:/SDL2/x86_64-w64-mingw32 exists.\nSee MINGW_BUILD.md for instructions.")
-    endif()
-
-elseif(PLATFORM_WEB)
+# Find SDL2 using platform-specific methods
+if(PLATFORM_WEB)
     # Emscripten has SDL2 built-in
     set(SDL2_FOUND TRUE)
     message(STATUS "Using Emscripten's built-in SDL2")
@@ -110,13 +74,19 @@ elseif(PLATFORM_ANDROID OR PLATFORM_IOS)
         find_library(SDL2_LIBRARY SDL2)
         set(SDL2_FOUND TRUE)
     endif()
+
 else()
-    # Linux/macOS: Try find_package first, then pkg-config
-    find_package(SDL2 QUIET)
-    if(NOT SDL2_FOUND)
-        find_package(PkgConfig)
+    # Desktop platforms (Windows, Linux, macOS)
+    # Try vcpkg/CMake config first, then pkg-config
+    find_package(SDL2 CONFIG QUIET)
+
+    if(SDL2_FOUND)
+        message(STATUS "Found SDL2 via vcpkg/CMake CONFIG")
+    else()
+        # Try pkg-config (Linux/macOS)
+        find_package(PkgConfig QUIET)
         if(PkgConfig_FOUND)
-            pkg_check_modules(SDL2 sdl2)
+            pkg_check_modules(SDL2 QUIET sdl2)
             if(SDL2_FOUND)
                 message(STATUS "Found SDL2 via pkg-config")
             endif()
@@ -124,7 +94,10 @@ else()
     endif()
 
     if(NOT SDL2_FOUND)
-        message(FATAL_ERROR "SDL2 not found! Install with: sudo apt-get install libsdl2-dev (Ubuntu) or brew install sdl2 (macOS)")
+        message(FATAL_ERROR "SDL2 not found!\n"
+            "Windows (vcpkg): vcpkg install sdl2\n"
+            "Ubuntu/Debian: sudo apt-get install libsdl2-dev\n"
+            "macOS: brew install sdl2")
     endif()
 endif()
 
@@ -156,22 +129,28 @@ endif()
 
 if(PLATFORM_WINDOWS)
     if(SDL2_FOUND)
-        # 1. Link Mingw32 FIRST (required for proper WinMain handling)
-        target_link_libraries(${PROJECT_NAME} mingw32)
+        # 1. Link Mingw32 FIRST (required for proper WinMain handling with MinGW)
+        if(MINGW)
+            target_link_libraries(${PROJECT_NAME} mingw32)
+        endif()
 
-        # 2. Include Directories
-        target_include_directories(${PROJECT_NAME} PRIVATE ${SDL2_INCLUDE_DIRS})
-
-        # 3. Link SDL2Main and SDL2 (in this order!)
-        target_link_libraries(${PROJECT_NAME} ${SDL2_LIBRARIES})
+        # 2. Link SDL2 - prefer imported targets from vcpkg
+        if(TARGET SDL2::SDL2)
+            # vcpkg provides imported targets
+            target_link_libraries(${PROJECT_NAME} SDL2::SDL2main SDL2::SDL2)
+        else()
+            # Fallback to variables (if using manual SDL2 installation)
+            target_include_directories(${PROJECT_NAME} PRIVATE ${SDL2_INCLUDE_DIRS})
+            target_link_libraries(${PROJECT_NAME} ${SDL2_LIBRARIES})
+        endif()
     else()
         message(FATAL_ERROR "SDL2 is required but was not found!")
     endif()
 
-    # 4. Windows system libraries
+    # 3. Windows system libraries
     target_link_libraries(${PROJECT_NAME} winmm imm32 version setupapi)
 
-    # 5. OpenGL
+    # 4. OpenGL
     target_link_libraries(${PROJECT_NAME} OpenGL::GL)
 
 elseif(PLATFORM_LINUX)
