@@ -272,21 +272,28 @@
     <div id="output"></div>
 
     <script type='text/javascript'>
+        console.log("=== HTML SCRIPT LOADED ===");
+
         // Progress tracking
         var Module = {
-            preRun: [],
-            postRun: [],
+            preRun: [function() {
+                console.log("=== MODULE PRE-RUN CALLBACK ===");
+            }],
+            postRun: [function() {
+                console.log("=== MODULE POST-RUN CALLBACK ===");
+            }],
             print: (function() {
+                console.log("=== MODULE PRINT SETUP ===");
                 var element = document.getElementById('output');
                 if (element) element.value = '';
                 return function(text) {
                     if (arguments.length > 1) text = Array.prototype.slice.call(arguments).join(' ');
-                    console.log(text);
+                    console.log("[WASM] " + text);
                 };
             })(),
             printErr: function(text) {
                 if (arguments.length > 1) text = Array.prototype.slice.call(arguments).join(' ');
-                console.error(text);
+                console.error("[WASM ERROR] " + text);
             },
             canvas: (function() {
                 var canvas = document.getElementById('canvas');
@@ -297,6 +304,7 @@
                 return canvas;
             })(),
             setStatus: function(text) {
+                console.log("=== MODULE STATUS: " + (text || "(empty - loaded)") + " ===");
                 var loading = document.getElementById('loading');
                 var loadingText = document.getElementById('loading-text');
                 var progressFill = document.getElementById('progress-fill');
@@ -311,6 +319,7 @@
                     }
                 } else {
                     // Game loaded - hide loading screen
+                    console.log("=== HIDING LOADING SCREEN ===");
                     loading.classList.add('hidden');
                     setTimeout(() => loading.remove(), 500);
                 }
@@ -322,11 +331,16 @@
             }
         };
 
+        console.log("=== MODULE OBJECT CONFIGURED ===");
+        console.log("=== Setting initial status: Downloading... ===");
         Module.setStatus('Downloading...');
 
         window.onerror = function(event) {
+            console.error("=== WINDOW ERROR: " + event + " ===");
             Module.setStatus('Error: See console for details');
         };
+
+        console.log("=== WAITING FOR WASM TO LOAD ===");
 
         // Fullscreen toggle
         function toggleFullscreen() {
