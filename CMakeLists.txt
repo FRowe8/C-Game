@@ -99,6 +99,26 @@ else()
             "Ubuntu/Debian: sudo apt-get install libsdl2-dev\n"
             "macOS: brew install sdl2")
     endif()
+
+    # Find SDL2_ttf for font rendering
+    find_package(SDL2_ttf CONFIG QUIET)
+    if(NOT SDL2_ttf_FOUND)
+        # Try pkg-config as fallback
+        find_package(PkgConfig)
+        if(PKG_CONFIG_FOUND)
+            pkg_search_module(SDL2_TTF QUIET SDL2_ttf)
+            if(SDL2_TTF_FOUND)
+                set(SDL2_ttf_FOUND TRUE)
+            endif()
+        endif()
+    endif()
+
+    if(NOT SDL2_ttf_FOUND)
+        message(FATAL_ERROR "SDL2_ttf not found!\n"
+            "Windows (vcpkg): vcpkg install sdl2-ttf\n"
+            "Ubuntu/Debian: sudo apt-get install libsdl2-ttf-dev\n"
+            "macOS: brew install sdl2_ttf")
+    endif()
 endif()
 
 # Source files
@@ -150,6 +170,16 @@ if(PLATFORM_WINDOWS)
         message(FATAL_ERROR "SDL2 is required but was not found!")
     endif()
 
+    # Link SDL2_ttf
+    if(SDL2_ttf_FOUND)
+        if(TARGET SDL2_ttf::SDL2_ttf)
+            target_link_libraries(${PROJECT_NAME} SDL2_ttf::SDL2_ttf)
+        elseif(SDL2_TTF_FOUND)
+            target_include_directories(${PROJECT_NAME} PRIVATE ${SDL2_TTF_INCLUDE_DIRS})
+            target_link_libraries(${PROJECT_NAME} ${SDL2_TTF_LIBRARIES})
+        endif()
+    endif()
+
     # 3. Windows system libraries
     target_link_libraries(${PROJECT_NAME} winmm imm32 version setupapi)
 
@@ -169,6 +199,16 @@ elseif(PLATFORM_LINUX)
         endif()
     else()
         message(FATAL_ERROR "SDL2 is required but was not found!")
+    endif()
+
+    # SDL2_ttf for Linux
+    if(SDL2_ttf_FOUND)
+        if(TARGET SDL2_ttf::SDL2_ttf)
+            target_link_libraries(${PROJECT_NAME} SDL2_ttf::SDL2_ttf)
+        elseif(SDL2_TTF_FOUND)
+            target_include_directories(${PROJECT_NAME} PRIVATE ${SDL2_TTF_INCLUDE_DIRS})
+            target_link_libraries(${PROJECT_NAME} ${SDL2_TTF_LIBRARIES})
+        endif()
     endif()
 
     # OpenGL
@@ -196,6 +236,16 @@ elseif(PLATFORM_MACOS)
         message(FATAL_ERROR "SDL2 is required but was not found!")
     endif()
 
+    # SDL2_ttf for macOS
+    if(SDL2_ttf_FOUND)
+        if(TARGET SDL2_ttf::SDL2_ttf)
+            target_link_libraries(${PROJECT_NAME} SDL2_ttf::SDL2_ttf)
+        elseif(SDL2_TTF_FOUND)
+            target_include_directories(${PROJECT_NAME} PRIVATE ${SDL2_TTF_INCLUDE_DIRS})
+            target_link_libraries(${PROJECT_NAME} ${SDL2_TTF_LIBRARIES})
+        endif()
+    endif()
+
     # OpenGL
     target_link_libraries(${PROJECT_NAME} OpenGL::GL)
 
@@ -206,14 +256,16 @@ elseif(PLATFORM_WEB)
         OUTPUT_NAME "QuantumIdle"
     )
 
-    # Emscripten compile flags (MUST include SDL2 flag for compilation)
+    # Emscripten compile flags (MUST include SDL2 and SDL2_ttf flags for compilation)
     target_compile_options(${PROJECT_NAME} PRIVATE
         "-sUSE_SDL=2"
+        "-sUSE_SDL_TTF=2"
     )
 
     # Emscripten linker flags
     set(EMSCRIPTEN_LINK_FLAGS
         "-sUSE_SDL=2"
+        "-sUSE_SDL_TTF=2"
         "-sLEGACY_GL_EMULATION=1"  # Emulate legacy OpenGL (glBegin/glEnd/etc) - requires WebGL1
         "-sALLOW_MEMORY_GROWTH=1"
         "-sINITIAL_MEMORY=67108864"  # 64MB
@@ -224,6 +276,8 @@ elseif(PLATFORM_WEB)
         "-sDISABLE_EXCEPTION_CATCHING=1"
         # Let SDL2's Emscripten port handle main() automatically
         "--shell-file ${CMAKE_SOURCE_DIR}/web/index.html"
+        # Embed assets (fonts) into the build
+        "--preload-file ${CMAKE_SOURCE_DIR}/assets@/assets"
     )
 
     # Optimization flags for release
