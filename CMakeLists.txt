@@ -114,11 +114,13 @@ file(GLOB_RECURSE GAME_SOURCES
 # Main executable
 if(PLATFORM_ANDROID)
     add_library(${PROJECT_NAME} SHARED
+        src/Main.cpp
         ${ENGINE_SOURCES}
         ${GAME_SOURCES}
     )
 else()
     add_executable(${PROJECT_NAME}
+        src/Main.cpp
         ${ENGINE_SOURCES}
         ${GAME_SOURCES}
     )
