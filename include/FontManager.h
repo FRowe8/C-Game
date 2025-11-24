@@ -1,7 +1,6 @@
 #pragma once
 
-#include "Core.h"
-#include "Math.h"
+#include "Types.h"
 #include <SDL_ttf.h>
 #include <string>
 #include <unordered_map>

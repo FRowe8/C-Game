@@ -9,6 +9,7 @@
 // SDL renames main() -> SDL_main() and provides platform-specific wrappers
 
 int main(int argc, char* argv[]) {
+    (void)argv; // Unused parameter
     printf("========================================\n");
     printf("=== MAIN() CALLED - argc: %d ===\n", argc);
     printf("========================================\n");
