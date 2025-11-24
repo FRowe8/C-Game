@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.15)
 project(QuantumIdle VERSION 1.0.0 LANGUAGES CXX C)
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
@@ -217,11 +217,10 @@ elseif(PLATFORM_WEB)
         "-sINITIAL_MEMORY=67108864"  # 64MB
         "-sMAXIMUM_MEMORY=268435456"  # 256MB max
         "-sSTACK_SIZE=5242880"  # 5MB stack
-        "-sASSERTIONS=0"
-        "-sGL_ASSERTIONS=0"
+        "-sASSERTIONS=1"  # Enable for debugging
+        "-sGL_ASSERTIONS=1"  # Enable for debugging
         "-sDISABLE_EXCEPTION_CATCHING=1"
-        "-sEXPORTED_RUNTIME_METHODS=['ccall','cwrap']"
-        "-sINVOKE_RUN=1"  # Automatically call main() after module loads
+        # Let SDL2's Emscripten port handle main() automatically
         "--shell-file ${CMAKE_SOURCE_DIR}/web/index.html"
     )
 
