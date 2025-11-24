@@ -175,8 +175,9 @@ void Renderer::DrawText(const std::string& text, const Vec2& position, const Col
         }
 
         // Draw character as a simple rectangle (placeholder)
+        // Using full opacity so text blocks are actually visible
         Rect charRect(x, position.y, charWidth * 0.8f, charHeight);
-        DrawRect(charRect, color * 0.3f, true);
+        DrawRect(charRect, color, true);
 
         x += charWidth;
     }
