@@ -231,7 +231,7 @@ elseif(PLATFORM_WEB)
         list(APPEND EMSCRIPTEN_LINK_FLAGS
             "-O3"
             "-sAGGRESSIVE_VARIABLE_ELIMINATION=1"
-            "--closure=1"
+            # "--closure=1"  # Disabled: breaks GL emulation variable names
         )
     else()
         list(APPEND EMSCRIPTEN_LINK_FLAGS
