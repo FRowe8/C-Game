@@ -26,6 +26,7 @@ public:
 
     bool Initialize();
     void Run();
+    void RunFrame(); // Single frame execution for Emscripten
     void Shutdown();
 
     void Quit() { m_Running = false; }

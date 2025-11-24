@@ -241,6 +241,7 @@ elseif(PLATFORM_WEB)
         "-sASSERTIONS=0"
         "-sGL_ASSERTIONS=0"
         "-sDISABLE_EXCEPTION_CATCHING=1"
+        "-sEXPORTED_RUNTIME_METHODS=['ccall','cwrap']"
         "--shell-file ${CMAKE_SOURCE_DIR}/web/index.html"
     )
 

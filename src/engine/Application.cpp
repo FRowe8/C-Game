@@ -7,6 +7,20 @@
 #include <SDL.h>
 #include <SDL_opengl.h>
 
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+
+// Global pointer for Emscripten callback
+static Application* g_AppInstance = nullptr;
+
+// Emscripten main loop callback
+void EmscriptenMainLoop() {
+    if (g_AppInstance) {
+        g_AppInstance->RunFrame();
+    }
+}
+#endif
+
 Application::Application(const ApplicationConfig& config)
     : m_Config(config) {
 }
@@ -91,35 +105,46 @@ void Application::Run() {
 
     Log::Info("Starting main loop...");
 
+#ifdef __EMSCRIPTEN__
+    // For web, use Emscripten's main loop
+    g_AppInstance = this;
+    // 0 = Use browser's requestAnimationFrame, 1 = Simulate infinite loop
+    emscripten_set_main_loop(EmscriptenMainLoop, 0, 1);
+#else
+    // For desktop, use traditional loop
     while (m_Running) {
-        // Calculate delta time
-        u64 currentTime = Platform::GetTicks();
-        m_DeltaTime = (currentTime - m_LastFrameTime) / 1000.0;
-        m_LastFrameTime = currentTime;
+        RunFrame();
+    }
+    Log::Info("Main loop ended");
+#endif
+}
 
-        // Cap delta time to avoid huge jumps
-        if (m_DeltaTime > 0.1) {
-            m_DeltaTime = 0.1;
-        }
+void Application::RunFrame() {
+    // Calculate delta time
+    u64 currentTime = Platform::GetTicks();
+    m_DeltaTime = (currentTime - m_LastFrameTime) / 1000.0;
+    m_LastFrameTime = currentTime;
 
-        m_Time += m_DeltaTime;
-        m_FrameCount++;
-
-        ProcessEvents();
-        Update(m_DeltaTime);
-        Render();
-
-        // Frame rate limiting (if not using VSync)
-        if (!m_Config.vsync && m_Config.targetFPS > 0) {
-            u64 frameTime = Platform::GetTicks() - currentTime;
-            u64 targetFrameTime = 1000 / m_Config.targetFPS;
-            if (frameTime < targetFrameTime) {
-                SDL_Delay(static_cast<u32>(targetFrameTime - frameTime));
-            }
-        }
+    // Cap delta time to avoid huge jumps
+    if (m_DeltaTime > 0.1) {
+        m_DeltaTime = 0.1;
     }
 
-    Log::Info("Main loop ended");
+    m_Time += m_DeltaTime;
+    m_FrameCount++;
+
+    ProcessEvents();
+    Update(m_DeltaTime);
+    Render();
+
+    // Frame rate limiting (if not using VSync)
+    if (!m_Config.vsync && m_Config.targetFPS > 0) {
+        u64 frameTime = Platform::GetTicks() - currentTime;
+        u64 targetFrameTime = 1000 / m_Config.targetFPS;
+        if (frameTime < targetFrameTime) {
+            SDL_Delay(static_cast<u32>(targetFrameTime - frameTime));
+        }
+    }
 }
 
 void Application::ProcessEvents() {
