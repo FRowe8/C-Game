@@ -5,11 +5,9 @@
 #include <ctime>
 #include <stdio.h>
 
-// On Windows with MinGW, we need to undef SDL's main macro
-// On Emscripten, we MUST keep SDL's main macro for proper initialization
-#if defined(_WIN32) && !defined(__EMSCRIPTEN__)
-    #undef main
-#endif
+// Don't undef SDL's main macro - SDL2 needs it for proper initialization
+// SDL will rename main() to SDL_main() and provide its own entry point
+// This works correctly on all platforms (Windows, Linux, macOS, Emscripten)
 
 int main(int argc, char* argv[]) {
     printf("========================================\n");
