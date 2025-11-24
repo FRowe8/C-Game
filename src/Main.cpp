@@ -1,3 +1,9 @@
+// Define SDL_MAIN_HANDLED before including SDL.h on non-Emscripten platforms
+// This tells SDL to NOT redefine main, we'll handle the entry point ourselves
+#ifndef __EMSCRIPTEN__
+#define SDL_MAIN_HANDLED
+#endif
+
 #include "Application.h"
 #include "Logger.h"
 #include <SDL.h>
@@ -5,9 +11,8 @@
 #include <ctime>
 #include <stdio.h>
 
-// Don't undef SDL's main macro - SDL2 needs it for proper initialization
-// SDL will rename main() to SDL_main() and provide its own entry point
-// This works correctly on all platforms (Windows, Linux, macOS, Emscripten)
+// SDL_MAIN_HANDLED tells SDL we're handling main() ourselves
+// This works correctly on all platforms
 
 int main(int argc, char* argv[]) {
     printf("========================================\n");
@@ -16,6 +21,9 @@ int main(int argc, char* argv[]) {
 
 #ifdef __EMSCRIPTEN__
     printf("=== EMSCRIPTEN DETECTED IN MAIN ===\n");
+#else
+    // Tell SDL that we're handling main() ourselves
+    SDL_SetMainReady();
 #endif
 
     // Seed random number generator

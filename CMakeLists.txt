@@ -137,7 +137,8 @@ if(PLATFORM_WINDOWS)
         # 2. Link SDL2 - prefer imported targets from vcpkg
         if(TARGET SDL2::SDL2)
             # vcpkg provides imported targets
-            target_link_libraries(${PROJECT_NAME} SDL2::SDL2main SDL2::SDL2)
+            # Only link SDL2, not SDL2main (we define SDL_MAIN_HANDLED)
+            target_link_libraries(${PROJECT_NAME} SDL2::SDL2)
         else()
             # Fallback to variables (if using manual SDL2 installation)
             target_include_directories(${PROJECT_NAME} PRIVATE ${SDL2_INCLUDE_DIRS})
