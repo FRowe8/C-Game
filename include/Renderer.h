@@ -1,7 +1,6 @@
 #pragma once
 
 #include "Types.h"
-#include "FontManager.h"
 #include <vector>
 #include <string>
 
@@ -24,11 +23,8 @@ public:
     void DrawCircle(const Vec2& center, f32 radius, const Color& color, bool filled = true);
     void DrawLine(const Vec2& start, const Vec2& end, const Color& color, f32 thickness = 1.0f);
 
-    // Text rendering (uses TrueType fonts via FontManager)
+    // Text rendering (uses bitmap font)
     void DrawText(const std::string& text, const Vec2& position, const Color& color, f32 size = 16.0f);
-
-    // Get font manager for loading custom fonts
-    FontManager* GetFontManager() { return m_FontManager.get(); }
 
     // Particle system
     struct Particle {
@@ -49,13 +45,11 @@ public:
 
 private:
     void InitializeShaders();
-    void DrawTexture(u32 textureId, const Rect& destRect);
 
     int m_Width = 0;
     int m_Height = 0;
 
     std::vector<Particle> m_Particles;
-    Scope<FontManager> m_FontManager;
 
     // Projection matrix for 2D rendering
     f32 m_ProjectionMatrix[16];

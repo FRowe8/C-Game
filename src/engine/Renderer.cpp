@@ -40,47 +40,15 @@ bool Renderer::Initialize(int width, int height) {
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glDisable(GL_DEPTH_TEST);
     glDisable(GL_CULL_FACE);
-    glEnable(GL_TEXTURE_2D);
 
     UpdateProjectionMatrix();
-
-    // Initialize font manager
-    m_FontManager = CreateScope<FontManager>();
-    if (!m_FontManager->Initialize()) {
-        Log::Error("Failed to initialize FontManager");
-        return false;
-    }
-
-    // Try to load a default font from common locations
-    bool fontLoaded = false;
-    const char* fontPaths[] = {
-        "assets/fonts/Roboto-Regular.ttf",  // Project font
-        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",  // Linux
-        "C:/Windows/Fonts/arial.ttf",  // Windows
-        "/System/Library/Fonts/Helvetica.ttc",  // macOS
-    };
-
-    for (const char* path : fontPaths) {
-        if (m_FontManager->LoadFont("default", path, 18)) {
-            fontLoaded = true;
-            Log::Infof("Loaded default font from: ", path);
-            break;
-        }
-    }
-
-    if (!fontLoaded) {
-        Log::Warning("Could not load TrueType font, text may not render correctly");
-    }
 
     Log::Info("Renderer initialized successfully");
     return true;
 }
 
 void Renderer::Shutdown() {
-    if (m_FontManager) {
-        m_FontManager->Shutdown();
-        m_FontManager.reset();
-    }
+    // Cleanup (bitmap font needs no cleanup)
 }
 
 void Renderer::UpdateProjectionMatrix() {
