@@ -1,6 +1,8 @@
 #pragma once
 
 #include "Types.h"
+#include "Research.h"
+#include "Milestones.h"
 #include <vector>
 #include <string>
 #include <functional>
@@ -200,6 +202,17 @@ public:
     // Statistics
     GameStatistics& GetStatistics() { return m_Statistics; }
 
+    // Research Tree
+    ResearchTree& GetResearchTree() { return m_ResearchTree; }
+    bool CanAffordResearch(ResearchID id) const;
+    bool PurchaseResearch(ResearchID id);
+    void UpdateResearchBonuses();
+
+    // Milestone System
+    MilestoneSystem& GetMilestoneSystem() { return m_MilestoneSystem; }
+    void CheckMilestones();
+    void AddPhotons(f64 amount);
+
 private:
     void InitializeStations();
     void InitializeUI();
@@ -210,6 +223,18 @@ private:
     void RenderResources(Renderer* renderer);
     void RenderStations(Renderer* renderer);
     void RenderParticleEffects(Renderer* renderer, f64 deltaTime);
+    void RenderAchievements(Renderer* renderer);
+    void RenderStatistics(Renderer* renderer);
+    void RenderActiveEvent(Renderer* renderer);
+    void RenderAchievementNotifications(Renderer* renderer);
+    void RenderResearchTree(Renderer* renderer);
+    void RenderMilestones(Renderer* renderer);
+    void RenderMilestoneNotifications(Renderer* renderer);
+
+    // Particle system helpers
+    void SpawnParticle(const Vec2& position, const Color& color, f64 lifetime = 1.0);
+    void SpawnParticleBurst(const Vec2& position, const Color& color, i32 count = 10);
+    void UpdateParticles(f64 deltaTime);
 
     // Resources
     f64 m_Resources[3]; // Qubits, Coherence, Entanglement
@@ -232,6 +257,12 @@ private:
     // Statistics
     GameStatistics m_Statistics;
 
+    // Research Tree
+    ResearchTree m_ResearchTree;
+
+    // Milestone System
+    MilestoneSystem m_MilestoneSystem;
+
     // Offline progress
     i64 m_LastSaveTimestamp;
 
@@ -240,6 +271,8 @@ private:
     Vec2 m_ScrollOffset;
     bool m_ShowAchievements;
     bool m_ShowStats;
+    bool m_ShowResearch;
+    bool m_ShowMilestones;
 
     // Game time
     f64 m_TotalTimePlayed;

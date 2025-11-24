@@ -3,11 +3,22 @@
 #include <SDL.h>
 #include <cstdlib>
 #include <ctime>
+#include <stdio.h>
 
-// Use SDL's main macro for cross-platform compatibility
-#undef main
+// On Windows with MinGW, we need to undef SDL's main macro
+// On Emscripten, we MUST keep SDL's main macro for proper initialization
+#if defined(_WIN32) && !defined(__EMSCRIPTEN__)
+    #undef main
+#endif
 
 int main(int argc, char* argv[]) {
+    printf("========================================\n");
+    printf("=== MAIN() CALLED - argc: %d ===\n", argc);
+    printf("========================================\n");
+
+#ifdef __EMSCRIPTEN__
+    printf("=== EMSCRIPTEN DETECTED IN MAIN ===\n");
+#endif
 
     // Seed random number generator
     srand(static_cast<unsigned int>(time(nullptr)));
@@ -22,15 +33,22 @@ int main(int argc, char* argv[]) {
     config.targetFPS = 60;
 
     // Create and run application
+    printf("=== Creating Application... ===\n");
     Application app(config);
 
+    printf("=== Initializing Application... ===\n");
     if (!app.Initialize()) {
+        printf("=== FAILED TO INITIALIZE ===\n");
         Log::Error("Failed to initialize application");
         return 1;
     }
 
+    printf("=== Running Application... ===\n");
     app.Run();
+
+    printf("=== Shutting down Application... ===\n");
     app.Shutdown();
 
+    printf("=== Exiting main() ===\n");
     return 0;
 }
