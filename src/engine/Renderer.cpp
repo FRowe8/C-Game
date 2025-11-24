@@ -161,53 +161,91 @@ void Renderer::DrawLine(const Vec2& start, const Vec2& end, const Color& color, 
     glLineWidth(1.0f);
 }
 
+// Simple bitmap font - each character is defined as a 5x7 pixel pattern
+// 1 = draw pixel, 0 = empty space
+static const unsigned char font5x7[][7] = {
+    // Digits 0-9 (ASCII 48-57)
+    {0x7E, 0x81, 0x89, 0x91, 0xA1, 0x81, 0x7E}, // 0
+    {0x00, 0x41, 0xFF, 0x01, 0x00, 0x00, 0x00}, // 1
+    {0x43, 0x85, 0x89, 0x91, 0x61, 0x00, 0x00}, // 2
+    {0x42, 0x81, 0x91, 0x91, 0x6E, 0x00, 0x00}, // 3
+    {0x18, 0x28, 0x48, 0xFF, 0x08, 0x00, 0x00}, // 4
+    {0xF2, 0x91, 0x91, 0x91, 0x8E, 0x00, 0x00}, // 5
+    {0x7E, 0x91, 0x91, 0x91, 0x4E, 0x00, 0x00}, // 6
+    {0x80, 0x87, 0x88, 0x90, 0xE0, 0x00, 0x00}, // 7
+    {0x6E, 0x91, 0x91, 0x91, 0x6E, 0x00, 0x00}, // 8
+    {0x72, 0x89, 0x89, 0x89, 0x7E, 0x00, 0x00}, // 9
+    // Uppercase A-Z (ASCII 65-90)
+    {0x3F, 0x48, 0x88, 0x88, 0x48, 0x3F, 0x00}, // A
+    {0xFF, 0x91, 0x91, 0x91, 0x6E, 0x00, 0x00}, // B
+    {0x7E, 0x81, 0x81, 0x81, 0x42, 0x00, 0x00}, // C
+    {0xFF, 0x81, 0x81, 0x81, 0x7E, 0x00, 0x00}, // D
+    {0xFF, 0x91, 0x91, 0x91, 0x81, 0x00, 0x00}, // E
+    {0xFF, 0x90, 0x90, 0x90, 0x80, 0x00, 0x00}, // F
+    {0x7E, 0x81, 0x89, 0x89, 0x4E, 0x00, 0x00}, // G
+    {0xFF, 0x10, 0x10, 0x10, 0xFF, 0x00, 0x00}, // H
+    {0x00, 0x81, 0xFF, 0x81, 0x00, 0x00, 0x00}, // I
+    {0x06, 0x01, 0x01, 0x01, 0xFE, 0x00, 0x00}, // J
+    {0xFF, 0x18, 0x24, 0x42, 0x81, 0x00, 0x00}, // K
+    {0xFF, 0x01, 0x01, 0x01, 0x01, 0x00, 0x00}, // L
+    {0xFF, 0x40, 0x30, 0x40, 0xFF, 0x00, 0x00}, // M
+    {0xFF, 0x40, 0x20, 0x10, 0xFF, 0x00, 0x00}, // N
+    {0x7E, 0x81, 0x81, 0x81, 0x7E, 0x00, 0x00}, // O
+    {0xFF, 0x88, 0x88, 0x88, 0x70, 0x00, 0x00}, // P
+    {0x7E, 0x81, 0x85, 0x82, 0x7D, 0x00, 0x00}, // Q
+    {0xFF, 0x88, 0x8C, 0x8A, 0x71, 0x00, 0x00}, // R
+    {0x62, 0x91, 0x91, 0x91, 0x8E, 0x00, 0x00}, // S
+    {0x80, 0x80, 0xFF, 0x80, 0x80, 0x00, 0x00}, // T
+    {0xFE, 0x01, 0x01, 0x01, 0xFE, 0x00, 0x00}, // U
+    {0xF8, 0x04, 0x02, 0x04, 0xF8, 0x00, 0x00}, // V
+    {0xFF, 0x02, 0x0C, 0x02, 0xFF, 0x00, 0x00}, // W
+    {0xC3, 0x24, 0x18, 0x24, 0xC3, 0x00, 0x00}, // X
+    {0xC0, 0x20, 0x1F, 0x20, 0xC0, 0x00, 0x00}, // Y
+    {0x83, 0x85, 0x89, 0x91, 0xE1, 0x00, 0x00}, // Z
+};
+
 void Renderer::DrawText(const std::string& text, const Vec2& position, const Color& color, f32 size) {
-    // Improved placeholder text rendering - makes characters distinguishable
-    // Different character types have different sizes/colors for readability
-    f32 charWidth = size * 0.8f;  // Increased from 0.6f for better visibility
-    f32 charHeight = size;
+    f32 pixelSize = size / 7.0f; // Each character is 7 pixels tall
+    f32 charSpacing = size * 0.8f;
     f32 x = position.x;
 
     for (char c : text) {
         if (c == ' ') {
-            x += charWidth * 0.5f;
+            x += charSpacing * 0.6f;
             continue;
         }
 
-        // Vary appearance based on character type for better readability
-        f32 width = charWidth;
-        f32 height = charHeight;
-        Color charColor = color;
-
-        // Make different character types visually distinct
+        // Get font pattern for this character
+        const unsigned char* pattern = nullptr;
         if (c >= '0' && c <= '9') {
-            // Numbers: brighter and full size
-            charColor = color * 1.3f;
-            charColor.a = 1.0f;
+            pattern = font5x7[c - '0'];
         } else if (c >= 'A' && c <= 'Z') {
-            // Uppercase: full height
-            height = charHeight;
+            pattern = font5x7[10 + (c - 'A')];
         } else if (c >= 'a' && c <= 'z') {
-            // Lowercase: slightly shorter
-            height = charHeight * 0.75f;
-        } else if (c == '.' || c == ',' || c == ':') {
-            // Punctuation: small and lower
-            height = charHeight * 0.3f;
-            width = charWidth * 0.4f;
-        } else {
-            // Other characters: medium size
-            height = charHeight * 0.6f;
-            width = charWidth * 0.6f;
+            // Use uppercase patterns for lowercase
+            pattern = font5x7[10 + (c - 'a')];
         }
 
-        // Draw character rectangle with full opacity
-        Rect charRect(x, position.y + (charHeight - height), width, height);
-        DrawRect(charRect, charColor, true);
+        // Draw the character pixel by pixel
+        if (pattern) {
+            for (int row = 0; row < 7; row++) {
+                unsigned char rowData = pattern[row];
+                for (int col = 0; col < 8; col++) {
+                    if (rowData & (0x80 >> col)) {
+                        f32 px = x + col * pixelSize;
+                        f32 py = position.y + row * pixelSize;
+                        Rect pixel(px, py, pixelSize * 1.2f, pixelSize * 1.2f);
+                        DrawRect(pixel, color, true);
+                    }
+                }
+            }
+        } else {
+            // For unsupported characters, draw a simple placeholder
+            Rect charRect(x, position.y, size * 0.5f, size);
+            DrawRect(charRect, color * 0.5f, false);
+        }
 
-        // Add subtle white outline for better contrast
-        DrawRect(charRect, Color(1.0f, 1.0f, 1.0f, 0.4f), false);
-
-        x += charWidth;
+        x += charSpacing;
     }
 }
 
