@@ -216,6 +216,7 @@ elseif(PLATFORM_WEB)
         "-sUSE_SDL=2"
         "-sUSE_WEBGL2=1"
         "-sFULL_ES3=1"
+        "-sLEGACY_GL_EMULATION=1"  # Emulate legacy OpenGL (glBegin/glEnd/etc)
         "-sALLOW_MEMORY_GROWTH=1"
         "-sINITIAL_MEMORY=67108864"  # 64MB
         "-sMAXIMUM_MEMORY=268435456"  # 256MB max
