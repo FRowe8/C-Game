@@ -162,22 +162,50 @@ void Renderer::DrawLine(const Vec2& start, const Vec2& end, const Color& color, 
 }
 
 void Renderer::DrawText(const std::string& text, const Vec2& position, const Color& color, f32 size) {
-    // Simple bitmap text rendering - draw each character as a small rect
-    // This is a placeholder - in a real game you'd use a proper font rendering library
-    f32 charWidth = size * 0.6f;
+    // Improved placeholder text rendering - makes characters distinguishable
+    // Different character types have different sizes/colors for readability
+    f32 charWidth = size * 0.8f;  // Increased from 0.6f for better visibility
     f32 charHeight = size;
     f32 x = position.x;
 
     for (char c : text) {
         if (c == ' ') {
-            x += charWidth;
+            x += charWidth * 0.5f;
             continue;
         }
 
-        // Draw character as a simple rectangle (placeholder)
-        // Using full opacity so text blocks are actually visible
-        Rect charRect(x, position.y, charWidth * 0.8f, charHeight);
-        DrawRect(charRect, color, true);
+        // Vary appearance based on character type for better readability
+        f32 width = charWidth;
+        f32 height = charHeight;
+        Color charColor = color;
+
+        // Make different character types visually distinct
+        if (c >= '0' && c <= '9') {
+            // Numbers: brighter and full size
+            charColor = color * 1.3f;
+            charColor.a = 1.0f;
+        } else if (c >= 'A' && c <= 'Z') {
+            // Uppercase: full height
+            height = charHeight;
+        } else if (c >= 'a' && c <= 'z') {
+            // Lowercase: slightly shorter
+            height = charHeight * 0.75f;
+        } else if (c == '.' || c == ',' || c == ':') {
+            // Punctuation: small and lower
+            height = charHeight * 0.3f;
+            width = charWidth * 0.4f;
+        } else {
+            // Other characters: medium size
+            height = charHeight * 0.6f;
+            width = charWidth * 0.6f;
+        }
+
+        // Draw character rectangle with full opacity
+        Rect charRect(x, position.y + (charHeight - height), width, height);
+        DrawRect(charRect, charColor, true);
+
+        // Add subtle white outline for better contrast
+        DrawRect(charRect, Color(1.0f, 1.0f, 1.0f, 0.4f), false);
 
         x += charWidth;
     }
