@@ -116,15 +116,80 @@ void UIButton::Update(const Vec2& mousePos) {
 }
 
 void UIButton::Render(Renderer* renderer) {
-    Color renderColor = enabled ? (hovered ? hoverColor : color) : Color(0.3f, 0.3f, 0.3f, 0.5f);
+    // Determine button colors based on state
+    Color renderColor, borderColor, shadowColor;
 
-    renderer->DrawRect(bounds, renderColor, true);
-    renderer->DrawRect(bounds, Color::White() * 0.8f, false);
+    if (!enabled) {
+        // Disabled state: dark gray
+        renderColor = Color(0.25f, 0.25f, 0.28f, 0.6f);
+        borderColor = Color(0.4f, 0.4f, 0.45f, 0.8f);
+        shadowColor = Color(0.0f, 0.0f, 0.0f, 0.3f);
+    } else if (hovered) {
+        // Hovered state: brighter with glow
+        renderColor = hoverColor * 1.1f;
+        renderColor.a = 0.95f;
+        borderColor = Color::White() * 0.9f;
+        shadowColor = hoverColor * 0.8f;
+        shadowColor.a = 0.6f;
+    } else {
+        // Normal state
+        renderColor = color;
+        renderColor.a = 0.85f;
+        borderColor = Color::White() * 0.6f;
+        shadowColor = Color(0.0f, 0.0f, 0.0f, 0.4f);
+    }
 
-    // Draw text (centered)
+    // Draw shadow (offset slightly down and right for depth)
+    Rect shadowRect = bounds;
+    shadowRect.x += 3.0f;
+    shadowRect.y += 3.0f;
+    renderer->DrawRect(shadowRect, shadowColor, true);
+
+    // Draw button background with subtle gradient effect
+    // Top half - slightly lighter
+    Rect topHalf(bounds.x, bounds.y, bounds.width, bounds.height * 0.5f);
+    Color topColor = renderColor * 1.15f;
+    topColor.a = renderColor.a;
+    renderer->DrawRect(topHalf, topColor, true);
+
+    // Bottom half - normal color
+    Rect bottomHalf(bounds.x, bounds.y + bounds.height * 0.5f, bounds.width, bounds.height * 0.5f);
+    renderer->DrawRect(bottomHalf, renderColor, true);
+
+    // Draw multiple borders for depth effect
+    // Outer border (thicker)
+    renderer->DrawRect(bounds, borderColor, false);
+
+    // Inner highlight border (creates 3D effect)
+    Rect innerBorder(bounds.x + 2.0f, bounds.y + 2.0f,
+                     bounds.width - 4.0f, bounds.height - 4.0f);
+    Color highlightColor = hovered ? Color::White() * 0.4f : Color::White() * 0.2f;
+    renderer->DrawRect(innerBorder, highlightColor, false);
+
+    // Draw glow effect on hover
+    if (hovered && enabled) {
+        Rect glowRect(bounds.x - 2.0f, bounds.y - 2.0f,
+                      bounds.width + 4.0f, bounds.height + 4.0f);
+        Color glowColor = hoverColor;
+        glowColor.a = 0.3f;
+        renderer->DrawRect(glowRect, glowColor, false);
+    }
+
+    // Draw text (properly centered)
     Vec2 textPos = bounds.Center();
-    textPos.x -= text.length() * 5.0f; // Rough centering
+    // Approximate text width based on character count (will be better with TTF)
+    f32 approxTextWidth = text.length() * 9.0f; // Rough estimate for 16pt font
+    textPos.x -= approxTextWidth * 0.5f;
     textPos.y -= 8.0f;
+
+    // Text with subtle shadow for readability
+    if (enabled) {
+        // Text shadow
+        Vec2 shadowTextPos = textPos;
+        shadowTextPos.x += 1.0f;
+        shadowTextPos.y += 1.0f;
+        renderer->DrawText(text, shadowTextPos, Color(0.0f, 0.0f, 0.0f, 0.7f), 16.0f);
+    }
 
     Color textColor = enabled ? Color::White() : Color(0.6f, 0.6f, 0.6f, 1.0f);
     renderer->DrawText(text, textPos, textColor, 16.0f);
@@ -467,24 +532,46 @@ void GameState::RenderStations(Renderer* renderer) {
     m_Buttons.clear(); // Rebuild buttons each frame for simplicity
 
     f32 startY = 120.0f;
-    f32 stationHeight = 120.0f;
-    f32 margin = 10.0f;
+    f32 stationHeight = 130.0f;  // Increased height for better spacing
+    f32 margin = 15.0f;  // Increased margin
 
     for (size_t i = 0; i < m_Stations.size(); i++) {
         auto& station = m_Stations[i];
         f32 y = startY + i * (stationHeight + margin) + m_ScrollOffset.y;
 
-        // Station background
-        Rect stationRect(20.0f, y, static_cast<f32>(renderer->GetWidth()) - 40.0f, stationHeight);
+        // Station background with improved visuals
+        Rect stationRect(25.0f, y, static_cast<f32>(renderer->GetWidth()) - 50.0f, stationHeight);
 
-        Color bgColor = station.unlocked ? Color(0.15f, 0.15f, 0.2f, 0.9f) : Color(0.1f, 0.1f, 0.1f, 0.5f);
+        // Draw shadow for depth
+        Rect shadowRect = stationRect;
+        shadowRect.x += 4.0f;
+        shadowRect.y += 4.0f;
+        renderer->DrawRect(shadowRect, Color(0.0f, 0.0f, 0.0f, 0.4f), true);
+
+        // Improved background colors with subtle gradients
+        Color bgColor, borderColor;
+        if (station.unlocked) {
+            // Unlocked stations: darker blue-tinted background
+            bgColor = Color(0.12f, 0.15f, 0.22f, 0.95f);
+            borderColor = Color::QuantumBlue() * 0.6f;
+        } else {
+            // Locked stations: very dark with red tint
+            bgColor = Color(0.15f, 0.1f, 0.1f, 0.7f);
+            borderColor = Color(0.4f, 0.2f, 0.2f, 0.8f);
+        }
+
         renderer->DrawRect(stationRect, bgColor, true);
-        renderer->DrawRect(stationRect, Color::White() * 0.3f, false);
+
+        // Draw double border for emphasis
+        renderer->DrawRect(stationRect, borderColor, false);
+        Rect innerBorder(stationRect.x + 2.0f, stationRect.y + 2.0f,
+                        stationRect.width - 4.0f, stationRect.height - 4.0f);
+        renderer->DrawRect(innerBorder, borderColor * 0.5f, false);
 
         if (!station.unlocked) {
-            // Draw unlock button
-            Vec2 titlePos(40.0f, y + 20.0f);
-            renderer->DrawText(station.name + " (LOCKED)", titlePos, Color(0.5f, 0.5f, 0.5f, 1.0f), 20.0f);
+            // Draw unlock button with better text
+            Vec2 titlePos(45.0f, y + 25.0f);
+            renderer->DrawText(station.name + " (LOCKED)", titlePos, Color(0.7f, 0.4f, 0.4f, 1.0f), 22.0f);
 
             UIButton unlockBtn;
             unlockBtn.bounds = Rect(40.0f, y + 60.0f, 200.0f, 40.0f);
@@ -505,37 +592,38 @@ void GameState::RenderStations(Renderer* renderer) {
             continue;
         }
 
-        // Draw station info
-        Vec2 titlePos(40.0f, y + 10.0f);
-        renderer->DrawText(station.name + " Lv." + std::to_string(station.level), titlePos, Color::White(), 18.0f);
+        // Draw station info with better spacing and hierarchy
+        Vec2 titlePos(45.0f, y + 15.0f);
+        renderer->DrawText(station.name + " Lv." + std::to_string(station.level), titlePos, Color::White(), 20.0f);
 
-        Vec2 descPos(40.0f, y + 35.0f);
-        renderer->DrawText(station.description, descPos, Color(0.7f, 0.7f, 0.7f, 1.0f), 12.0f);
+        Vec2 descPos(45.0f, y + 42.0f);
+        renderer->DrawText(station.description, descPos, Color(0.75f, 0.75f, 0.8f, 1.0f), 13.0f);
 
-        // Draw production
+        // Draw production with icon-like prefix
         std::ostringstream prodOss;
         prodOss.precision(2);
         prodOss << std::fixed << station.currentProduction << "/s";
-        Vec2 prodPos(40.0f, y + 55.0f);
-        renderer->DrawText("Production: " + prodOss.str(), prodPos, Color::CoherenceGreen(), 14.0f);
+        Vec2 prodPos(45.0f, y + 65.0f);
+        renderer->DrawText(">> Production: " + prodOss.str(), prodPos, Color::CoherenceGreen() * 1.1f, 15.0f);
 
-        // Draw superposition value
+        // Draw superposition value with improved color
         std::ostringstream superOss;
         superOss.precision(1);
         superOss << std::fixed << station.superpositionValue;
-        Vec2 superPos(300.0f, y + 55.0f);
-        renderer->DrawText("Superposition: " + superOss.str(), superPos, Color::QuantumPurple(), 14.0f);
+        Vec2 superPos(320.0f, y + 65.0f);
+        renderer->DrawText("Superposition: " + superOss.str(), superPos, Color::QuantumPurple() * 1.2f, 15.0f);
 
-        // Draw probability
+        // Draw probability with better color
         std::ostringstream probOss;
         probOss.precision(0);
         probOss << std::fixed << (station.superpositionProbability * 100.0f) << "%";
-        Vec2 probPos(550.0f, y + 55.0f);
-        renderer->DrawText("Success: " + probOss.str(), probPos, Color::Yellow(), 14.0f);
+        Vec2 probPos(590.0f, y + 65.0f);
+        Color probColor = station.superpositionProbability > 0.7f ? Color::CoherenceGreen() : Color::Yellow();
+        renderer->DrawText("Success: " + probOss.str(), probPos, probColor, 15.0f);
 
-        // Observe button
+        // Observe button - improved positioning
         UIButton observeBtn;
-        observeBtn.bounds = Rect(40.0f, y + 75.0f, 150.0f, 35.0f);
+        observeBtn.bounds = Rect(45.0f, y + 88.0f, 160.0f, 36.0f);
         observeBtn.text = "OBSERVE";
         observeBtn.color = Color::QuantumPurple() * 0.7f;
         observeBtn.hoverColor = Color::QuantumPurple();
@@ -567,9 +655,9 @@ void GameState::RenderStations(Renderer* renderer) {
         observeBtn.Render(renderer);
         m_Buttons.push_back(observeBtn);
 
-        // Upgrade button
+        // Upgrade button - improved positioning and size
         UIButton upgradeBtn;
-        upgradeBtn.bounds = Rect(200.0f, y + 75.0f, 200.0f, 35.0f);
+        upgradeBtn.bounds = Rect(215.0f, y + 88.0f, 210.0f, 36.0f);
         upgradeBtn.text = "Upgrade (" + std::to_string(static_cast<int>(station.upgradeCost)) + ")";
         upgradeBtn.color = Color::EntanglementOrange() * 0.7f;
         upgradeBtn.hoverColor = Color::EntanglementOrange();

@@ -22,6 +22,8 @@ public:
     void DrawRect(const Rect& rect, const Color& color, bool filled = true);
     void DrawCircle(const Vec2& center, f32 radius, const Color& color, bool filled = true);
     void DrawLine(const Vec2& start, const Vec2& end, const Color& color, f32 thickness = 1.0f);
+
+    // Text rendering (uses bitmap font)
     void DrawText(const std::string& text, const Vec2& position, const Color& color, f32 size = 16.0f);
 
     // Particle system

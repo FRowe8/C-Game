@@ -78,8 +78,10 @@ bool Application::Initialize() {
         return false;
     }
 
-    // Set VSync
+    // Set VSync (skip on Emscripten - browser controls timing)
+#ifndef __EMSCRIPTEN__
     SDL_GL_SetSwapInterval(m_Config.vsync ? 1 : 0);
+#endif
 
     // Initialize subsystems
     m_Renderer = CreateScope<Renderer>();
