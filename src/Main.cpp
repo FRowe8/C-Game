@@ -5,9 +5,9 @@
 #include <ctime>
 #include <stdio.h>
 
-// On Windows with MinGW, we need to undef SDL's main macro
-// On Emscripten, we need to keep it for proper initialization
-#if defined(_WIN32) && !defined(__EMSCRIPTEN__)
+// On Windows and Emscripten, undef SDL's main macro to use our own entry point
+// SDL's main macro interferes with Emscripten's module initialization
+#if defined(_WIN32) || defined(__EMSCRIPTEN__)
     #undef main
 #endif
 
