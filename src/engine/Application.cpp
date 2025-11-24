@@ -35,6 +35,10 @@ bool Application::Initialize() {
     Log::Infof("Platform: ", Platform::GetPlatformName());
     Log::Infof("CPU Count: ", Platform::GetCPUCount());
 
+#ifdef __EMSCRIPTEN__
+    printf("=== EMSCRIPTEN BUILD - Starting initialization ===\n");
+#endif
+
     // Initialize SDL
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS) != 0) {
         Log::Errorf("Failed to initialize SDL: ", SDL_GetError());
@@ -84,6 +88,10 @@ bool Application::Initialize() {
         return false;
     }
 
+#ifdef __EMSCRIPTEN__
+    printf("=== Renderer initialized: %dx%d ===\n", m_Config.windowWidth, m_Config.windowHeight);
+#endif
+
     m_Input = CreateScope<Input>();
 
     m_GameState = CreateScope<GameState>();
@@ -92,6 +100,10 @@ bool Application::Initialize() {
     m_Initialized = true;
     m_Running = true;
     m_LastFrameTime = Platform::GetTicks();
+
+#ifdef __EMSCRIPTEN__
+    printf("=== Application initialized successfully ===\n");
+#endif
 
     Log::Info("Application initialized successfully");
     return true;
@@ -132,6 +144,14 @@ void Application::RunFrame() {
 
     m_Time += m_DeltaTime;
     m_FrameCount++;
+
+#ifdef __EMSCRIPTEN__
+    // Log every 60 frames (about once per second at 60fps)
+    if (m_FrameCount % 60 == 1) {
+        printf("=== Frame %llu, DeltaTime: %.3f, Running: %d ===\n",
+               m_FrameCount, m_DeltaTime, m_Running);
+    }
+#endif
 
     ProcessEvents();
     Update(m_DeltaTime);
