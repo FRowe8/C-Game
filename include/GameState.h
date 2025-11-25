@@ -267,7 +267,7 @@ private:
     i64 m_LastSaveTimestamp;
 
     // UI
-    std::vector<UIButton> m_Buttons;
+    std::vector<UIButton> m_StationButtons; // Persistent buttons (unlock, observe, upgrade per station + prestige)
     Vec2 m_ScrollOffset;
     bool m_ShowAchievements;
     bool m_ShowStats;

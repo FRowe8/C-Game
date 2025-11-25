@@ -362,7 +362,60 @@ void GameState::InitializeStations() {
 
 void GameState::InitializeUI() {
     m_ScrollOffset = Vec2(0, 0);
-    // UI buttons will be created dynamically during rendering
+    m_StationButtons.clear();
+
+    // Create persistent buttons for each research station
+    // For each station, we create: unlock button (index 3*i), observe button (index 3*i+1), upgrade button (index 3*i+2)
+    for (size_t i = 0; i < m_Stations.size(); i++) {
+        // Unlock Button
+        UIButton unlockBtn;
+        unlockBtn.text = "Unlock";
+        unlockBtn.color = Color::QuantumBlue() * 0.7f;
+        unlockBtn.hoverColor = Color::QuantumBlue();
+        unlockBtn.onClick = [this, i]() {
+            if (SpendResource(QuantumResource::Qubits, m_Stations[i].unlockCost)) {
+                m_Stations[i].unlocked = true;
+                m_Stations[i].level = 0;
+                Log::Infof("Unlocked: ", m_Stations[i].name);
+            }
+        };
+        m_StationButtons.push_back(unlockBtn);
+
+        // Observe Button
+        UIButton observeBtn;
+        observeBtn.text = "OBSERVE";
+        observeBtn.color = Color::QuantumPurple() * 0.7f;
+        observeBtn.hoverColor = Color::QuantumPurple();
+        observeBtn.onClick = [this, i]() {
+            auto& st = m_Stations[i];
+            st.Observe(this);
+            Log::Infof("Observed ", st.name);
+        };
+        m_StationButtons.push_back(observeBtn);
+
+        // Upgrade Button
+        UIButton upgradeBtn;
+        upgradeBtn.text = "Upgrade";
+        upgradeBtn.color = Color::EntanglementOrange() * 0.7f;
+        upgradeBtn.hoverColor = Color::EntanglementOrange();
+        upgradeBtn.onClick = [this, i]() {
+            if (SpendResource(QuantumResource::Qubits, m_Stations[i].upgradeCost)) {
+                m_Stations[i].Upgrade();
+                Log::Infof("Upgraded ", m_Stations[i].name, " to level ", m_Stations[i].level);
+            }
+        };
+        m_StationButtons.push_back(upgradeBtn);
+    }
+
+    // Create Prestige Button (last button in the list)
+    UIButton prestigeBtn;
+    prestigeBtn.text = "PRESTIGE";
+    prestigeBtn.color = Color::Magenta() * 0.5f;
+    prestigeBtn.hoverColor = Color::Magenta();
+    prestigeBtn.onClick = [this]() {
+        PerformPrestige();
+    };
+    m_StationButtons.push_back(prestigeBtn);
 }
 
 void GameState::Update(f64 deltaTime, Input* input, Renderer* renderer) {
@@ -461,7 +514,7 @@ void GameState::UpdateUI(Input* input) {
     }
 
     // Update buttons
-    for (auto& button : m_Buttons) {
+    for (auto& button : m_StationButtons) {
         button.Update(mousePos);
 
         if (button.WasClicked(mousePos, mousePressed) && button.onClick) {
@@ -529,11 +582,15 @@ void GameState::RenderResources(Renderer* renderer) {
 }
 
 void GameState::RenderStations(Renderer* renderer) {
-    m_Buttons.clear(); // Rebuild buttons each frame for simplicity
+    // Buttons are persistent and created in InitializeUI
+    // Here we just update their bounds, text, and enabled state, then render them
 
     f32 startY = 120.0f;
     f32 stationHeight = 130.0f;  // Increased height for better spacing
     f32 margin = 15.0f;  // Increased margin
+
+    // Counter for accessing persistent buttons (3 buttons per station + 1 prestige button)
+    size_t buttonIdx = 0;
 
     for (size_t i = 0; i < m_Stations.size(); i++) {
         auto& station = m_Stations[i];
@@ -569,26 +626,20 @@ void GameState::RenderStations(Renderer* renderer) {
         renderer->DrawRect(innerBorder, borderColor * 0.5f, false);
 
         if (!station.unlocked) {
-            // Draw unlock button with better text
+            // Draw locked station title
             Vec2 titlePos(45.0f, y + 25.0f);
             renderer->DrawText(station.name + " (LOCKED)", titlePos, Color(0.7f, 0.4f, 0.4f, 1.0f), 22.0f);
 
-            UIButton unlockBtn;
+            // Update unlock button from persistent list
+            UIButton& unlockBtn = m_StationButtons[buttonIdx++];
             unlockBtn.bounds = Rect(40.0f, y + 60.0f, 200.0f, 40.0f);
             unlockBtn.text = "Unlock (" + std::to_string(static_cast<int>(station.unlockCost)) + " Qubits)";
-            unlockBtn.color = Color::QuantumBlue() * 0.7f;
-            unlockBtn.hoverColor = Color::QuantumBlue();
             unlockBtn.enabled = m_Resources[0] >= station.unlockCost;
-            unlockBtn.onClick = [this, i]() {
-                if (SpendResource(QuantumResource::Qubits, m_Stations[i].unlockCost)) {
-                    m_Stations[i].unlocked = true;
-                    m_Stations[i].level = 0; // Not upgraded yet
-                    Log::Infof("Unlocked: ", m_Stations[i].name);
-                }
-            };
 
             unlockBtn.Render(renderer);
-            m_Buttons.push_back(unlockBtn);
+
+            // Skip observe and upgrade buttons for this station (they won't be rendered)
+            buttonIdx += 2;
             continue;
         }
 
@@ -621,74 +672,36 @@ void GameState::RenderStations(Renderer* renderer) {
         Color probColor = station.superpositionProbability > 0.7f ? Color::CoherenceGreen() : Color::Yellow();
         renderer->DrawText("Success: " + probOss.str(), probPos, probColor, 15.0f);
 
-        // Observe button - improved positioning
-        UIButton observeBtn;
+        // Skip unlock button (not needed for unlocked stations)
+        buttonIdx++;
+
+        // Get observe button from persistent list
+        UIButton& observeBtn = m_StationButtons[buttonIdx++];
         observeBtn.bounds = Rect(45.0f, y + 88.0f, 160.0f, 36.0f);
-        observeBtn.text = "OBSERVE";
-        observeBtn.color = Color::QuantumPurple() * 0.7f;
-        observeBtn.hoverColor = Color::QuantumPurple();
         observeBtn.enabled = station.superpositionValue > 0.1;
-        observeBtn.onClick = [this, i, renderer]() {
-            auto& st = m_Stations[i];
-            f64 value = st.superpositionValue;
-            st.Observe(this);
-
-            // Spawn particle effects
-            Rect stationRect(20.0f, 120.0f + i * 130.0f, 800.0f, 120.0f);
-            Vec2 center = stationRect.Center();
-            for (int p = 0; p < 20; p++) {
-                Renderer::Particle particle;
-                particle.position = center;
-                f32 angle = (rand() % 360) * 3.14159f / 180.0f;
-                f32 speed = 50.0f + (rand() % 100);
-                particle.velocity = Vec2(cosf(angle) * speed, sinf(angle) * speed);
-                particle.color = Color::QuantumPurple();
-                particle.life = 0.5f + (rand() % 100) / 200.0f;
-                particle.maxLife = particle.life;
-                particle.size = 3.0f + (rand() % 5);
-                renderer->AddParticle(particle);
-            }
-
-            Log::Infof("Observed ", st.name, ", collapsed value: ", value);
-        };
 
         observeBtn.Render(renderer);
-        m_Buttons.push_back(observeBtn);
 
-        // Upgrade button - improved positioning and size
-        UIButton upgradeBtn;
+        // Get upgrade button from persistent list
+        UIButton& upgradeBtn = m_StationButtons[buttonIdx++];
         upgradeBtn.bounds = Rect(215.0f, y + 88.0f, 210.0f, 36.0f);
         upgradeBtn.text = "Upgrade (" + std::to_string(static_cast<int>(station.upgradeCost)) + ")";
-        upgradeBtn.color = Color::EntanglementOrange() * 0.7f;
-        upgradeBtn.hoverColor = Color::EntanglementOrange();
         upgradeBtn.enabled = m_Resources[0] >= station.upgradeCost;
-        upgradeBtn.onClick = [this, i]() {
-            if (SpendResource(QuantumResource::Qubits, m_Stations[i].upgradeCost)) {
-                m_Stations[i].Upgrade();
-                Log::Infof("Upgraded ", m_Stations[i].name, " to level ", m_Stations[i].level);
-            }
-        };
 
         upgradeBtn.Render(renderer);
-        m_Buttons.push_back(upgradeBtn);
     }
 
-    // Prestige button
+    // Update prestige button from persistent list (last button)
+    UIButton& prestigeBtn = m_StationButtons.back();
+
     f32 prestigeY = startY + m_Stations.size() * (stationHeight + margin) + 20.0f + m_ScrollOffset.y;
     f64 photonsOnPrestige = CalculatePhotonsOnPrestige();
 
-    UIButton prestigeBtn;
     prestigeBtn.bounds = Rect(20.0f, prestigeY, 400.0f, 60.0f);
     prestigeBtn.text = "PRESTIGE (+" + std::to_string(static_cast<int>(photonsOnPrestige)) + " Photons)";
-    prestigeBtn.color = Color::Magenta() * 0.5f;
-    prestigeBtn.hoverColor = Color::Magenta();
     prestigeBtn.enabled = photonsOnPrestige > 0;
-    prestigeBtn.onClick = [this]() {
-        PerformPrestige();
-    };
 
     prestigeBtn.Render(renderer);
-    m_Buttons.push_back(prestigeBtn);
 }
 
 void GameState::RenderUI(Renderer* renderer) {
