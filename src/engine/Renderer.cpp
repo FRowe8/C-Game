@@ -294,22 +294,6 @@ void Renderer::DrawText(const std::string& text, const Vec2& position, const Col
     }
 }
 
-void Renderer::DrawTexture(u32 textureId, const Rect& destRect) {
-    glEnable(GL_TEXTURE_2D);
-    glBindTexture(GL_TEXTURE_2D, textureId);
-
-    glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
-
-    glBegin(GL_QUADS);
-        glTexCoord2f(0.0f, 0.0f); glVertex2f(destRect.x, destRect.y);
-        glTexCoord2f(1.0f, 0.0f); glVertex2f(destRect.x + destRect.width, destRect.y);
-        glTexCoord2f(1.0f, 1.0f); glVertex2f(destRect.x + destRect.width, destRect.y + destRect.height);
-        glTexCoord2f(0.0f, 1.0f); glVertex2f(destRect.x, destRect.y + destRect.height);
-    glEnd();
-
-    glBindTexture(GL_TEXTURE_2D, 0);
-}
-
 void Renderer::AddParticle(const Particle& particle) {
     m_Particles.push_back(particle);
 }
