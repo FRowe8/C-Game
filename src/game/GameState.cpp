@@ -295,8 +295,8 @@ void GameState::InitializeStations() {
     station1.description = "Generates qubits in superposition";
     station1.resourceType = QuantumResource::Qubits;
     station1.baseProduction = 1.0;
-    station1.currentProduction = 0;
-    station1.level = 0;
+    station1.currentProduction = 1.0; // Start producing immediately
+    station1.level = 1; // Start at level 1 for immediate passive income
     station1.upgradeCost = 10.0;
     station1.upgradeCostMultiplier = 1.15;
     station1.superpositionProbability = 0.7;
@@ -485,6 +485,29 @@ void GameState::UpdateCoherence(f64 deltaTime) {
 void GameState::UpdateUI(Input* input) {
     Vec2 mousePos = input->GetMousePosition();
     bool mousePressed = input->IsMouseButtonPressed(MouseButton::Left);
+
+    // Scrolling support
+    if (!m_ShowAchievements && !m_ShowStats && !m_ShowResearch && !m_ShowMilestones) {
+        // Mouse wheel scrolling (desktop)
+        f32 mouseWheel = input->GetMouseWheel();
+        if (mouseWheel != 0) {
+            m_ScrollOffset.y += mouseWheel * 30.0f; // Scroll speed
+        }
+
+        // Touch drag scrolling (mobile)
+        const auto& touches = input->GetTouches();
+        if (!touches.empty()) {
+            const auto& touch = touches[0]; // Use first touch
+            m_ScrollOffset.y += touch.delta.y;
+        }
+
+        // Clamp scroll bounds
+        f32 maxScroll = 0.0f; // Can't scroll up past the top
+        f32 minScroll = -((m_Stations.size() + 1) * 145.0f - 600.0f); // Allow scrolling to bottom
+        if (minScroll > 0) minScroll = 0; // If content fits on screen, don't allow scrolling
+
+        m_ScrollOffset.y = std::max(minScroll, std::min(maxScroll, m_ScrollOffset.y));
+    }
 
     // Keyboard shortcuts
     // SDL_SCANCODE_A = 4, M = 13, R = 15, S = 16, ESCAPE = 41
