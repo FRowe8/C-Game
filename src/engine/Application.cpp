@@ -125,6 +125,8 @@ bool Application::Initialize() {
 #endif
 
     m_Input = CreateScope<Input>();
+    // Set window size for touch coordinate scaling
+    m_Input->SetWindowSize(static_cast<f32>(m_Config.windowWidth), static_cast<f32>(m_Config.windowHeight));
 
     m_GameState = CreateScope<GameState>();
     m_GameState->Initialize();
