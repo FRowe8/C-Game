@@ -301,6 +301,17 @@
                 }, false);
                 return canvas;
             })(),
+            // WebGL context attributes for better performance
+            webglContextAttributes: {
+                alpha: false,              // Disable alpha channel (no transparency) for better performance
+                antialias: false,          // Disable antialiasing for pixel-perfect rendering
+                depth: true,               // Enable depth buffer
+                stencil: false,            // Disable stencil buffer (not needed)
+                preserveDrawingBuffer: false,  // Don't preserve buffer between frames
+                powerPreference: "high-performance",  // Request high-performance GPU
+                premultipliedAlpha: true,  // Standard WebGL setting
+                failIfMajorPerformanceCaveat: false  // Allow software rendering if needed
+            },
             setStatus: function(text) {
                 console.log("=== MODULE STATUS: " + (text || "(empty - loaded)") + " ===");
                 var loading = document.getElementById('loading');
