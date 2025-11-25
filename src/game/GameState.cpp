@@ -491,7 +491,18 @@ void GameState::UpdateUI(Input* input) {
         // Mouse wheel scrolling (desktop)
         f32 mouseWheel = input->GetMouseWheel();
         if (mouseWheel != 0) {
-            m_ScrollOffset.y += mouseWheel * 30.0f; // Scroll speed
+            m_ScrollOffset.y += mouseWheel * 50.0f; // Increased scroll speed
+        }
+
+        // Keyboard arrow scrolling (UP/DOWN arrow keys)
+        // SDL_SCANCODE_UP = 82, DOWN = 81
+        const int KEY_UP = 82;
+        const int KEY_DOWN = 81;
+        if (input->IsKeyDown(KEY_UP)) {
+            m_ScrollOffset.y += 5.0f; // Smooth scroll up
+        }
+        if (input->IsKeyDown(KEY_DOWN)) {
+            m_ScrollOffset.y -= 5.0f; // Smooth scroll down
         }
 
         // Touch drag scrolling (mobile)
@@ -503,7 +514,9 @@ void GameState::UpdateUI(Input* input) {
 
         // Clamp scroll bounds
         f32 maxScroll = 0.0f; // Can't scroll up past the top
-        f32 minScroll = -((m_Stations.size() + 1) * 145.0f - 600.0f); // Allow scrolling to bottom
+        f32 contentHeight = (m_Stations.size() * 145.0f) + 200.0f; // Total content height
+        f32 viewportHeight = 600.0f; // Visible area height
+        f32 minScroll = -(contentHeight - viewportHeight);
         if (minScroll > 0) minScroll = 0; // If content fits on screen, don't allow scrolling
 
         m_ScrollOffset.y = std::max(minScroll, std::min(maxScroll, m_ScrollOffset.y));
