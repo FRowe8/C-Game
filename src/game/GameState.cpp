@@ -115,83 +115,61 @@ void UIButton::Update(const Vec2& mousePos) {
     hovered = enabled && bounds.Contains(mousePos);
 }
 
+// In UIButton implementation
+
 void UIButton::Render(Renderer* renderer) {
-    // Determine button colors based on state
-    Color renderColor, borderColor, shadowColor;
+    // --- 1. Determine Button Colors and State ---
+    Color renderColor, borderColor, textColor;
+    f32 baseAlpha = 0.85f;
 
     if (!enabled) {
-        // Disabled state: dark gray
-        renderColor = Color(0.25f, 0.25f, 0.28f, 0.6f);
-        borderColor = Color(0.4f, 0.4f, 0.45f, 0.8f);
-        shadowColor = Color(0.0f, 0.0f, 0.0f, 0.3f);
+        // Disabled: Muted gray/dark blue
+        renderColor = Color(0.15f, 0.15f, 0.2f, baseAlpha * 0.5f);
+        borderColor = Color(0.2f, 0.2f, 0.25f, baseAlpha * 0.5f);
+        textColor = Color(0.5f, 0.5f, 0.55f, 1.0f);
     } else if (hovered) {
-        // Hovered state: brighter with glow
-        renderColor = hoverColor * 1.1f;
-        renderColor.a = 0.95f;
-        borderColor = Color::White() * 0.9f;
-        shadowColor = hoverColor * 0.8f;
-        shadowColor.a = 0.6f;
+        // Hovered: Brighter color, strong white border, strong glow
+        renderColor = hoverColor * 0.9f;
+        renderColor.a = baseAlpha + 0.1f;
+        borderColor = Color::White() * 0.8f;
+        textColor = Color::White();
     } else {
-        // Normal state
+        // Normal: Standard color
         renderColor = color;
-        renderColor.a = 0.85f;
-        borderColor = Color::White() * 0.6f;
-        shadowColor = Color(0.0f, 0.0f, 0.0f, 0.4f);
+        renderColor.a = baseAlpha;
+        borderColor = color * 1.5f; // Slight color-matched border
+        borderColor.a = 0.5f;
+        textColor = Color::White();
     }
 
-    // Draw shadow (offset slightly down and right for depth)
-    Rect shadowRect = bounds;
-    shadowRect.x += 3.0f;
-    shadowRect.y += 3.0f;
-    renderer->DrawRect(shadowRect, shadowColor, true);
+    // --- 2. Draw Background (Subtle flat fill) ---
+    // Use a single, slightly transparent fill for a 'glass' effect
+    renderer->DrawRect(bounds, renderColor, true);
 
-    // Draw button background with subtle gradient effect
-    // Top half - slightly lighter
-    Rect topHalf(bounds.x, bounds.y, bounds.width, bounds.height * 0.5f);
-    Color topColor = renderColor * 1.15f;
-    topColor.a = renderColor.a;
-    renderer->DrawRect(topHalf, topColor, true);
-
-    // Bottom half - normal color
-    Rect bottomHalf(bounds.x, bounds.y + bounds.height * 0.5f, bounds.width, bounds.height * 0.5f);
-    renderer->DrawRect(bottomHalf, renderColor, true);
-
-    // Draw multiple borders for depth effect
-    // Outer border (thicker)
+    // --- 3. Draw Border ---
     renderer->DrawRect(bounds, borderColor, false);
-
-    // Inner highlight border (creates 3D effect)
-    Rect innerBorder(bounds.x + 2.0f, bounds.y + 2.0f,
-                     bounds.width - 4.0f, bounds.height - 4.0f);
-    Color highlightColor = hovered ? Color::White() * 0.4f : Color::White() * 0.2f;
-    renderer->DrawRect(innerBorder, highlightColor, false);
-
-    // Draw glow effect on hover
+    
+    // --- 4. Draw Hover Glow (for modern feedback) ---
     if (hovered && enabled) {
-        Rect glowRect(bounds.x - 2.0f, bounds.y - 2.0f,
-                      bounds.width + 4.0f, bounds.height + 4.0f);
+        // Create a distinct glow effect outside the main button
+        Rect glowRect(bounds.x - 1.0f, bounds.y - 1.0f,
+                      bounds.width + 2.0f, bounds.height + 2.0f);
         Color glowColor = hoverColor;
-        glowColor.a = 0.3f;
+        glowColor.a = 0.3f; // Less opaque glow
         renderer->DrawRect(glowRect, glowColor, false);
     }
 
-    // Draw text (properly centered)
+    // --- 5. Draw Text (Perfectly Centered for professionalism) ---
     Vec2 textPos = bounds.Center();
-    // Approximate text width based on character count (will be better with TTF)
+    
+    // NOTE: This text rendering part still relies on a rough text width estimate.
+    // For true professionalism, this must be replaced with accurate font rendering metrics (e.g., proper TTF text size calculation).
     f32 approxTextWidth = text.length() * 9.0f; // Rough estimate for 16pt font
+    
     textPos.x -= approxTextWidth * 0.5f;
-    textPos.y -= 8.0f;
+    textPos.y -= 8.0f; // Adjust for vertical centering (font-dependent)
 
-    // Text with subtle shadow for readability
-    if (enabled) {
-        // Text shadow
-        Vec2 shadowTextPos = textPos;
-        shadowTextPos.x += 1.0f;
-        shadowTextPos.y += 1.0f;
-        renderer->DrawText(text, shadowTextPos, Color(0.0f, 0.0f, 0.0f, 0.7f), 16.0f);
-    }
-
-    Color textColor = enabled ? Color::White() : Color(0.6f, 0.6f, 0.6f, 1.0f);
+    // No text shadow for a flatter, cleaner look
     renderer->DrawText(text, textPos, textColor, 16.0f);
 }
 
@@ -622,8 +600,8 @@ void GameState::RenderStations(Renderer* renderer) {
     // Here we just update their bounds, text, and enabled state, then render them
 
     f32 startY = 120.0f;
-    f32 stationHeight = 130.0f;  // Increased height for better spacing
-    f32 margin = 15.0f;  // Increased margin
+    f32 stationHeight = 150.0f; // Increased height for the new layout
+    f32 margin = 20.0f; // Generous margin for breathing room
 
     // Counter for accessing persistent buttons (3 buttons per station + 1 prestige button)
     size_t buttonIdx = 0;
@@ -631,110 +609,123 @@ void GameState::RenderStations(Renderer* renderer) {
     for (size_t i = 0; i < m_Stations.size(); i++) {
         auto& station = m_Stations[i];
         f32 y = startY + i * (stationHeight + margin) + m_ScrollOffset.y;
+        
+        // Define the main panel area
+        Rect stationRect(30.0f, y, static_cast<f32>(renderer->GetWidth()) - 60.0f, stationHeight);
 
-        // Station background with improved visuals
-        Rect stationRect(25.0f, y, static_cast<f32>(renderer->GetWidth()) - 50.0f, stationHeight);
-
-        // Draw shadow for depth
-        Rect shadowRect = stationRect;
-        shadowRect.x += 4.0f;
-        shadowRect.y += 4.0f;
-        renderer->DrawRect(shadowRect, Color(0.0f, 0.0f, 0.0f, 0.4f), true);
-
-        // Improved background colors with subtle gradients
+        // --- New Glass-Panel Background ---
         Color bgColor, borderColor;
         if (station.unlocked) {
-            // Unlocked stations: darker blue-tinted background
-            bgColor = Color(0.12f, 0.15f, 0.22f, 0.95f);
-            borderColor = Color::QuantumBlue() * 0.6f;
+            bgColor = Color(0.1f, 0.12f, 0.18f, 0.8f); // Darker, subtle background
+            borderColor = Color::QuantumBlue() * 0.7f;
+            borderColor.a = 0.8f;
         } else {
-            // Locked stations: very dark with red tint
-            bgColor = Color(0.15f, 0.1f, 0.1f, 0.7f);
+            bgColor = Color(0.15f, 0.1f, 0.1f, 0.6f);
             borderColor = Color(0.4f, 0.2f, 0.2f, 0.8f);
         }
 
+        // Draw the background panel (No heavy shadow for a flatter look)
         renderer->DrawRect(stationRect, bgColor, true);
-
-        // Draw double border for emphasis
         renderer->DrawRect(stationRect, borderColor, false);
-        Rect innerBorder(stationRect.x + 2.0f, stationRect.y + 2.0f,
-                        stationRect.width - 4.0f, stationRect.height - 4.0f);
-        renderer->DrawRect(innerBorder, borderColor * 0.5f, false);
+        
+        // Draw a light internal separator line for the Information block
+        Rect separator(stationRect.x + 5.0f, stationRect.y + 70.0f, stationRect.width - 10.0f, 2.0f);
+        renderer->DrawRect(separator, borderColor * 0.5f, true);
 
+
+        // ----------------------------------------------------------------------
+        // --- LOCKED STATION UI ---
+        // ----------------------------------------------------------------------
         if (!station.unlocked) {
-            // Draw locked station title
-            Vec2 titlePos(45.0f, y + 25.0f);
-            renderer->DrawText(station.name + " (LOCKED)", titlePos, Color(0.7f, 0.4f, 0.4f, 1.0f), 22.0f);
+            // Title and description
+            Vec2 titlePos(stationRect.x + 20.0f, y + 25.0f);
+            renderer->DrawText(station.name + " // CLASSIFIED", titlePos, Color(0.7f, 0.4f, 0.4f, 1.0f), 22.0f);
+            
+            Vec2 descPos(stationRect.x + 20.0f, y + 50.0f);
+            renderer->DrawText(station.description, descPos, Color(0.5f, 0.5f, 0.55f, 1.0f), 13.0f);
 
-            // Update unlock button from persistent list
+            // Update unlock button (below the separator line)
             UIButton& unlockBtn = m_StationButtons[buttonIdx++];
-            unlockBtn.bounds = Rect(40.0f, y + 60.0f, 200.0f, 40.0f);
-            unlockBtn.text = "Unlock (" + std::to_string(static_cast<int>(station.unlockCost)) + " Qubits)";
+            unlockBtn.bounds = Rect(stationRect.x + 20.0f, y + 85.0f, 300.0f, 45.0f);
+            unlockBtn.text = "UNLOCK FIELD (" + std::to_string(static_cast<i64>(station.unlockCost)) + " Qubits)";
             unlockBtn.enabled = m_Resources[0] >= station.unlockCost;
 
             unlockBtn.Render(renderer);
 
-            // Skip observe and upgrade buttons for this station (they won't be rendered)
+            // Skip observe and upgrade buttons
             buttonIdx += 2;
             continue;
         }
 
-        // Draw station info with better spacing and hierarchy
-        Vec2 titlePos(45.0f, y + 15.0f);
-        renderer->DrawText(station.name + " Lv." + std::to_string(station.level), titlePos, Color::White(), 20.0f);
+        // ----------------------------------------------------------------------
+        // --- UNLOCKED STATION UI (Information Block - Top Half) ---
+        // ----------------------------------------------------------------------
+        
+        // Station Title and Level (Main Header)
+        Vec2 titlePos(stationRect.x + 20.0f, y + 15.0f);
+        renderer->DrawText(station.name + " | Lv." + std::to_string(station.level), titlePos, Color::White(), 22.0f);
 
-        Vec2 descPos(45.0f, y + 42.0f);
+        // Station Description (Sub-Header)
+        Vec2 descPos(stationRect.x + 20.0f, y + 40.0f);
         renderer->DrawText(station.description, descPos, Color(0.75f, 0.75f, 0.8f, 1.0f), 13.0f);
 
-        // Draw production with icon-like prefix
+        // Production Rate (Left Block)
         std::ostringstream prodOss;
         prodOss.precision(2);
-        prodOss << std::fixed << station.currentProduction << "/s";
-        Vec2 prodPos(45.0f, y + 65.0f);
-        renderer->DrawText(">> Production: " + prodOss.str(), prodPos, Color::CoherenceGreen() * 1.1f, 15.0f);
+        prodOss << std::fixed << (station.currentProduction * GetTimeline()->photonBonus) << "/s";
+        Vec2 prodPos(stationRect.x + 20.0f, y + 58.0f);
+        renderer->DrawText("PROD: " + prodOss.str(), prodPos, Color::CoherenceGreen() * 1.1f, 15.0f);
 
-        // Draw superposition value with improved color
+        // Superposition Value (Center Block)
         std::ostringstream superOss;
         superOss.precision(1);
         superOss << std::fixed << station.superpositionValue;
-        Vec2 superPos(320.0f, y + 65.0f);
-        renderer->DrawText("Superposition: " + superOss.str(), superPos, Color::QuantumPurple() * 1.2f, 15.0f);
+        Vec2 superPos(stationRect.x + 250.0f, y + 58.0f);
+        renderer->DrawText("SUPERPOSITION: " + superOss.str(), superPos, Color::QuantumPurple() * 1.2f, 15.0f);
 
-        // Draw probability with better color
+        // Probability (Right Block)
         std::ostringstream probOss;
         probOss.precision(0);
         probOss << std::fixed << (station.superpositionProbability * 100.0f) << "%";
-        Vec2 probPos(590.0f, y + 65.0f);
+        Vec2 probPos(stationRect.x + 480.0f, y + 58.0f);
         Color probColor = station.superpositionProbability > 0.7f ? Color::CoherenceGreen() : Color::Yellow();
-        renderer->DrawText("Success: " + probOss.str(), probPos, probColor, 15.0f);
+        renderer->DrawText("COLLAPSE CHANCE: " + probOss.str(), probPos, probColor, 15.0f);
 
+
+        // ----------------------------------------------------------------------
+        // --- UNLOCKED STATION UI (Action Block - Bottom Half) ---
+        // ----------------------------------------------------------------------
+        
         // Skip unlock button (not needed for unlocked stations)
         buttonIdx++;
 
-        // Get observe button from persistent list
+        // Get observe button (Left Button)
         UIButton& observeBtn = m_StationButtons[buttonIdx++];
-        observeBtn.bounds = Rect(45.0f, y + 88.0f, 160.0f, 36.0f);
+        observeBtn.bounds = Rect(stationRect.x + 20.0f, y + 85.0f, 200.0f, 45.0f);
         observeBtn.enabled = station.superpositionValue > 0.1;
-
         observeBtn.Render(renderer);
 
-        // Get upgrade button from persistent list
+        // Get upgrade button (Right Button)
         UIButton& upgradeBtn = m_StationButtons[buttonIdx++];
-        upgradeBtn.bounds = Rect(215.0f, y + 88.0f, 210.0f, 36.0f);
-        upgradeBtn.text = "Upgrade (" + std::to_string(static_cast<int>(station.upgradeCost)) + ")";
+        upgradeBtn.bounds = Rect(stationRect.x + 240.0f, y + 85.0f, 250.0f, 45.0f);
+        upgradeBtn.text = "UPGRADE CORE (" + std::to_string(static_cast<i64>(station.upgradeCost)) + ")";
         upgradeBtn.enabled = m_Resources[0] >= station.upgradeCost;
-
         upgradeBtn.Render(renderer);
     }
+
+    // ----------------------------------------------------------------------
+    // --- PRESTIGE BUTTON ---
+    // ----------------------------------------------------------------------
 
     // Update prestige button from persistent list (last button)
     UIButton& prestigeBtn = m_StationButtons.back();
 
     f32 prestigeY = startY + m_Stations.size() * (stationHeight + margin) + 20.0f + m_ScrollOffset.y;
     f64 photonsOnPrestige = CalculatePhotonsOnPrestige();
-
-    prestigeBtn.bounds = Rect(20.0f, prestigeY, 400.0f, 60.0f);
-    prestigeBtn.text = "PRESTIGE (+" + std::to_string(static_cast<int>(photonsOnPrestige)) + " Photons)";
+    
+    // Make the prestige button full width and more prominent
+    prestigeBtn.bounds = Rect(30.0f, prestigeY, static_cast<f32>(renderer->GetWidth()) - 60.0f, 60.0f);
+    prestigeBtn.text = "QUANTUM LEAP: INITIATE PRESTIGE (+" + std::to_string(static_cast<i64>(photonsOnPrestige)) + " PHOTONS)";
     prestigeBtn.enabled = photonsOnPrestige > 0;
 
     prestigeBtn.Render(renderer);
