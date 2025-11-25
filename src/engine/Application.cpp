@@ -200,6 +200,9 @@ void Application::RunFrame() {
 }
 
 void Application::ProcessEvents() {
+    // Update input state first (clears previous frame's input)
+    m_Input->Update();
+
     SDL_Event event;
     while (SDL_PollEvent(&event)) {
         if (event.type == SDL_QUIT) {
@@ -209,9 +212,6 @@ void Application::ProcessEvents() {
         // Let input system process the event
         m_Input->ProcessEvent(event);
     }
-
-    // Update input state
-    m_Input->Update();
 }
 
 void Application::Update(f64 deltaTime) {
