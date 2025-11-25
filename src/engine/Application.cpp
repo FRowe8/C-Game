@@ -46,10 +46,22 @@ bool Application::Initialize() {
     }
 
     // Set OpenGL attributes
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 1);
     SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
     SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
+
+#ifdef __EMSCRIPTEN__
+    // For web: Request OpenGL ES 2.0 (WebGL 1) to avoid legacy emulation
+    // This prevents Emscripten from needing to emulate desktop OpenGL
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
+    Log::Info("Requesting OpenGL ES 2.0 context for WebGL");
+#else
+    // For desktop: Use OpenGL 2.1 compatibility profile
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 1);
+    Log::Info("Requesting OpenGL 2.1 context for desktop");
+#endif
 
     // Create window
     u32 windowFlags = SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN;

@@ -268,7 +268,8 @@ elseif(PLATFORM_WEB)
         "-sUSE_SDL_TTF=2"
         "-sLEGACY_GL_EMULATION=1"  # Emulate legacy OpenGL (glBegin/glEnd/etc)
         "-sGL_UNSAFE_OPTS=0"  # Disable unsafe GL optimizations to prevent warnings
-        "-sMAX_WEBGL_VERSION=2"  # Prefer WebGL 2 if available
+        "-sMIN_WEBGL_VERSION=1"  # Require at least WebGL 1
+        "-sMAX_WEBGL_VERSION=1"  # Use WebGL 1 (OpenGL ES 2.0 compatible)
         "-sALLOW_MEMORY_GROWTH=1"
         "-sINITIAL_MEMORY=67108864"  # 64MB
         "-sMAXIMUM_MEMORY=268435456"  # 256MB max
