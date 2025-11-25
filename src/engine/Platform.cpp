@@ -2,6 +2,7 @@
 #include <SDL.h>
 #include <sys/stat.h>
 #include <cstring>
+#include <cerrno>  // For errno and EEXIST
 
 #ifdef PLATFORM_WINDOWS
 #include <windows.h>
@@ -21,7 +22,10 @@ namespace Platform {
 std::string GetSaveDirectory() {
     std::string saveDir;
 
-#ifdef PLATFORM_WINDOWS
+#ifdef __EMSCRIPTEN__
+    // For web: Use IndexedDB virtual filesystem
+    saveDir = "/idbfs/QuantumIdle/";
+#elif defined(PLATFORM_WINDOWS)
     char path[MAX_PATH];
     if (SUCCEEDED(SHGetFolderPathA(NULL, CSIDL_APPDATA, NULL, 0, path))) {
         saveDir = std::string(path) + "\\QuantumIdle\\";
@@ -71,7 +75,9 @@ uint64_t GetTicks() {
 }
 
 std::string GetPlatformName() {
-#ifdef PLATFORM_WINDOWS
+#ifdef __EMSCRIPTEN__
+    return "Web (Emscripten)";
+#elif defined(PLATFORM_WINDOWS)
     return "Windows";
 #elif defined(PLATFORM_MACOS)
     return "macOS";

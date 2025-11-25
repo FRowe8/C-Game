@@ -37,6 +37,24 @@ bool Application::Initialize() {
 
 #ifdef __EMSCRIPTEN__
     printf("=== EMSCRIPTEN BUILD - Starting initialization ===\n");
+
+    // Mount IndexedDB filesystem for persistent saves
+    printf("=== Mounting IndexedDB filesystem ===\n");
+    EM_ASM(
+        // Create the /idbfs directory
+        FS.mkdir('/idbfs');
+        // Mount IndexedDB filesystem
+        FS.mount(IDBFS, {}, '/idbfs');
+        // Sync from IndexedDB to memory (load existing saves)
+        FS.syncfs(true, function(err) {
+            if (err) {
+                console.error('Error loading saves from IndexedDB:', err);
+            } else {
+                console.log('Successfully loaded saves from IndexedDB');
+            }
+        });
+    );
+    printf("=== IndexedDB filesystem mounted ===\n");
 #endif
 
     // Initialize SDL
@@ -224,6 +242,20 @@ void Application::Shutdown() {
     if (!m_Initialized) return;
 
     Log::Info("Shutting down application...");
+
+#ifdef __EMSCRIPTEN__
+    // Sync filesystem to IndexedDB before shutdown (save to browser storage)
+    printf("=== Syncing saves to IndexedDB ===\n");
+    EM_ASM(
+        FS.syncfs(false, function(err) {
+            if (err) {
+                console.error('Error saving to IndexedDB:', err);
+            } else {
+                console.log('Successfully saved to IndexedDB');
+            }
+        });
+    );
+#endif
 
     m_GameState.reset();
     m_Input.reset();
