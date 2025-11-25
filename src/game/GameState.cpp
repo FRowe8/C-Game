@@ -596,12 +596,11 @@ void GameState::RenderResources(Renderer* renderer) {
 }
 
 void GameState::RenderStations(Renderer* renderer) {
-    // Buttons are persistent and created in InitializeUI
-    // Here we just update their bounds, text, and enabled state, then render them
+    // ... (rest of function setup remains the same)
 
     f32 startY = 120.0f;
-    f32 stationHeight = 150.0f; // Increased height for the new layout
-    f32 margin = 20.0f; // Generous margin for breathing room
+    f32 stationHeight = 150.0f;
+    f32 margin = 20.0f;
 
     // Counter for accessing persistent buttons (3 buttons per station + 1 prestige button)
     size_t buttonIdx = 0;
@@ -616,7 +615,7 @@ void GameState::RenderStations(Renderer* renderer) {
         // --- New Glass-Panel Background ---
         Color bgColor, borderColor;
         if (station.unlocked) {
-            bgColor = Color(0.1f, 0.12f, 0.18f, 0.8f); // Darker, subtle background
+            bgColor = Color(0.1f, 0.12f, 0.18f, 0.8f); 
             borderColor = Color::QuantumBlue() * 0.7f;
             borderColor.a = 0.8f;
         } else {
@@ -624,7 +623,7 @@ void GameState::RenderStations(Renderer* renderer) {
             borderColor = Color(0.4f, 0.2f, 0.2f, 0.8f);
         }
 
-        // Draw the background panel (No heavy shadow for a flatter look)
+        // Draw the background panel 
         renderer->DrawRect(stationRect, bgColor, true);
         renderer->DrawRect(stationRect, borderColor, false);
         
@@ -672,7 +671,8 @@ void GameState::RenderStations(Renderer* renderer) {
         // Production Rate (Left Block)
         std::ostringstream prodOss;
         prodOss.precision(2);
-        prodOss << std::fixed << (station.currentProduction * GetTimeline()->photonBonus) << "/s";
+        // *** FIX APPLIED HERE: m_Timeline.photonBonus instead of GetTimeline()->photonBonus ***
+        prodOss << std::fixed << (station.currentProduction * m_Timeline.photonBonus) << "/s"; 
         Vec2 prodPos(stationRect.x + 20.0f, y + 58.0f);
         renderer->DrawText("PROD: " + prodOss.str(), prodPos, Color::CoherenceGreen() * 1.1f, 15.0f);
 
@@ -696,7 +696,7 @@ void GameState::RenderStations(Renderer* renderer) {
         // --- UNLOCKED STATION UI (Action Block - Bottom Half) ---
         // ----------------------------------------------------------------------
         
-        // Skip unlock button (not needed for unlocked stations)
+        // Skip unlock button 
         buttonIdx++;
 
         // Get observe button (Left Button)
