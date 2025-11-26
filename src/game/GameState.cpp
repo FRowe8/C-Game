@@ -196,7 +196,7 @@ bool UIButton::WasClicked(const Vec2& mousePos, bool mousePressed) {
 GameState::GameState()
     : m_CurrentEvent(nullptr), m_TimeSinceLastEvent(0), m_EventCooldown(120.0),
       m_LastSaveTimestamp(0),
-      m_ShowAchievements(false), m_ShowStats(false), m_ShowResearch(false), m_ShowMilestones(false),
+      m_ShowAchievements(false), m_ShowStats(false), m_ShowResearch(false), m_ShowMilestones(false), m_ShowBuyables(false),
       m_NumberFormat(GameUtils::NumberFormat::Suffix),
       m_TotalTimePlayed(0), m_TimeSinceLastSave(0),
       m_Coherence(100), m_MaxCoherence(100), m_CoherenceDecayRate(1.0) {
@@ -268,6 +268,10 @@ void GameState::Initialize() {
     // Initialize Milestone System
     m_MilestoneSystem.Initialize();
     Log::Info("Milestone system initialized");
+
+    // Initialize Buyables System
+    m_BuyableManager.Initialize(this);
+    Log::Info("Buyables system initialized");
 
     // Try to load save file
     std::string savePath = Platform::GetSaveDirectory() + "quantum_save.json";
@@ -516,8 +520,9 @@ void GameState::UpdateUI(Input* input) {
     }
 
     // Keyboard shortcuts
-    // SDL_SCANCODE_A = 4, F = 9, M = 13, R = 15, S = 16, ESCAPE = 41
+    // SDL_SCANCODE_A = 4, B = 5, F = 9, M = 13, R = 15, S = 16, ESCAPE = 41
     const int KEY_A = 4;
+    const int KEY_B = 5;
     const int KEY_F = 9;
     const int KEY_M = 13;
     const int KEY_R = 15;
@@ -536,6 +541,9 @@ void GameState::UpdateUI(Input* input) {
     if (input->IsKeyPressed(KEY_M)) {
         m_ShowMilestones = !m_ShowMilestones;
     }
+    if (input->IsKeyPressed(KEY_B)) {
+        m_ShowBuyables = !m_ShowBuyables;
+    }
     if (input->IsKeyPressed(KEY_F)) {
         // Toggle number format between Suffix and Scientific
         m_NumberFormat = (m_NumberFormat == GameUtils::NumberFormat::Suffix)
@@ -548,6 +556,7 @@ void GameState::UpdateUI(Input* input) {
         m_ShowStats = false;
         m_ShowResearch = false;
         m_ShowMilestones = false;
+        m_ShowBuyables = false;
     }
 
     // Handle popup close button clicks (X button in top-right of panels)
@@ -583,6 +592,7 @@ void GameState::UpdateUI(Input* input) {
 
         // Check close buttons for each popup (in reverse render order - check top-most first)
         bool handled = false;
+        if (!handled) handled = checkCloseButton(m_ShowBuyables, 900.0f, 600.0f, &m_ShowBuyables);
         if (!handled) handled = checkCloseButton(m_ShowMilestones, 950.0f, 670.0f, &m_ShowMilestones);
         if (!handled) handled = checkCloseButton(m_ShowResearch, 900.0f, 600.0f, &m_ShowResearch);
         if (!handled) handled = checkCloseButton(m_ShowStats, 900.0f, 600.0f, &m_ShowStats);
@@ -627,6 +637,38 @@ void GameState::UpdateUI(Input* input) {
             }
         }
 
+        // Handle buyable purchase button clicks (if buyables panel is open)
+        if (!handled && m_ShowBuyables) {
+            f32 panelWidth = 900.0f;
+            f32 panelX = (1280.0f - panelWidth) / 2.0f;  // Default screen width
+            f32 panelY = (720.0f - 600.0f) / 2.0f;  // Default screen height
+
+            f32 buyableStartY = panelY + 70.0f;
+            f32 buyableX = panelX + 20.0f;
+            f32 buyableWidth = panelWidth - 40.0f;
+            f32 buyableHeight = 100.0f;
+            f32 buyableSpacing = 12.0f;
+
+            auto& buyables = m_BuyableManager.GetBuyables();
+
+            for (size_t i = 0; i < buyables.size(); i++) {
+                f32 buyableY = buyableStartY + (buyableHeight + buyableSpacing) * i;
+
+                // Purchase button rectangle
+                Rect buyBtn(buyableX + buyableWidth - 120.0f, buyableY + 55.0f, 110.0f, 35.0f);
+
+                if (buyBtn.Contains(mousePos)) {
+                    const auto& buyable = buyables[i];
+                    if (m_BuyableManager.Purchase(buyable.id, this)) {
+                        Log::Infof("Purchased: ", buyable.name);
+                        UpdateResearchBonuses(); // Recalculate production with new multipliers
+                    }
+                    handled = true;
+                    break;
+                }
+            }
+        }
+
         // Handle navigation bar button clicks (only if no popup consumed the click)
         if (!handled) {
             f32 navY = 100.0f;
@@ -638,7 +680,7 @@ void GameState::UpdateUI(Input* input) {
             f32 startX = 25.0f;
 
             // Check each navigation button
-            for (int i = 0; i < 4; i++) {
+            for (int i = 0; i < 5; i++) {  // Updated to 5 buttons (added BUYABLES)
                 f32 x = startX + i * (btnWidth + spacing);
                 Rect btnRect(x, btnY, btnWidth, btnHeight);
 
@@ -648,6 +690,7 @@ void GameState::UpdateUI(Input* input) {
                     else if (i == 1) m_ShowAchievements = !m_ShowAchievements;
                     else if (i == 2) m_ShowStats = !m_ShowStats;
                     else if (i == 3) m_ShowMilestones = !m_ShowMilestones;
+                    else if (i == 4) m_ShowBuyables = !m_ShowBuyables;
                     handled = true;
                     break;  // Only handle one click per frame
                 }
@@ -674,6 +717,7 @@ void GameState::Render(Renderer* renderer) {
     RenderStatistics(renderer);
     RenderResearchTree(renderer);
     RenderMilestones(renderer);
+    RenderBuyables(renderer);
     RenderParticleEffects(renderer, 1.0/60.0); // Assume 60 FPS for particles
     RenderAchievementNotifications(renderer);
     RenderMilestoneNotifications(renderer);
@@ -949,10 +993,11 @@ void GameState::RenderUI(Renderer* renderer) {
         {"RESEARCH (R)", &m_ShowResearch, Color::QuantumPurple()},
         {"ACHIEVEMENTS (A)", &m_ShowAchievements, Color::CoherenceGreen()},
         {"STATS (S)", &m_ShowStats, Color::EntanglementOrange()},
-        {"MILESTONES (M)", &m_ShowMilestones, Color::NeonPink()}
+        {"MILESTONES (M)", &m_ShowMilestones, Color::NeonPink()},
+        {"BUYABLES (B)", &m_ShowBuyables, Color::ElectricBlue()}
     };
 
-    for (int i = 0; i < 4; i++) {
+    for (int i = 0; i < 5; i++) {
         auto& btn = navButtons[i];
         f32 x = startX + i * (btnWidth + spacing);
         Rect btnRect(x, btnY, btnWidth, btnHeight);
@@ -1980,9 +2025,28 @@ void GameState::UpdateResearchBonuses() {
     f64 milestoneBonus = 1.0 + m_MilestoneSystem.GetTotalProductionBonus();
     productionMult *= milestoneBonus;
 
+    // Calculate buyable multipliers for each resource type
+    // Each purchase doubles production (2^timesPurchased)
+    auto* quantumAccelerator = m_BuyableManager.GetBuyable("quantum_accelerator");
+    auto* coherenceAmplifier = m_BuyableManager.GetBuyable("coherence_amplifier");
+    auto* entanglementBooster = m_BuyableManager.GetBuyable("entanglement_booster");
+
+    f64 qubitMultiplier = quantumAccelerator ? std::pow(2.0, quantumAccelerator->timesPurchased) : 1.0;
+    f64 coherenceMultiplier = coherenceAmplifier ? std::pow(2.0, coherenceAmplifier->timesPurchased) : 1.0;
+    f64 entanglementMultiplier = entanglementBooster ? std::pow(2.0, entanglementBooster->timesPurchased) : 1.0;
+
     for (auto& station : m_Stations) {
         if (station.unlocked && station.level > 0) {
             station.currentProduction = station.baseProduction * station.level * productionMult;
+
+            // Apply resource-specific buyable multipliers
+            if (station.resourceType == QuantumResource::Qubits) {
+                station.currentProduction *= qubitMultiplier;
+            } else if (station.resourceType == QuantumResource::Coherence) {
+                station.currentProduction *= coherenceMultiplier;
+            } else if (station.resourceType == QuantumResource::Entanglement) {
+                station.currentProduction *= entanglementMultiplier;
+            }
         }
     }
 
@@ -2249,6 +2313,103 @@ void GameState::RenderMilestones(Renderer* renderer) {
             renderer->DrawText(completedText, completedPos, Color::CoherenceGreen(), 12.0f);
 
             completedCount++;
+        }
+    }
+}
+
+void GameState::RenderBuyables(Renderer* renderer) {
+    if (!m_ShowBuyables) return;
+
+    // Background overlay
+    Rect bg(0, 0, static_cast<f32>(renderer->GetWidth()), static_cast<f32>(renderer->GetHeight()));
+    renderer->DrawRect(bg, Color(0.0f, 0.0f, 0.0f, 0.8f), true);
+
+    // Buyables panel
+    f32 panelWidth = 900.0f;
+    f32 panelHeight = 600.0f;
+    f32 panelX = (renderer->GetWidth() - panelWidth) / 2.0f;
+    f32 panelY = (renderer->GetHeight() - panelHeight) / 2.0f;
+
+    Rect panel(panelX, panelY, panelWidth, panelHeight);
+    renderer->DrawRect(panel, Color::DarkPanel(), true);
+    renderer->DrawRect(panel, Color::ElectricBlue() * 0.8f, false);
+
+    // Title
+    Vec2 titlePos(panelX + 20.0f, panelY + 15.0f);
+    renderer->DrawText("BUYABLE UPGRADES", titlePos, Color::ElectricBlue(), 24.0f);
+
+    // Close button (X) in top right
+    f32 closeBtnSize = 30.0f;
+    f32 closeBtnX = panelX + panelWidth - closeBtnSize - 10.0f;
+    f32 closeBtnY = panelY + 10.0f;
+    Rect closeBtn(closeBtnX, closeBtnY, closeBtnSize, closeBtnSize);
+
+    renderer->DrawRect(closeBtn, Color(0.3f, 0.1f, 0.1f, 0.8f), true);
+    renderer->DrawRect(closeBtn, Color::Red() * 0.8f, false);
+
+    Vec2 xPos(closeBtnX + 10.0f, closeBtnY + 8.0f);
+    renderer->DrawText("X", xPos, Color::White(), 16.0f);
+
+    // Hint text
+    Vec2 hintPos(panelX + panelWidth - 200.0f, panelY + 45.0f);
+    renderer->DrawText("(Click X or press B/ESC)", hintPos, Color(0.6f, 0.6f, 0.6f, 1.0f), 11.0f);
+
+    // Buyables list
+    f32 buyableStartY = panelY + 70.0f;
+    f32 buyableX = panelX + 20.0f;
+    f32 buyableWidth = panelWidth - 40.0f;
+    f32 buyableHeight = 100.0f;
+    f32 buyableSpacing = 12.0f;
+
+    auto& buyables = m_BuyableManager.GetBuyables();
+
+    for (size_t i = 0; i < buyables.size(); i++) {
+        const auto& buyable = buyables[i];
+        f32 buyableY = buyableStartY + (buyableHeight + buyableSpacing) * i;
+
+        // Buyable background
+        bool maxed = buyable.IsMaxed();
+        Color buyableBg = maxed ? Color(0.1f, 0.2f, 0.15f, 1.0f) : Color(0.15f, 0.15f, 0.2f, 1.0f);
+        Color buyableBorder = maxed ? Color::CoherenceGreen() * 0.6f : Color::ElectricBlue() * 0.6f;
+
+        Rect buyableRect(buyableX, buyableY, buyableWidth, buyableHeight);
+        renderer->DrawRect(buyableRect, buyableBg, true);
+        renderer->DrawRect(buyableRect, buyableBorder, false);
+
+        // Buyable name
+        Vec2 namePos(buyableX + 10.0f, buyableY + 10.0f);
+        renderer->DrawText(buyable.name, namePos, Color::White(), 18.0f);
+
+        // Purchase count
+        std::string progressStr = buyable.GetProgressString();
+        Vec2 progressPos(buyableX + 400.0f, buyableY + 10.0f);
+        renderer->DrawText("Owned: " + progressStr, progressPos, Color::QuantumPurple(), 14.0f);
+
+        // Description
+        Vec2 descPos(buyableX + 10.0f, buyableY + 35.0f);
+        renderer->DrawText(buyable.description, descPos, Color(0.8f, 0.8f, 0.9f, 1.0f), 13.0f);
+
+        // Cost and Buy button
+        f64 cost = buyable.GetCurrentCost();
+        bool canAfford = buyable.CanAfford(m_Resources[0]);
+
+        if (!maxed) {
+            std::string costStr = GameUtils::FormatNumber(cost, m_NumberFormat) + " Qubits";
+            Vec2 costPos(buyableX + 10.0f, buyableY + 60.0f);
+            Color costColor = canAfford ? Color::CoherenceGreen() : Color(0.7f, 0.5f, 0.5f, 1.0f);
+            renderer->DrawText("Cost: " + costStr, costPos, costColor, 14.0f);
+
+            // Buy button
+            Rect buyBtn(buyableX + buyableWidth - 120.0f, buyableY + 55.0f, 110.0f, 35.0f);
+            Color btnColor = canAfford ? Color::CoherenceGreen() : Color(0.3f, 0.3f, 0.3f, 1.0f);
+            renderer->DrawRect(buyBtn, btnColor * 0.3f, true);
+            renderer->DrawRect(buyBtn, canAfford ? Color::CoherenceGreen() : Color(0.4f, 0.4f, 0.4f, 1.0f), false);
+
+            Vec2 btnTextPos(buyBtn.x + 28.0f, buyBtn.y + 10.0f);
+            renderer->DrawText("PURCHASE", btnTextPos, Color::White(), 14.0f);
+        } else {
+            Vec2 maxedPos(buyableX + 10.0f, buyableY + 60.0f);
+            renderer->DrawText("MAXED OUT", maxedPos, Color::CoherenceGreen(), 16.0f);
         }
     }
 }
