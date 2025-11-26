@@ -528,28 +528,68 @@ void GameState::UpdateUI(Input* input) {
         m_ShowMilestones = false;
     }
 
-    // Handle navigation bar button clicks
+    // Handle popup close button clicks (X button in top-right of panels)
     if (mousePressed) {
-        f32 navY = 100.0f;
-        f32 navHeight = 50.0f;
-        f32 btnWidth = 130.0f;
-        f32 btnHeight = 32.0f;
-        f32 btnY = navY + (navHeight - btnHeight) * 0.5f;
-        f32 spacing = 12.0f;
-        f32 startX = 25.0f;
+        f32 closeBtnSize = 30.0f;
+        f32 screenWidth = 1280.0f;  // Default window width
+        f32 screenHeight = 720.0f;  // Default window height
 
-        // Check each navigation button
-        for (int i = 0; i < 4; i++) {
-            f32 x = startX + i * (btnWidth + spacing);
-            Rect btnRect(x, btnY, btnWidth, btnHeight);
+        // Helper function to check close button for a panel
+        auto checkCloseButton = [&](bool isShown, f32 panelWidth, f32 panelHeight, bool* showFlag) {
+            if (!isShown) return false;
 
-            if (btnRect.Contains(mousePos)) {
-                // Toggle the corresponding panel
-                if (i == 0) m_ShowResearch = !m_ShowResearch;
-                else if (i == 1) m_ShowAchievements = !m_ShowAchievements;
-                else if (i == 2) m_ShowStats = !m_ShowStats;
-                else if (i == 3) m_ShowMilestones = !m_ShowMilestones;
-                break;  // Only handle one click per frame
+            f32 panelX = (screenWidth - panelWidth) / 2.0f;
+            f32 panelY = (screenHeight - panelHeight) / 2.0f;
+            f32 closeBtnX = panelX + panelWidth - closeBtnSize - 10.0f;
+            f32 closeBtnY = panelY + 10.0f;
+            Rect closeBtn(closeBtnX, closeBtnY, closeBtnSize, closeBtnSize);
+
+            if (closeBtn.Contains(mousePos)) {
+                *showFlag = false;
+                return true;  // Click was handled
+            }
+
+            // Click outside panel to close
+            Rect panel(panelX, panelY, panelWidth, panelHeight);
+            if (!panel.Contains(mousePos)) {
+                *showFlag = false;
+                return true;  // Click was handled
+            }
+
+            return false;
+        };
+
+        // Check close buttons for each popup (in reverse render order - check top-most first)
+        bool handled = false;
+        if (!handled) handled = checkCloseButton(m_ShowMilestones, 950.0f, 670.0f, &m_ShowMilestones);
+        if (!handled) handled = checkCloseButton(m_ShowResearch, 900.0f, 600.0f, &m_ShowResearch);
+        if (!handled) handled = checkCloseButton(m_ShowStats, 900.0f, 600.0f, &m_ShowStats);
+        if (!handled) handled = checkCloseButton(m_ShowAchievements, 900.0f, 600.0f, &m_ShowAchievements);
+
+        // Handle navigation bar button clicks (only if no popup consumed the click)
+        if (!handled) {
+            f32 navY = 100.0f;
+            f32 navHeight = 50.0f;
+            f32 btnWidth = 130.0f;
+            f32 btnHeight = 32.0f;
+            f32 btnY = navY + (navHeight - btnHeight) * 0.5f;
+            f32 spacing = 12.0f;
+            f32 startX = 25.0f;
+
+            // Check each navigation button
+            for (int i = 0; i < 4; i++) {
+                f32 x = startX + i * (btnWidth + spacing);
+                Rect btnRect(x, btnY, btnWidth, btnHeight);
+
+                if (btnRect.Contains(mousePos)) {
+                    // Toggle the corresponding panel
+                    if (i == 0) m_ShowResearch = !m_ShowResearch;
+                    else if (i == 1) m_ShowAchievements = !m_ShowAchievements;
+                    else if (i == 2) m_ShowStats = !m_ShowStats;
+                    else if (i == 3) m_ShowMilestones = !m_ShowMilestones;
+                    handled = true;
+                    break;  // Only handle one click per frame
+                }
             }
         }
     }
@@ -634,7 +674,28 @@ void GameState::RenderStations(Renderer* renderer) {
     for (size_t i = 0; i < m_Stations.size(); i++) {
         auto& station = m_Stations[i];
         f32 y = startY + i * (stationHeight + margin) + m_ScrollOffset.y;
-        
+
+        // Skip rendering if station is clipped by fixed headers at top
+        if (y + stationHeight < 150.0f) {
+            // Station is completely above the navigation bar - skip it
+            if (!station.unlocked) {
+                buttonIdx += 1; // Skip unlock button
+            } else {
+                buttonIdx += 3; // Skip all three buttons
+            }
+            continue;
+        }
+
+        // Skip rendering if station is below the screen
+        if (y > static_cast<f32>(renderer->GetHeight())) {
+            if (!station.unlocked) {
+                buttonIdx += 1;
+            } else {
+                buttonIdx += 3;
+            }
+            continue;
+        }
+
         // Define the main panel area
         Rect stationRect(30.0f, y, static_cast<f32>(renderer->GetWidth()) - 60.0f, stationHeight);
 
@@ -1391,20 +1452,38 @@ void GameState::RenderParticleEffects(Renderer* renderer, f64 deltaTime) {
 void GameState::RenderAchievements(Renderer* renderer) {
     if (!m_ShowAchievements) return;
 
+    // Background overlay
+    Rect bg(0, 0, static_cast<f32>(renderer->GetWidth()), static_cast<f32>(renderer->GetHeight()));
+    renderer->DrawRect(bg, Color(0.0f, 0.0f, 0.0f, 0.8f), true);
+
     // Achievement panel
-    f32 panelWidth = 600.0f;
-    f32 panelHeight = 500.0f;
+    f32 panelWidth = 900.0f;
+    f32 panelHeight = 600.0f;
     f32 panelX = (renderer->GetWidth() - panelWidth) / 2.0f;
     f32 panelY = (renderer->GetHeight() - panelHeight) / 2.0f;
 
     // Background
     Rect panelBg(panelX, panelY, panelWidth, panelHeight);
-    renderer->DrawRect(panelBg, Color(0.05f, 0.05f, 0.1f, 0.95f), true);
-    renderer->DrawRect(panelBg, Color::QuantumBlue() * 0.5f, false);
+    renderer->DrawRect(panelBg, Color::DarkPanel(), true);
+    renderer->DrawRect(panelBg, Color::CoherenceGreen() * 0.8f, false);
 
     // Title
-    Vec2 titlePos(panelX + 20.0f, panelY + 10.0f);
-    renderer->DrawText("Achievements", titlePos, Color::QuantumBlue(), 24.0f);
+    Vec2 titlePos(panelX + 20.0f, panelY + 15.0f);
+    renderer->DrawText("ACHIEVEMENTS", titlePos, Color::CoherenceGreen(), 24.0f);
+
+    // Close button (X) in top right
+    f32 closeBtnSize = 30.0f;
+    f32 closeBtnX = panelX + panelWidth - closeBtnSize - 10.0f;
+    f32 closeBtnY = panelY + 10.0f;
+    Rect closeBtn(closeBtnX, closeBtnY, closeBtnSize, closeBtnSize);
+    renderer->DrawRect(closeBtn, Color(0.3f, 0.1f, 0.1f, 0.8f), true);
+    renderer->DrawRect(closeBtn, Color::Red() * 0.8f, false);
+    Vec2 xPos(closeBtnX + 10.0f, closeBtnY + 8.0f);
+    renderer->DrawText("X", xPos, Color::White(), 16.0f);
+
+    // Hint text
+    Vec2 hintPos(panelX + panelWidth - 200.0f, panelY + 45.0f);
+    renderer->DrawText("(Click X or press A/ESC)", hintPos, Color(0.6f, 0.6f, 0.6f, 1.0f), 11.0f);
 
     // List achievements
     f32 yOffset = panelY + 50.0f;
@@ -1454,20 +1533,38 @@ void GameState::RenderAchievements(Renderer* renderer) {
 void GameState::RenderStatistics(Renderer* renderer) {
     if (!m_ShowStats) return;
 
+    // Background overlay
+    Rect bg(0, 0, static_cast<f32>(renderer->GetWidth()), static_cast<f32>(renderer->GetHeight()));
+    renderer->DrawRect(bg, Color(0.0f, 0.0f, 0.0f, 0.8f), true);
+
     // Stats panel
-    f32 panelWidth = 500.0f;
-    f32 panelHeight = 400.0f;
+    f32 panelWidth = 900.0f;
+    f32 panelHeight = 600.0f;
     f32 panelX = (renderer->GetWidth() - panelWidth) / 2.0f;
     f32 panelY = (renderer->GetHeight() - panelHeight) / 2.0f;
 
     // Background
     Rect panelBg(panelX, panelY, panelWidth, panelHeight);
-    renderer->DrawRect(panelBg, Color(0.05f, 0.05f, 0.1f, 0.95f), true);
-    renderer->DrawRect(panelBg, Color::EntanglementOrange() * 0.5f, false);
+    renderer->DrawRect(panelBg, Color::DarkPanel(), true);
+    renderer->DrawRect(panelBg, Color::EntanglementOrange() * 0.8f, false);
 
     // Title
-    Vec2 titlePos(panelX + 20.0f, panelY + 10.0f);
-    renderer->DrawText("Statistics", titlePos, Color::EntanglementOrange(), 24.0f);
+    Vec2 titlePos(panelX + 20.0f, panelY + 15.0f);
+    renderer->DrawText("STATISTICS", titlePos, Color::EntanglementOrange(), 24.0f);
+
+    // Close button (X) in top right
+    f32 closeBtnSize = 30.0f;
+    f32 closeBtnX = panelX + panelWidth - closeBtnSize - 10.0f;
+    f32 closeBtnY = panelY + 10.0f;
+    Rect closeBtn(closeBtnX, closeBtnY, closeBtnSize, closeBtnSize);
+    renderer->DrawRect(closeBtn, Color(0.3f, 0.1f, 0.1f, 0.8f), true);
+    renderer->DrawRect(closeBtn, Color::Red() * 0.8f, false);
+    Vec2 xPos(closeBtnX + 10.0f, closeBtnY + 8.0f);
+    renderer->DrawText("X", xPos, Color::White(), 16.0f);
+
+    // Hint text
+    Vec2 hintPos(panelX + panelWidth - 200.0f, panelY + 45.0f);
+    renderer->DrawText("(Click X or press S/ESC)", hintPos, Color(0.6f, 0.6f, 0.6f, 1.0f), 11.0f);
 
     // Display stats
     f32 yOffset = panelY + 50.0f;
@@ -1581,21 +1678,31 @@ void GameState::RenderResearchTree(Renderer* renderer) {
 
     // Research panel
     f32 panelWidth = 900.0f;
-    f32 panelHeight = 650.0f;
+    f32 panelHeight = 600.0f;
     f32 panelX = (renderer->GetWidth() - panelWidth) / 2.0f;
     f32 panelY = (renderer->GetHeight() - panelHeight) / 2.0f;
 
     Rect panel(panelX, panelY, panelWidth, panelHeight);
-    renderer->DrawRect(panel, Color(0.1f, 0.1f, 0.15f, 1.0f), true);
-    renderer->DrawRect(panel, Color::QuantumBlue(), false);
+    renderer->DrawRect(panel, Color::DarkPanel(), true);
+    renderer->DrawRect(panel, Color::QuantumPurple() * 0.8f, false);
 
     // Title
     Vec2 titlePos(panelX + 20.0f, panelY + 15.0f);
-    renderer->DrawText("🔬 Research Tree", titlePos, Color::QuantumBlue(), 24.0f);
+    renderer->DrawText("RESEARCH TREE", titlePos, Color::QuantumPurple(), 24.0f);
 
-    // Close button hint
-    Vec2 closeHintPos(panelX + panelWidth - 120.0f, panelY + 18.0f);
-    renderer->DrawText("[R to Close]", closeHintPos, Color(0.7f, 0.7f, 0.7f, 1.0f), 12.0f);
+    // Close button (X) in top right
+    f32 closeBtnSize = 30.0f;
+    f32 closeBtnX = panelX + panelWidth - closeBtnSize - 10.0f;
+    f32 closeBtnY = panelY + 10.0f;
+    Rect closeBtn(closeBtnX, closeBtnY, closeBtnSize, closeBtnSize);
+    renderer->DrawRect(closeBtn, Color(0.3f, 0.1f, 0.1f, 0.8f), true);
+    renderer->DrawRect(closeBtn, Color::Red() * 0.8f, false);
+    Vec2 xPos(closeBtnX + 10.0f, closeBtnY + 8.0f);
+    renderer->DrawText("X", xPos, Color::White(), 16.0f);
+
+    // Hint text
+    Vec2 hintPos(panelX + panelWidth - 200.0f, panelY + 45.0f);
+    renderer->DrawText("(Click X or press R/ESC)", hintPos, Color(0.6f, 0.6f, 0.6f, 1.0f), 11.0f);
 
     // Research count
     i32 researched = m_ResearchTree.GetResearchedCount();
@@ -1923,16 +2030,30 @@ void GameState::RenderMilestones(Renderer* renderer) {
     f32 panelY = (renderer->GetHeight() - panelHeight) / 2.0f;
 
     Rect panel(panelX, panelY, panelWidth, panelHeight);
-    renderer->DrawRect(panel, Color(0.1f, 0.1f, 0.15f, 1.0f), true);
-    renderer->DrawRect(panel, Color::QuantumBlue(), false);
+    renderer->DrawRect(panel, Color::DarkPanel(), true);
+    renderer->DrawRect(panel, Color::NeonPink() * 0.8f, false);
 
     // Title
     Vec2 titlePos(panelX + 20.0f, panelY + 15.0f);
-    renderer->DrawText("🎯 Milestones", titlePos, Color::QuantumBlue(), 24.0f);
+    renderer->DrawText("MILESTONES", titlePos, Color::NeonPink(), 24.0f);
 
-    // Close button hint
-    Vec2 closeHintPos(panelX + panelWidth - 120.0f, panelY + 18.0f);
-    renderer->DrawText("[M to Close]", closeHintPos, Color(0.7f, 0.7f, 0.7f, 1.0f), 12.0f);
+    // Close button (X) in top right
+    f32 closeBtnSize = 30.0f;
+    f32 closeBtnX = panelX + panelWidth - closeBtnSize - 10.0f;
+    f32 closeBtnY = panelY + 10.0f;
+    Rect closeBtn(closeBtnX, closeBtnY, closeBtnSize, closeBtnSize);
+
+    // Draw close button background
+    renderer->DrawRect(closeBtn, Color(0.3f, 0.1f, 0.1f, 0.8f), true);
+    renderer->DrawRect(closeBtn, Color::Red() * 0.8f, false);
+
+    // Draw X symbol
+    Vec2 xPos(closeBtnX + 10.0f, closeBtnY + 8.0f);
+    renderer->DrawText("X", xPos, Color::White(), 16.0f);
+
+    // Hint text
+    Vec2 hintPos(panelX + panelWidth - 200.0f, panelY + 45.0f);
+    renderer->DrawText("(Click X or press M/ESC)", hintPos, Color(0.6f, 0.6f, 0.6f, 1.0f), 11.0f);
 
     // Completion stats
     auto completedMilestones = m_MilestoneSystem.GetCompletedMilestones();
