@@ -273,6 +273,7 @@ private:
     bool m_ShowStats;
     bool m_ShowResearch;
     bool m_ShowMilestones;
+    GameUtils::NumberFormat m_NumberFormat; // Toggle between suffix (1.23M) and scientific (1.23e6)
 
     // Game time
     f64 m_TotalTimePlayed;

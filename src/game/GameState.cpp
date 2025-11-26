@@ -184,6 +184,7 @@ GameState::GameState()
     : m_CurrentEvent(nullptr), m_TimeSinceLastEvent(0), m_EventCooldown(120.0),
       m_LastSaveTimestamp(0),
       m_ShowAchievements(false), m_ShowStats(false), m_ShowResearch(false), m_ShowMilestones(false),
+      m_NumberFormat(GameUtils::NumberFormat::Suffix),
       m_TotalTimePlayed(0), m_TimeSinceLastSave(0),
       m_Coherence(100), m_MaxCoherence(100), m_CoherenceDecayRate(1.0) {
 
@@ -502,8 +503,9 @@ void GameState::UpdateUI(Input* input) {
     }
 
     // Keyboard shortcuts
-    // SDL_SCANCODE_A = 4, M = 13, R = 15, S = 16, ESCAPE = 41
+    // SDL_SCANCODE_A = 4, F = 9, M = 13, R = 15, S = 16, ESCAPE = 41
     const int KEY_A = 4;
+    const int KEY_F = 9;
     const int KEY_M = 13;
     const int KEY_R = 15;
     const int KEY_S = 16;
@@ -520,6 +522,13 @@ void GameState::UpdateUI(Input* input) {
     }
     if (input->IsKeyPressed(KEY_M)) {
         m_ShowMilestones = !m_ShowMilestones;
+    }
+    if (input->IsKeyPressed(KEY_F)) {
+        // Toggle number format between Suffix and Scientific
+        m_NumberFormat = (m_NumberFormat == GameUtils::NumberFormat::Suffix)
+            ? GameUtils::NumberFormat::Scientific
+            : GameUtils::NumberFormat::Suffix;
+        Log::Info("Number format toggled");
     }
     if (input->IsKeyPressed(KEY_ESCAPE)) {
         m_ShowAchievements = false;
@@ -676,8 +685,8 @@ void GameState::RenderResources(Renderer* renderer) {
 
         renderer->DrawText(resourceNames[i], textPos, Color::White(), 16.0f);
 
-        // Draw value (formatted)
-        std::string formattedValue = GameUtils::FormatNumber(m_Resources[i]);
+        // Draw value (formatted with current format preference)
+        std::string formattedValue = GameUtils::FormatNumber(m_Resources[i], m_NumberFormat);
         Vec2 valuePos(xOffset, 50.0f);
         renderer->DrawText(formattedValue, valuePos, resourceColors[i], 24.0f);
 
@@ -1564,7 +1573,7 @@ void GameState::RenderAchievements(Renderer* renderer) {
             renderer->DrawRect(barFill, Color::QuantumBlue(), true);
 
             // Progress text
-            std::string progressText = GameUtils::FormatNumber(ach.progress) + " / " + GameUtils::FormatNumber(ach.target);
+            std::string progressText = GameUtils::FormatNumber(ach.progress, m_NumberFormat) + " / " + GameUtils::FormatNumber(ach.target, m_NumberFormat);
             Vec2 progressPos(panelX + 260.0f, yOffset + 32.0f);
             renderer->DrawText(progressText, progressPos, Color::White(), 10.0f);
         }
@@ -1626,18 +1635,18 @@ void GameState::RenderStatistics(Renderer* renderer) {
         yOffset += 25.0f;
     };
 
-    renderStat("Total Qubits Earned:", GameUtils::FormatNumber(m_Statistics.totalQubitsEarned));
+    renderStat("Total Qubits Earned:", GameUtils::FormatNumber(m_Statistics.totalQubitsEarned, m_NumberFormat));
     renderStat("Total Observations:", std::to_string(m_Statistics.totalObservations));
     renderStat("Total Upgrades:", std::to_string(m_Statistics.totalUpgrades));
     renderStat("Total Prestiges:", std::to_string(m_Statistics.totalPrestigesPerformed));
 
     yOffset += 10.0f;
     renderStat("Session Time:", GameUtils::FormatTime(m_Statistics.sessionTime));
-    renderStat("Session Qubits:", GameUtils::FormatNumber(m_Statistics.sessionQubits));
+    renderStat("Session Qubits:", GameUtils::FormatNumber(m_Statistics.sessionQubits, m_NumberFormat));
     renderStat("Session Observations:", std::to_string(m_Statistics.sessionObservations));
 
     yOffset += 10.0f;
-    renderStat("Highest Qubits:", GameUtils::FormatNumber(m_Statistics.highestQubits));
+    renderStat("Highest Qubits:", GameUtils::FormatNumber(m_Statistics.highestQubits, m_NumberFormat));
     renderStat("Fastest Prestige:", GameUtils::FormatTime(m_Statistics.fastestPrestige));
     renderStat("Current Streak:", std::to_string(m_Statistics.currentStreak) + " days");
 }
@@ -1801,13 +1810,13 @@ void GameState::RenderResearchTree(Renderer* renderer) {
         f32 costY = nodeY + 55.0f;
         std::string costText = "Cost: ";
         if (node->qubitCost > 0) {
-            costText += GameUtils::FormatNumber(node->qubitCost) + " Qubits  ";
+            costText += GameUtils::FormatNumber(node->qubitCost, m_NumberFormat) + " Qubits  ";
         }
         if (node->coherenceCost > 0) {
-            costText += GameUtils::FormatNumber(node->coherenceCost) + " Coherence  ";
+            costText += GameUtils::FormatNumber(node->coherenceCost, m_NumberFormat) + " Coherence  ";
         }
         if (node->entanglementCost > 0) {
-            costText += GameUtils::FormatNumber(node->entanglementCost) + " Entanglement  ";
+            costText += GameUtils::FormatNumber(node->entanglementCost, m_NumberFormat) + " Entanglement  ";
         }
         if (node->photonCost > 0) {
             costText += std::to_string(node->photonCost) + " Photons";
@@ -2166,7 +2175,7 @@ void GameState::RenderMilestones(Renderer* renderer) {
         renderer->DrawRect(progressFill, barColor, true);
 
         // Progress text
-        std::string progressText = GameUtils::FormatNumber(milestone->progress) + " / " + GameUtils::FormatNumber(milestone->target);
+        std::string progressText = GameUtils::FormatNumber(milestone->progress, m_NumberFormat) + " / " + GameUtils::FormatNumber(milestone->target, m_NumberFormat);
         if (milestone->id == MilestoneID::HalfAchievements || milestone->id == MilestoneID::AllAchievements) {
             progressText = std::to_string(static_cast<i32>(progressPercent * 100.0)) + "%";
         }
