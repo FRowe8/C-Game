@@ -226,7 +226,7 @@ void Application::Update(f64 deltaTime) {
 
 void Application::Render() {
     m_Renderer->BeginFrame();
-    m_Renderer->Clear(Color(0.05f, 0.05f, 0.1f, 1.0f)); // Dark blue background
+    m_Renderer->Clear(Color::DarkBackground()); // Modern dark cyberpunk background
 
     // Render game
     m_GameState->Render(m_Renderer.get());
