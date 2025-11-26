@@ -527,6 +527,32 @@ void GameState::UpdateUI(Input* input) {
         m_ShowMilestones = false;
     }
 
+    // Handle navigation bar button clicks
+    if (mousePressed) {
+        f32 navY = 100.0f;
+        f32 navHeight = 50.0f;
+        f32 btnWidth = 130.0f;
+        f32 btnHeight = 32.0f;
+        f32 btnY = navY + (navHeight - btnHeight) * 0.5f;
+        f32 spacing = 12.0f;
+        f32 startX = 25.0f;
+
+        // Check each navigation button
+        for (int i = 0; i < 4; i++) {
+            f32 x = startX + i * (btnWidth + spacing);
+            Rect btnRect(x, btnY, btnWidth, btnHeight);
+
+            if (btnRect.Contains(mousePos)) {
+                // Toggle the corresponding panel
+                if (i == 0) m_ShowResearch = !m_ShowResearch;
+                else if (i == 1) m_ShowAchievements = !m_ShowAchievements;
+                else if (i == 2) m_ShowStats = !m_ShowStats;
+                else if (i == 3) m_ShowMilestones = !m_ShowMilestones;
+                break;  // Only handle one click per frame
+            }
+        }
+    }
+
     // Update buttons
     for (auto& button : m_StationButtons) {
         button.Update(mousePos);
@@ -538,10 +564,10 @@ void GameState::UpdateUI(Input* input) {
 }
 
 void GameState::Render(Renderer* renderer) {
-    RenderResources(renderer);
-    RenderStations(renderer);
+    RenderResources(renderer);  // Fixed at top (0-100px)
+    RenderUI(renderer);          // Navigation bar (100-150px) - BEFORE stations so it's on top
+    RenderStations(renderer);    // Scrollable area (starts at 150px)
     RenderActiveEvent(renderer);
-    RenderUI(renderer);
     RenderAchievements(renderer);
     RenderStatistics(renderer);
     RenderResearchTree(renderer);
@@ -596,9 +622,8 @@ void GameState::RenderResources(Renderer* renderer) {
 }
 
 void GameState::RenderStations(Renderer* renderer) {
-    // ... (rest of function setup remains the same)
-
-    f32 startY = 120.0f;
+    // Stations start below the navigation bar (resources at 0-100, nav at 100-150)
+    f32 startY = 160.0f;  // Start below nav bar with small gap
     f32 stationHeight = 150.0f;
     f32 margin = 20.0f;
 
@@ -732,8 +757,79 @@ void GameState::RenderStations(Renderer* renderer) {
 }
 
 void GameState::RenderUI(Renderer* renderer) {
-    // Additional UI elements can go here
-    // Prestige info, achievements, etc.
+    // Top navigation bar with modern cyberpunk design (sits at 100-150px)
+    f32 navY = 100.0f;
+    f32 navHeight = 50.0f;
+    Rect navBar(0, navY, static_cast<f32>(renderer->GetWidth()), navHeight);
+
+    // Navigation bar background with dark panel
+    renderer->DrawRect(navBar, Color::DarkPanel(), true);
+
+    // Glowing cyan bottom border for cyberpunk feel
+    Rect navBorder(0, navY + navHeight - 2.0f, static_cast<f32>(renderer->GetWidth()), 2.0f);
+    renderer->DrawRect(navBorder, Color::NeonCyan() * 0.6f, true);
+
+    // Navigation buttons
+    f32 btnWidth = 130.0f;
+    f32 btnHeight = 32.0f;
+    f32 btnY = navY + (navHeight - btnHeight) * 0.5f;
+    f32 spacing = 12.0f;
+    f32 startX = 25.0f;
+
+    struct NavButton {
+        const char* label;
+        bool* showFlag;
+        Color color;
+    };
+
+    NavButton navButtons[] = {
+        {"RESEARCH (R)", &m_ShowResearch, Color::QuantumPurple()},
+        {"ACHIEVEMENTS (A)", &m_ShowAchievements, Color::CoherenceGreen()},
+        {"STATS (S)", &m_ShowStats, Color::EntanglementOrange()},
+        {"MILESTONES (M)", &m_ShowMilestones, Color::NeonPink()}
+    };
+
+    for (int i = 0; i < 4; i++) {
+        auto& btn = navButtons[i];
+        f32 x = startX + i * (btnWidth + spacing);
+        Rect btnRect(x, btnY, btnWidth, btnHeight);
+
+        bool active = *btn.showFlag;
+        Color btnColor = active ? btn.color : btn.color * 0.5f;
+
+        // Button background
+        renderer->DrawRect(btnRect, btnColor * 0.25f, true);
+
+        // Glowing border
+        if (active) {
+            // Active - bright glow
+            Rect glowRect(x - 1.0f, btnY - 1.0f, btnWidth + 2.0f, btnHeight + 2.0f);
+            renderer->DrawRect(glowRect, btn.color * 0.9f, false);
+        } else {
+            // Inactive - subtle border
+            renderer->DrawRect(btnRect, Color::DarkBorder(), false);
+        }
+
+        // Button text (centered)
+        f32 textWidth = strlen(btn.label) * 5.0f;  // Approximate width
+        Vec2 textPos(x + (btnWidth - textWidth) * 0.5f, btnY + (btnHeight - 12.0f) * 0.5f);
+        renderer->DrawText(btn.label, textPos, Color::White(), 11.0f);
+    }
+
+    // Scroll indicator (bottom right corner - animated)
+    if (m_ScrollOffset.y > -50.0f && !m_ShowAchievements && !m_ShowStats && !m_ShowResearch && !m_ShowMilestones) {
+        f32 indicatorY = static_cast<f32>(renderer->GetHeight()) - 40.0f;
+        Vec2 arrowPos(static_cast<f32>(renderer->GetWidth()) - 90.0f, indicatorY);
+
+        // Animated pulsing glow
+        f32 pulse = 0.5f + 0.5f * static_cast<f32>(sin(m_TotalTimePlayed * 3.0));
+        Color glowColor = Color::NeonCyan() * pulse;
+
+        // Draw pulsing text
+        renderer->DrawText("SCROLL DOWN", arrowPos, glowColor, 13.0f);
+        Vec2 arrowPos2(static_cast<f32>(renderer->GetWidth()) - 60.0f, indicatorY + 15.0f);
+        renderer->DrawText("v v v", arrowPos2, glowColor, 14.0f);
+    }
 }
 
 void GameState::AddResource(QuantumResource type, f64 amount) {
