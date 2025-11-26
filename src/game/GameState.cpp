@@ -566,6 +566,45 @@ void GameState::UpdateUI(Input* input) {
         if (!handled) handled = checkCloseButton(m_ShowStats, 900.0f, 600.0f, &m_ShowStats);
         if (!handled) handled = checkCloseButton(m_ShowAchievements, 900.0f, 600.0f, &m_ShowAchievements);
 
+        // Handle research node clicks (if research panel is open)
+        if (!handled && m_ShowResearch) {
+            f32 panelWidth = 900.0f;
+            f32 panelHeight = 600.0f;
+            f32 panelX = (screenWidth - panelWidth) / 2.0f;
+            f32 panelY = (screenHeight - panelHeight) / 2.0f;
+
+            f32 nodeStartY = panelY + 80.0f;
+            f32 nodeX = panelX + 20.0f;
+            f32 nodeWidth = panelWidth - 40.0f;
+            f32 nodeHeight = 100.0f;
+            f32 nodeSpacing = 10.0f;
+
+            auto availableNodes = m_ResearchTree.GetAvailableResearch(m_Timeline.completedResets);
+            i32 displayedCount = 0;
+            i32 maxDisplay = 5;
+
+            for (const ResearchNode* node : availableNodes) {
+                if (displayedCount >= maxDisplay) break;
+
+                f32 nodeY = nodeStartY + (nodeHeight + nodeSpacing) * displayedCount;
+                Rect nodeRect(nodeX, nodeY, nodeWidth, nodeHeight);
+
+                if (nodeRect.Contains(mousePos)) {
+                    // Try to research this node
+                    if (CanAffordResearch(node->id)) {
+                        PurchaseResearch(node->id);
+                        Log::Infof("Researched: ", node->name);
+                    } else {
+                        Log::Info("Cannot afford this research");
+                    }
+                    handled = true;
+                    break;
+                }
+
+                displayedCount++;
+            }
+        }
+
         // Handle navigation bar button clicks (only if no popup consumed the click)
         if (!handled) {
             f32 navY = 100.0f;
@@ -682,6 +721,17 @@ void GameState::RenderStations(Renderer* renderer) {
                 buttonIdx += 1; // Skip unlock button
             } else {
                 buttonIdx += 3; // Skip all three buttons
+            }
+            continue;
+        }
+
+        // Also skip if station would render over resource panel (top 100px)
+        if (y < 100.0f) {
+            // Part of station would be in resource area - skip it
+            if (!station.unlocked) {
+                buttonIdx += 1;
+            } else {
+                buttonIdx += 3;
             }
             continue;
         }
