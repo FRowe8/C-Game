@@ -181,10 +181,11 @@ bool UIButton::WasClicked(const Vec2& mousePos, bool mousePressed) {
 
 // GameState implementation
 GameState::GameState()
-    : m_TotalTimePlayed(0), m_TimeSinceLastSave(0),
-      m_Coherence(100), m_MaxCoherence(100), m_CoherenceDecayRate(1.0),
-      m_CurrentEvent(nullptr), m_TimeSinceLastEvent(0), m_EventCooldown(120.0),
-      m_LastSaveTimestamp(0), m_ShowAchievements(false), m_ShowStats(false), m_ShowResearch(false), m_ShowMilestones(false) {
+    : m_CurrentEvent(nullptr), m_TimeSinceLastEvent(0), m_EventCooldown(120.0),
+      m_LastSaveTimestamp(0),
+      m_ShowAchievements(false), m_ShowStats(false), m_ShowResearch(false), m_ShowMilestones(false),
+      m_TotalTimePlayed(0), m_TimeSinceLastSave(0),
+      m_Coherence(100), m_MaxCoherence(100), m_CoherenceDecayRate(1.0) {
 
     for (int i = 0; i < 3; i++) {
         m_Resources[i] = 0;
@@ -397,6 +398,8 @@ void GameState::InitializeUI() {
 }
 
 void GameState::Update(f64 deltaTime, Input* input, Renderer* renderer) {
+    (void)renderer; // Unused parameter - reserved for future use
+
     m_TotalTimePlayed += deltaTime;
     m_TimeSinceLastSave += deltaTime;
     m_TimeSinceLastEvent += deltaTime;
@@ -455,9 +458,7 @@ void GameState::UpdateCoherence(f64 deltaTime) {
     m_Coherence -= m_CoherenceDecayRate * deltaTime;
     if (m_Coherence < 0) m_Coherence = 0;
 
-    // Coherence affects production
-    f64 coherenceMultiplier = m_Coherence / m_MaxCoherence;
-    // Apply to stations (already done in UpdateStations)
+    // Coherence affects production (applied in UpdateStations)
 }
 
 void GameState::UpdateUI(Input* input) {
