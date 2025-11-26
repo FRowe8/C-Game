@@ -294,6 +294,47 @@ void Renderer::DrawText(const std::string& text, const Vec2& position, const Col
     }
 }
 
+void Renderer::DrawProgressBar(const Vec2& position, f32 width, f32 height,
+                               f64 current, f64 max,
+                               const Color& fillColor, const Color& bgColor,
+                               bool showPercentage, f32 textSize) {
+    // Clamp progress to 0-1 range
+    f64 progress = (max > 0.0) ? (current / max) : 0.0;
+    progress = std::max(0.0, std::min(1.0, progress));
+
+    // Draw background
+    Rect bg(position.x, position.y, width, height);
+    DrawRect(bg, bgColor, true);
+
+    // Draw fill (progress portion)
+    f32 fillWidth = static_cast<f32>(width * progress);
+    if (fillWidth > 0.0f) {
+        Rect fill(position.x, position.y, fillWidth, height);
+        DrawRect(fill, fillColor, true);
+    }
+
+    // Draw border (subtle outline)
+    Color borderColor = Color(0.4f, 0.4f, 0.4f, 1.0f);
+    DrawRect(bg, borderColor, false);
+
+    // Draw percentage text if enabled
+    if (showPercentage) {
+        i32 percentage = static_cast<i32>(progress * 100.0);
+        std::string percentText = std::to_string(percentage) + "%";
+
+        // Center text in progress bar
+        f32 textWidth = percentText.length() * textSize * 0.5f; // Approximate text width
+        Vec2 textPos(
+            position.x + (width - textWidth) / 2.0f,
+            position.y + (height - textSize) / 2.0f + 2.0f
+        );
+
+        // Draw text with contrasting color for visibility
+        Color textColor = (progress > 0.5) ? Color(0.1f, 0.1f, 0.1f, 1.0f) : Color::White();
+        DrawText(percentText, textPos, textColor, textSize);
+    }
+}
+
 void Renderer::AddParticle(const Particle& particle) {
     m_Particles.push_back(particle);
 }

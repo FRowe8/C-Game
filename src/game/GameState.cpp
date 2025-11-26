@@ -123,10 +123,23 @@ void UIButton::Render(Renderer* renderer) {
     f32 baseAlpha = 0.85f;
 
     if (!enabled) {
-        // Disabled: Muted gray/dark blue
-        renderColor = Color(0.15f, 0.15f, 0.2f, baseAlpha * 0.5f);
-        borderColor = Color(0.2f, 0.2f, 0.25f, baseAlpha * 0.5f);
-        textColor = Color(0.5f, 0.5f, 0.55f, 1.0f);
+        // Disabled: Color-code based on affordability (how close to affording)
+        if (affordability >= 0.75) {
+            // Close to affording (75-99%) - Yellow tint
+            renderColor = Color(0.25f, 0.25f, 0.1f, baseAlpha * 0.5f);
+            borderColor = Color::Yellow() * 0.4f;
+            textColor = Color(0.9f, 0.9f, 0.6f, 1.0f);
+        } else if (affordability >= 0.5) {
+            // Halfway there (50-74%) - Orange tint
+            renderColor = Color(0.25f, 0.15f, 0.1f, baseAlpha * 0.5f);
+            borderColor = Color::EntanglementOrange() * 0.4f;
+            textColor = Color(0.9f, 0.7f, 0.5f, 1.0f);
+        } else {
+            // Far from affording (<50%) - Red/gray tint
+            renderColor = Color(0.2f, 0.1f, 0.1f, baseAlpha * 0.5f);
+            borderColor = Color(0.4f, 0.2f, 0.2f, baseAlpha * 0.5f);
+            textColor = Color(0.7f, 0.5f, 0.5f, 1.0f);
+        }
     } else if (hovered) {
         // Hovered: Brighter color, strong white border, strong glow
         renderColor = hoverColor * 0.9f;
@@ -794,6 +807,7 @@ void GameState::RenderStations(Renderer* renderer) {
             unlockBtn.bounds = Rect(stationRect.x + 20.0f, y + 85.0f, 300.0f, 45.0f);
             unlockBtn.text = "UNLOCK FIELD (" + std::to_string(static_cast<i64>(station.unlockCost)) + " Qubits)";
             unlockBtn.enabled = m_Resources[0] >= station.unlockCost;
+            unlockBtn.affordability = std::min(1.0, m_Resources[0] / station.unlockCost);
 
             unlockBtn.Render(renderer);
 
@@ -856,7 +870,35 @@ void GameState::RenderStations(Renderer* renderer) {
         upgradeBtn.bounds = Rect(stationRect.x + 240.0f, y + 85.0f, 250.0f, 45.0f);
         upgradeBtn.text = "UPGRADE CORE (" + std::to_string(static_cast<i64>(station.upgradeCost)) + ")";
         upgradeBtn.enabled = m_Resources[0] >= station.upgradeCost;
+        upgradeBtn.affordability = std::min(1.0, m_Resources[0] / station.upgradeCost);
         upgradeBtn.Render(renderer);
+
+        // Progress bar showing how close to affording next upgrade
+        f32 progressBarY = y + 135.0f;
+        f32 progressBarWidth = stationRect.width - 40.0f;
+        f32 progressBarHeight = 18.0f;
+        Vec2 progressBarPos(stationRect.x + 20.0f, progressBarY);
+
+        // Calculate progress (0-100% based on current resources vs upgrade cost)
+        f64 currentQubits = m_Resources[0];
+        f64 upgradeCost = station.upgradeCost;
+        f64 progress = std::min(1.0, currentQubits / upgradeCost);
+
+        // Color-code based on affordability
+        Color progressColor;
+        if (progress >= 1.0) {
+            progressColor = Color::CoherenceGreen();  // Can afford now
+        } else if (progress >= 0.75) {
+            progressColor = Color::Yellow();  // Almost there
+        } else if (progress >= 0.5) {
+            progressColor = Color::EntanglementOrange();  // Halfway
+        } else {
+            progressColor = Color::QuantumPurple();  // Still far away
+        }
+
+        renderer->DrawProgressBar(progressBarPos, progressBarWidth, progressBarHeight,
+                                 currentQubits, upgradeCost, progressColor,
+                                 Color(0.15f, 0.15f, 0.2f, 1.0f), true, 11.0f);
     }
 
     // ----------------------------------------------------------------------

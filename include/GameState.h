@@ -158,6 +158,7 @@ struct UIButton {
     std::function<void()> onClick;
     bool enabled = true;
     bool hovered = false;
+    f64 affordability = 1.0; // 0.0-1.0: How close to affording (for visual feedback)
 
     void Update(const Vec2& mousePos);
     void Render(Renderer* renderer);
