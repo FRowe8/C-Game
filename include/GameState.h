@@ -4,6 +4,7 @@
 #include "Research.h"
 #include "Milestones.h"
 #include "Buyables.h"
+#include "GameUtils.h"
 #include <vector>
 #include <string>
 #include <functional>
