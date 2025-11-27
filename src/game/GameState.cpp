@@ -196,7 +196,7 @@ bool UIButton::WasClicked(const Vec2& mousePos, bool mousePressed) {
 GameState::GameState()
     : m_CurrentEvent(nullptr), m_TimeSinceLastEvent(0), m_EventCooldown(120.0),
       m_LastSaveTimestamp(0),
-      m_ShowAchievements(false), m_ShowStats(false), m_ShowResearch(false), m_ShowMilestones(false), m_ShowBuyables(false),
+      m_ShowAchievements(false), m_ShowStats(false), m_ShowResearch(false), m_ShowMilestones(false), m_ShowBuyables(false), m_ShowChallenges(false),
       m_NumberFormat(GameUtils::NumberFormat::Suffix),
       m_TotalTimePlayed(0), m_TimeSinceLastSave(0),
       m_Coherence(100), m_MaxCoherence(100), m_CoherenceDecayRate(1.0),
@@ -274,6 +274,10 @@ void GameState::Initialize() {
     // Initialize Buyables System
     m_BuyableManager.Initialize(this);
     Log::Info("Buyables system initialized");
+
+    // Initialize Challenge System
+    m_ChallengeManager.Initialize();
+    Log::Info("Challenge system initialized");
 
     // Try to load save file
     std::string savePath = Platform::GetSaveDirectory() + "quantum_save.json";
@@ -398,8 +402,15 @@ void GameState::InitializeUI() {
         upgradeBtn.color = Color::EntanglementOrange() * 0.7f;
         upgradeBtn.hoverColor = Color::EntanglementOrange();
         upgradeBtn.onClick = [this, i]() {
-            if (SpendResource(QuantumResource::Qubits, m_Stations[i].upgradeCost)) {
+            // Calculate effective upgrade cost with challenge modifiers
+            f64 effectiveCost = m_Stations[i].upgradeCost;
+            if (m_ChallengeManager.HasModifier(ChallengeModifier::ExpensiveUpgrades)) {
+                effectiveCost *= 3.0;
+            }
+
+            if (SpendResource(QuantumResource::Qubits, effectiveCost)) {
                 m_Stations[i].Upgrade();
+                UpdateResearchBonuses(); // Recalculate production
                 Log::Infof("Upgraded ", m_Stations[i].name, " to level ", m_Stations[i].level);
             }
         };
@@ -415,12 +426,25 @@ void GameState::InitializeUI() {
             f64 currentQubits = GetResource(QuantumResource::Qubits);
             i32 upgradesBought = 0;
 
+            // Check if expensive upgrades modifier is active
+            bool expensiveUpgrades = m_ChallengeManager.HasModifier(ChallengeModifier::ExpensiveUpgrades);
+
             // Keep buying while we can afford it
-            while (currentQubits >= station.upgradeCost && upgradesBought < 1000) { // Cap at 1000 to prevent infinite loops
-                if (SpendResource(QuantumResource::Qubits, station.upgradeCost)) {
-                    station.Upgrade();
-                    currentQubits = GetResource(QuantumResource::Qubits);
-                    upgradesBought++;
+            while (upgradesBought < 1000) { // Cap at 1000 to prevent infinite loops
+                // Calculate effective upgrade cost with challenge modifiers
+                f64 effectiveCost = station.upgradeCost;
+                if (expensiveUpgrades) {
+                    effectiveCost *= 3.0;
+                }
+
+                if (currentQubits >= effectiveCost) {
+                    if (SpendResource(QuantumResource::Qubits, effectiveCost)) {
+                        station.Upgrade();
+                        currentQubits = GetResource(QuantumResource::Qubits);
+                        upgradesBought++;
+                    } else {
+                        break;
+                    }
                 } else {
                     break;
                 }
@@ -517,13 +541,25 @@ void GameState::UpdateStations(f64 deltaTime) {
         globalMultiplier *= m_BoostMultiplier;
     }
 
+    // Apply challenge modifiers
+    if (m_ChallengeManager.HasModifier(ChallengeModifier::HalfProduction)) {
+        globalMultiplier *= 0.5; // Half production rate
+    }
+    if (m_ChallengeManager.HasModifier(ChallengeModifier::SlowTime)) {
+        globalMultiplier *= 0.5; // Time runs at half speed (same effect)
+    }
+
     // Check if Auto-Observer research is unlocked
     bool hasAutoObserver = m_ResearchTree.IsResearched(ResearchID::AutoObserver);
+
+    // Check if manual observation is disabled by challenge
+    bool canManuallyObserve = !m_ChallengeManager.HasModifier(ChallengeModifier::NoObserve);
 
     for (auto& station : m_Stations) {
         station.Update(deltaTime * globalMultiplier);
 
         // Auto-observe if research is unlocked and superposition is high enough
+        // Auto-observe still works even in NoObserve challenge (only manual is disabled)
         if (hasAutoObserver && station.unlocked && station.superpositionValue >= 10.0) {
             station.Observe(this);
         }
@@ -531,6 +567,12 @@ void GameState::UpdateStations(f64 deltaTime) {
 }
 
 void GameState::UpdateCoherence(f64 deltaTime) {
+    // Check if coherence is disabled by challenge
+    if (m_ChallengeManager.HasModifier(ChallengeModifier::NoCoherence)) {
+        m_Coherence = 0;
+        return;
+    }
+
     // Coherence slowly decays
     m_Coherence -= m_CoherenceDecayRate * deltaTime;
     if (m_Coherence < 0) m_Coherence = 0;
@@ -579,9 +621,10 @@ void GameState::UpdateUI(Input* input) {
     }
 
     // Keyboard shortcuts
-    // SDL_SCANCODE_A = 4, B = 5, F = 9, M = 13, R = 15, S = 16, ESCAPE = 41
+    // SDL_SCANCODE_A = 4, B = 5, C = 6, F = 9, M = 13, R = 15, S = 16, ESCAPE = 41
     const int KEY_A = 4;
     const int KEY_B = 5;
+    const int KEY_C = 6;
     const int KEY_F = 9;
     const int KEY_M = 13;
     const int KEY_R = 15;
@@ -603,6 +646,9 @@ void GameState::UpdateUI(Input* input) {
     if (input->IsKeyPressed(KEY_B)) {
         m_ShowBuyables = !m_ShowBuyables;
     }
+    if (input->IsKeyPressed(KEY_C)) {
+        m_ShowChallenges = !m_ShowChallenges;
+    }
     if (input->IsKeyPressed(KEY_F)) {
         // Toggle number format between Suffix and Scientific
         m_NumberFormat = (m_NumberFormat == GameUtils::NumberFormat::Suffix)
@@ -616,6 +662,7 @@ void GameState::UpdateUI(Input* input) {
         m_ShowResearch = false;
         m_ShowMilestones = false;
         m_ShowBuyables = false;
+        m_ShowChallenges = false;
     }
 
     // Handle popup close button clicks (X button in top-right of panels)
@@ -718,9 +765,63 @@ void GameState::UpdateUI(Input* input) {
 
                 if (buyBtn.Contains(mousePos)) {
                     const auto& buyable = buyables[i];
-                    if (m_BuyableManager.Purchase(buyable.id, this)) {
+                    // Check if buyables are disabled by challenge
+                    if (m_ChallengeManager.HasModifier(ChallengeModifier::NoBuyables)) {
+                        Log::Info("Buyables are disabled during this challenge!");
+                    } else if (m_BuyableManager.Purchase(buyable.id, this)) {
                         Log::Infof("Purchased: ", buyable.name);
                         UpdateResearchBonuses(); // Recalculate production with new multipliers
+                    }
+                    handled = true;
+                    break;
+                }
+            }
+        }
+
+        // Handle challenge Enter/Exit button clicks (if challenges panel is open)
+        if (!handled && m_ShowChallenges) {
+            f32 panelWidth = 900.0f;
+            f32 panelHeight = 650.0f;
+            f32 panelX = (1280.0f - panelWidth) / 2.0f;
+            f32 panelY = (720.0f - panelHeight) / 2.0f;
+
+            const Challenge* currentChallenge = m_ChallengeManager.GetCurrentChallenge();
+            f32 challengeStartY = currentChallenge ? panelY + 100.0f : panelY + 70.0f;
+            f32 challengeX = panelX + 20.0f;
+            f32 challengeWidth = panelWidth - 40.0f;
+            f32 challengeHeight = 120.0f;
+            f32 challengeSpacing = 10.0f;
+
+            auto& challenges = m_ChallengeManager.GetChallenges();
+            i32 currentPrestige = m_Statistics.totalPrestigesPerformed;
+
+            for (size_t i = 0; i < challenges.size(); i++) {
+                const auto& challenge = challenges[i];
+                f32 challengeY = challengeStartY + (challengeHeight + challengeSpacing) * i;
+
+                // Skip if challenge is completed
+                if (challenge.completed) continue;
+
+                // Action button rectangle
+                Rect actionBtn(challengeX + challengeWidth - 120.0f, challengeY + 80.0f, 110.0f, 30.0f);
+
+                if (actionBtn.Contains(mousePos)) {
+                    if (challenge.active) {
+                        // Exit challenge
+                        m_ChallengeManager.ExitChallenge(this);
+                        Log::Infof("Exited challenge: ", challenge.name);
+                        PerformPrestige(); // Reset game state when exiting challenge
+                    } else {
+                        // Try to enter challenge
+                        bool canEnter = challenge.CanEnter(currentPrestige, currentChallenge != nullptr);
+                        if (canEnter) {
+                            if (m_ChallengeManager.EnterChallenge(challenge.id, this)) {
+                                Log::Infof("Entered challenge: ", challenge.name);
+                                PerformPrestige(); // Reset game state when entering challenge
+                            }
+                        } else {
+                            Log::Info("Cannot enter this challenge (check requirements or exit current challenge)");
+                        }
                     }
                     handled = true;
                     break;
@@ -739,7 +840,7 @@ void GameState::UpdateUI(Input* input) {
             f32 startX = 25.0f;
 
             // Check each navigation button
-            for (int i = 0; i < 5; i++) {  // Updated to 5 buttons (added BUYABLES)
+            for (int i = 0; i < 6; i++) {  // Updated to 6 buttons (added BUYABLES and CHALLENGES)
                 f32 x = startX + i * (btnWidth + spacing);
                 Rect btnRect(x, btnY, btnWidth, btnHeight);
 
@@ -768,7 +869,9 @@ void GameState::UpdateUI(Input* input) {
         f32 boostBtnY = navY + (navHeight - boostBtnHeight) * 0.5f;
         Rect boostBtnRect(boostBtnX, boostBtnY, boostBtnWidth, boostBtnHeight);
 
-        if (boostBtnRect.Contains(mousePos) && !m_BoostActive && m_BoostCooldownRemaining <= 0) {
+        // Check if boost is allowed (not disabled by challenge)
+        bool canBoost = !m_ChallengeManager.HasModifier(ChallengeModifier::NoBoost);
+        if (boostBtnRect.Contains(mousePos) && !m_BoostActive && m_BoostCooldownRemaining <= 0 && canBoost) {
             // Activate boost!
             m_BoostActive = true;
             m_BoostTimeRemaining = m_BoostDuration;
@@ -796,6 +899,7 @@ void GameState::Render(Renderer* renderer) {
     RenderResearchTree(renderer);
     RenderMilestones(renderer);
     RenderBuyables(renderer);
+    RenderChallenges(renderer);
     RenderParticleEffects(renderer, 1.0/60.0); // Assume 60 FPS for particles
     RenderAchievementNotifications(renderer);
     RenderMilestoneNotifications(renderer);
@@ -981,26 +1085,35 @@ void GameState::RenderStations(Renderer* renderer) {
         // Skip unlock button 
         buttonIdx++;
 
+        // Calculate effective upgrade cost (with challenge modifiers)
+        f64 effectiveUpgradeCost = station.upgradeCost;
+        if (m_ChallengeManager.HasModifier(ChallengeModifier::ExpensiveUpgrades)) {
+            effectiveUpgradeCost *= 3.0; // Upgrades cost 3x more
+        }
+
         // Get observe button (Left Button)
         UIButton& observeBtn = m_StationButtons[buttonIdx++];
         observeBtn.bounds = Rect(stationRect.x + 20.0f, y + 85.0f, 200.0f, 45.0f);
-        observeBtn.enabled = station.superpositionValue > 0.1;
+        observeBtn.enabled = station.superpositionValue > 0.1 &&
+                            !m_ChallengeManager.HasModifier(ChallengeModifier::NoObserve);
         observeBtn.Render(renderer);
 
         // Get upgrade button (Middle Button)
         UIButton& upgradeBtn = m_StationButtons[buttonIdx++];
         upgradeBtn.bounds = Rect(stationRect.x + 240.0f, y + 85.0f, 180.0f, 45.0f);
-        upgradeBtn.text = "UPGRADE (" + std::to_string(static_cast<i64>(station.upgradeCost)) + ")";
-        upgradeBtn.enabled = m_Resources[0] >= station.upgradeCost;
-        upgradeBtn.affordability = std::min(1.0, m_Resources[0] / station.upgradeCost);
+        upgradeBtn.text = "UPGRADE (" + GameUtils::FormatNumber(effectiveUpgradeCost, m_NumberFormat) + ")";
+        upgradeBtn.enabled = m_Resources[0] >= effectiveUpgradeCost &&
+                            !m_ChallengeManager.HasModifier(ChallengeModifier::NoUpgrades);
+        upgradeBtn.affordability = std::min(1.0, m_Resources[0] / effectiveUpgradeCost);
         upgradeBtn.Render(renderer);
 
         // Get buy max button (Right Button)
         UIButton& buyMaxBtn = m_StationButtons[buttonIdx++];
         buyMaxBtn.bounds = Rect(stationRect.x + 440.0f, y + 85.0f, 140.0f, 45.0f);
         buyMaxBtn.text = "BUY MAX";
-        buyMaxBtn.enabled = m_Resources[0] >= station.upgradeCost;
-        buyMaxBtn.affordability = std::min(1.0, m_Resources[0] / station.upgradeCost);
+        buyMaxBtn.enabled = m_Resources[0] >= effectiveUpgradeCost &&
+                           !m_ChallengeManager.HasModifier(ChallengeModifier::NoUpgrades);
+        buyMaxBtn.affordability = std::min(1.0, m_Resources[0] / effectiveUpgradeCost);
         buyMaxBtn.Render(renderer);
 
         // Progress bar showing how close to affording next upgrade
@@ -1011,7 +1124,7 @@ void GameState::RenderStations(Renderer* renderer) {
 
         // Calculate progress (0-100% based on current resources vs upgrade cost)
         f64 currentQubits = m_Resources[0];
-        f64 upgradeCost = station.upgradeCost;
+        f64 upgradeCost = effectiveUpgradeCost; // Use effective cost with challenge modifiers
         f64 progress = std::min(1.0, currentQubits / upgradeCost);
 
         // Color-code based on affordability
@@ -1080,10 +1193,11 @@ void GameState::RenderUI(Renderer* renderer) {
         {"ACHIEVEMENTS (A)", &m_ShowAchievements, Color::CoherenceGreen()},
         {"STATS (S)", &m_ShowStats, Color::EntanglementOrange()},
         {"MILESTONES (M)", &m_ShowMilestones, Color::NeonPink()},
-        {"BUYABLES (B)", &m_ShowBuyables, Color::ElectricBlue()}
+        {"BUYABLES (B)", &m_ShowBuyables, Color::ElectricBlue()},
+        {"CHALLENGES (C)", &m_ShowChallenges, Color::Red()}
     };
 
-    for (int i = 0; i < 5; i++) {
+    for (int i = 0; i < 6; i++) {
         auto& btn = navButtons[i];
         f32 x = startX + i * (btnWidth + spacing);
         Rect btnRect(x, btnY, btnWidth, btnHeight);
@@ -1122,7 +1236,13 @@ void GameState::RenderUI(Renderer* renderer) {
     std::string boostText;
     bool boostClickable = false;
 
-    if (m_BoostActive) {
+    // Check if boost is disabled by challenge
+    bool boostDisabledByChallenge = m_ChallengeManager.HasModifier(ChallengeModifier::NoBoost);
+
+    if (boostDisabledByChallenge) {
+        boostColor = Color(0.3f, 0.3f, 0.3f, 1.0f);
+        boostText = "BOOST DISABLED";
+    } else if (m_BoostActive) {
         boostColor = Color::CoherenceGreen();
         boostText = "BOOST ACTIVE! " + std::to_string(static_cast<i32>(m_BoostTimeRemaining)) + "s";
     } else if (m_BoostCooldownRemaining > 0) {
@@ -2153,6 +2273,10 @@ void GameState::UpdateResearchBonuses() {
     f64 milestoneBonus = 1.0 + m_MilestoneSystem.GetTotalProductionBonus();
     productionMult *= milestoneBonus;
 
+    // Apply challenge reward multipliers (permanent bonuses from completed challenges)
+    f64 challengeBonus = m_ChallengeManager.GetTotalRewardMultiplier();
+    productionMult *= challengeBonus;
+
     // Calculate buyable multipliers for each resource type
     // Each purchase doubles production (2^timesPurchased)
     auto* quantumAccelerator = m_BuyableManager.GetBuyable("quantum_accelerator");
@@ -2520,21 +2644,23 @@ void GameState::RenderBuyables(Renderer* renderer) {
         // Cost and Buy button
         f64 cost = buyable.GetCurrentCost();
         bool canAfford = buyable.CanAfford(m_Resources[0]);
+        bool disabledByChallenge = m_ChallengeManager.HasModifier(ChallengeModifier::NoBuyables);
 
         if (!maxed) {
             std::string costStr = GameUtils::FormatNumber(cost, m_NumberFormat) + " Qubits";
             Vec2 costPos(buyableX + 10.0f, buyableY + 60.0f);
-            Color costColor = canAfford ? Color::CoherenceGreen() : Color(0.7f, 0.5f, 0.5f, 1.0f);
+            Color costColor = (canAfford && !disabledByChallenge) ? Color::CoherenceGreen() : Color(0.7f, 0.5f, 0.5f, 1.0f);
             renderer->DrawText("Cost: " + costStr, costPos, costColor, 14.0f);
 
             // Buy button
             Rect buyBtn(buyableX + buyableWidth - 120.0f, buyableY + 55.0f, 110.0f, 35.0f);
-            Color btnColor = canAfford ? Color::CoherenceGreen() : Color(0.3f, 0.3f, 0.3f, 1.0f);
+            Color btnColor = (canAfford && !disabledByChallenge) ? Color::CoherenceGreen() : Color(0.3f, 0.3f, 0.3f, 1.0f);
             renderer->DrawRect(buyBtn, btnColor * 0.3f, true);
-            renderer->DrawRect(buyBtn, canAfford ? Color::CoherenceGreen() : Color(0.4f, 0.4f, 0.4f, 1.0f), false);
+            renderer->DrawRect(buyBtn, (canAfford && !disabledByChallenge) ? Color::CoherenceGreen() : Color(0.4f, 0.4f, 0.4f, 1.0f), false);
 
             Vec2 btnTextPos(buyBtn.x + 28.0f, buyBtn.y + 10.0f);
-            renderer->DrawText("PURCHASE", btnTextPos, Color::White(), 14.0f);
+            std::string btnText = disabledByChallenge ? "DISABLED" : "PURCHASE";
+            renderer->DrawText(btnText, btnTextPos, Color::White(), 14.0f);
         } else {
             Vec2 maxedPos(buyableX + 10.0f, buyableY + 60.0f);
             renderer->DrawText("MAXED OUT", maxedPos, Color::CoherenceGreen(), 16.0f);
@@ -2584,6 +2710,141 @@ void GameState::RenderMilestoneNotifications(Renderer* renderer) {
         if (m_TotalTimePlayed - lastClear > 5.0) {
             m_MilestoneSystem.ClearRecentCompletions();
             lastClear = m_TotalTimePlayed;
+        }
+    }
+}
+
+void GameState::RenderChallenges(Renderer* renderer) {
+    if (!m_ShowChallenges) return;
+
+    // Background overlay
+    Rect bg(0, 0, static_cast<f32>(renderer->GetWidth()), static_cast<f32>(renderer->GetHeight()));
+    renderer->DrawRect(bg, Color(0.0f, 0.0f, 0.0f, 0.8f), true);
+
+    // Challenges panel
+    f32 panelWidth = 900.0f;
+    f32 panelHeight = 650.0f;
+    f32 panelX = (renderer->GetWidth() - panelWidth) / 2.0f;
+    f32 panelY = (renderer->GetHeight() - panelHeight) / 2.0f;
+
+    Rect panel(panelX, panelY, panelWidth, panelHeight);
+    renderer->DrawRect(panel, Color::DarkPanel(), true);
+    renderer->DrawRect(panel, Color::Red() * 0.8f, false);
+
+    // Title
+    Vec2 titlePos(panelX + 20.0f, panelY + 15.0f);
+    renderer->DrawText("QUANTUM CHALLENGES", titlePos, Color::Red(), 24.0f);
+
+    // Close button (X) in top right
+    f32 closeBtnSize = 30.0f;
+    f32 closeBtnX = panelX + panelWidth - closeBtnSize - 10.0f;
+    f32 closeBtnY = panelY + 10.0f;
+    Rect closeBtn(closeBtnX, closeBtnY, closeBtnSize, closeBtnSize);
+
+    renderer->DrawRect(closeBtn, Color(0.3f, 0.1f, 0.1f, 0.8f), true);
+    renderer->DrawRect(closeBtn, Color::Red() * 0.8f, false);
+
+    Vec2 xPos(closeBtnX + 10.0f, closeBtnY + 8.0f);
+    renderer->DrawText("X", xPos, Color::White(), 16.0f);
+
+    // Hint text
+    Vec2 hintPos(panelX + panelWidth - 200.0f, panelY + 45.0f);
+    renderer->DrawText("(Click X or press C/ESC)", hintPos, Color(0.6f, 0.6f, 0.6f, 1.0f), 11.0f);
+
+    // Current challenge info (if in challenge)
+    const Challenge* currentChallenge = m_ChallengeManager.GetCurrentChallenge();
+    if (currentChallenge) {
+        Vec2 currentPos(panelX + 20.0f, panelY + 50.0f);
+        renderer->DrawText("⚠ ACTIVE CHALLENGE: " + currentChallenge->name, currentPos, Color::Red(), 16.0f);
+
+        Vec2 goalPos(panelX + 20.0f, panelY + 70.0f);
+        f64 currentQubits = GetResource(QuantumResource::Qubits);
+        std::string goalText = "Goal: " + GameUtils::FormatNumber(currentQubits, m_NumberFormat) +
+                               " / " + GameUtils::FormatNumber(currentChallenge->goalQubits, m_NumberFormat) + " Qubits";
+        renderer->DrawText(goalText, goalPos, Color::Yellow(), 13.0f);
+    }
+
+    // Challenges list
+    f32 challengeStartY = currentChallenge ? panelY + 100.0f : panelY + 70.0f;
+    f32 challengeX = panelX + 20.0f;
+    f32 challengeWidth = panelWidth - 40.0f;
+    f32 challengeHeight = 120.0f;
+    f32 challengeSpacing = 10.0f;
+
+    auto& challenges = m_ChallengeManager.GetChallenges();
+    i32 currentPrestige = m_Statistics.totalPrestigesPerformed;
+
+    for (size_t i = 0; i < challenges.size(); i++) {
+        const auto& challenge = challenges[i];
+        f32 challengeY = challengeStartY + (challengeHeight + challengeSpacing) * i;
+
+        // Challenge background
+        bool completed = challenge.completed;
+        bool active = challenge.active;
+        bool canEnter = challenge.CanEnter(currentPrestige, currentChallenge != nullptr);
+
+        Color challengeBg;
+        Color challengeBorder;
+        if (active) {
+            challengeBg = Color(0.2f, 0.1f, 0.1f, 1.0f);
+            challengeBorder = Color::Red();
+        } else if (completed) {
+            challengeBg = Color(0.1f, 0.2f, 0.15f, 1.0f);
+            challengeBorder = Color::CoherenceGreen() * 0.6f;
+        } else {
+            challengeBg = Color(0.15f, 0.15f, 0.2f, 1.0f);
+            challengeBorder = Color::Red() * 0.6f;
+        }
+
+        Rect challengeRect(challengeX, challengeY, challengeWidth, challengeHeight);
+        renderer->DrawRect(challengeRect, challengeBg, true);
+        renderer->DrawRect(challengeRect, challengeBorder, false);
+
+        // Challenge name
+        Vec2 namePos(challengeX + 10.0f, challengeY + 10.0f);
+        std::string nameStr = challenge.name;
+        if (active) nameStr += " [ACTIVE]";
+        if (completed) nameStr += " [COMPLETED]";
+        Color nameColor = completed ? Color::CoherenceGreen() : (active ? Color::Red() : Color::White());
+        renderer->DrawText(nameStr, namePos, nameColor, 18.0f);
+
+        // Description
+        Vec2 descPos(challengeX + 10.0f, challengeY + 35.0f);
+        renderer->DrawText(challenge.description, descPos, Color(0.8f, 0.8f, 0.9f, 1.0f), 13.0f);
+
+        // Requirements
+        Vec2 reqPos(challengeX + 10.0f, challengeY + 55.0f);
+        std::string reqText = "Requires: " + std::to_string(challenge.minPrestigeLevel) + " prestiges";
+        Color reqColor = currentPrestige >= challenge.minPrestigeLevel ? Color::CoherenceGreen() : Color(0.7f, 0.5f, 0.5f, 1.0f);
+        renderer->DrawText(reqText, reqPos, reqColor, 12.0f);
+
+        // Goal
+        Vec2 goalPos(challengeX + 10.0f, challengeY + 75.0f);
+        std::string goalText = "Goal: " + GameUtils::FormatNumber(challenge.goalQubits, m_NumberFormat) + " Qubits";
+        renderer->DrawText(goalText, goalPos, Color::Yellow(), 12.0f);
+
+        // Reward
+        Vec2 rewardPos(challengeX + 10.0f, challengeY + 95.0f);
+        renderer->DrawText("Reward: " + challenge.rewardDescription, rewardPos, Color::QuantumPurple(), 12.0f);
+
+        // Enter/Exit button
+        if (!completed) {
+            Rect actionBtn(challengeX + challengeWidth - 120.0f, challengeY + 80.0f, 110.0f, 30.0f);
+
+            if (active) {
+                // Exit button
+                renderer->DrawRect(actionBtn, Color::Red() * 0.3f, true);
+                renderer->DrawRect(actionBtn, Color::Red(), false);
+                Vec2 btnTextPos(actionBtn.x + 35.0f, actionBtn.y + 8.0f);
+                renderer->DrawText("EXIT", btnTextPos, Color::White(), 14.0f);
+            } else {
+                // Enter button
+                Color btnColor = canEnter ? Color::CoherenceGreen() : Color(0.3f, 0.3f, 0.3f, 1.0f);
+                renderer->DrawRect(actionBtn, btnColor * 0.3f, true);
+                renderer->DrawRect(actionBtn, canEnter ? Color::CoherenceGreen() : Color(0.4f, 0.4f, 0.4f, 1.0f), false);
+                Vec2 btnTextPos(actionBtn.x + 30.0f, actionBtn.y + 8.0f);
+                renderer->DrawText("ENTER", btnTextPos, Color::White(), 14.0f);
+            }
         }
     }
 }

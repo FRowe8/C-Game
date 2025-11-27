@@ -4,6 +4,7 @@
 #include "Research.h"
 #include "Milestones.h"
 #include "Buyables.h"
+#include "Challenges.h"
 #include "GameUtils.h"
 #include <vector>
 #include <string>
@@ -219,6 +220,9 @@ public:
     // Buyables System
     BuyableManager& GetBuyableManager() { return m_BuyableManager; }
 
+    // Challenge System
+    ChallengeManager& GetChallengeManager() { return m_ChallengeManager; }
+
 private:
     void InitializeStations();
     void InitializeUI();
@@ -237,6 +241,7 @@ private:
     void RenderMilestones(Renderer* renderer);
     void RenderMilestoneNotifications(Renderer* renderer);
     void RenderBuyables(Renderer* renderer);
+    void RenderChallenges(Renderer* renderer);
 
     // Particle system helpers
     void SpawnParticle(const Vec2& position, const Color& color, f64 lifetime = 1.0);
@@ -273,6 +278,9 @@ private:
     // Buyables System
     BuyableManager m_BuyableManager;
 
+    // Challenge System
+    ChallengeManager m_ChallengeManager;
+
     // Offline progress
     i64 m_LastSaveTimestamp;
 
@@ -284,6 +292,7 @@ private:
     bool m_ShowResearch;
     bool m_ShowMilestones;
     bool m_ShowBuyables;
+    bool m_ShowChallenges;
     GameUtils::NumberFormat m_NumberFormat; // Toggle between suffix (1.23M) and scientific (1.23e6)
 
     // Game time
