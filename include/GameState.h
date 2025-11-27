@@ -6,6 +6,7 @@
 #include "Buyables.h"
 #include "Challenges.h"
 #include "EssenceShop.h"
+#include "SingularityShop.h"
 #include "GameUtils.h"
 #include <vector>
 #include <string>
@@ -151,6 +152,10 @@ struct QuantumTimeline {
     f64 photons; // Prestige currency
     f64 photonBonus; // Global multiplier from photons
 
+    // Second prestige layer
+    i32 completedCollapses; // Number of singularity collapses performed
+    f64 singularities; // Second-layer currency (gained by collapsing photons)
+
     std::vector<bool> permanentUpgrades;
 
     QuantumTimeline();
@@ -199,6 +204,10 @@ public:
     void PerformPrestige();
     f64 CalculatePhotonsOnPrestige() const;
 
+    // Singularity Collapse (Second prestige layer)
+    void PerformCollapse();
+    f64 CalculateSingularitiesOnCollapse() const;
+
     // Achievements
     void CheckAchievements();
     void UnlockAchievement(AchievementID id);
@@ -235,6 +244,10 @@ public:
     // Essence Shop System
     EssenceShopManager& GetEssenceShopManager() { return m_EssenceShopManager; }
 
+    // Singularity Shop System
+    SingularityShopManager& GetSingularityShopManager() { return m_SingularityShopManager; }
+    QuantumTimeline& GetTimeline() { return m_Timeline; }
+
 private:
     void InitializeStations();
     void InitializeUI();
@@ -255,6 +268,7 @@ private:
     void RenderBuyables(Renderer* renderer);
     void RenderChallenges(Renderer* renderer);
     void RenderEssenceShop(Renderer* renderer);
+    void RenderSingularityShop(Renderer* renderer);
 
     // Particle system helpers
     void SpawnParticle(const Vec2& position, const Color& color, f64 lifetime = 1.0);
@@ -300,6 +314,9 @@ private:
     // Essence Shop System
     EssenceShopManager m_EssenceShopManager;
 
+    // Singularity Shop System
+    SingularityShopManager m_SingularityShopManager;
+
     // Offline progress
     i64 m_LastSaveTimestamp;
 
@@ -313,6 +330,7 @@ private:
     bool m_ShowBuyables;
     bool m_ShowChallenges;
     bool m_ShowEssenceShop;
+    bool m_ShowSingularityShop;
     GameUtils::NumberFormat m_NumberFormat; // Toggle between suffix (1.23M) and scientific (1.23e6)
 
     // Game time

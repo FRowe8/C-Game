@@ -135,8 +135,11 @@ bool ChallengeManager::CompleteChallenge(GameState* gameState) {
     challenge->active = false;
     m_CurrentChallengeId = "";
 
-    // Award Quantum Essence for completing challenge
-    gameState->AddEssence(5.0); // 5 essence per challenge completion
+    // Award Quantum Essence for completing challenge (with singularity bonus)
+    f64 baseEssence = 5.0;
+    f64 challengeBonus = gameState->GetSingularityShopManager().GetChallengeRewardMultiplier();
+    f64 totalEssence = baseEssence * challengeBonus;
+    gameState->AddEssence(totalEssence);
 
     Log::Infof("Completed challenge: ", challenge->name, " - ", challenge->rewardDescription);
     return true;

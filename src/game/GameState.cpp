@@ -42,7 +42,8 @@ QuantumEvent::QuantumEvent()
 
 // QuantumTimeline implementation
 QuantumTimeline::QuantumTimeline()
-    : completedResets(0), photons(0), photonBonus(1.0) {
+    : completedResets(0), photons(0), photonBonus(1.0),
+      completedCollapses(0), singularities(0) {
 }
 
 // ResearchStation implementation
@@ -196,7 +197,7 @@ bool UIButton::WasClicked(const Vec2& mousePos, bool mousePressed) {
 GameState::GameState()
     : m_CurrentEvent(nullptr), m_TimeSinceLastEvent(0), m_EventCooldown(120.0),
       m_LastSaveTimestamp(0),
-      m_ShowAchievements(false), m_ShowStats(false), m_ShowResearch(false), m_ShowMilestones(false), m_ShowBuyables(false), m_ShowChallenges(false), m_ShowEssenceShop(false),
+      m_ShowAchievements(false), m_ShowStats(false), m_ShowResearch(false), m_ShowMilestones(false), m_ShowBuyables(false), m_ShowChallenges(false), m_ShowEssenceShop(false), m_ShowSingularityShop(false),
       m_NumberFormat(GameUtils::NumberFormat::Suffix),
       m_TotalTimePlayed(0), m_TimeSinceLastSave(0),
       m_Coherence(100), m_MaxCoherence(100), m_CoherenceDecayRate(1.0),
@@ -284,6 +285,10 @@ void GameState::Initialize() {
     // Initialize Essence Shop System
     m_EssenceShopManager.Initialize(this);
     Log::Info("Essence shop initialized");
+
+    // Initialize Singularity Shop System
+    m_SingularityShopManager.Initialize(this);
+    Log::Info("Singularity shop initialized");
 
     // Try to load save file
     std::string savePath = Platform::GetSaveDirectory() + "quantum_save.json";
@@ -515,6 +520,15 @@ void GameState::Update(f64 deltaTime, Input* input, Renderer* renderer) {
         }
     }
 
+    // Passive photon generation from singularities
+    f64 photonGenRate = m_SingularityShopManager.GetPhotonGenerationRate();
+    if (photonGenRate > 0 && m_Timeline.singularities > 0) {
+        // photonGenRate is the multiplier per singularity
+        // Total generation = photonGenRate * singularities * deltaTime
+        f64 photonsGained = photonGenRate * m_Timeline.singularities * deltaTime;
+        AddPhotons(photonsGained);
+    }
+
     // Auto-prestige if enabled and threshold reached
     if (m_ResearchTree.IsResearched(ResearchID::AutoPrestige)) {
         f64 photonsOnPrestige = CalculatePhotonsOnPrestige();
@@ -721,6 +735,7 @@ void GameState::UpdateUI(Input* input) {
         m_ShowBuyables = false;
         m_ShowChallenges = false;
         m_ShowEssenceShop = false;
+        m_ShowSingularityShop = false;
     }
 
     // Handle popup close button clicks (X button in top-right of panels)
@@ -939,6 +954,39 @@ void GameState::UpdateUI(Input* input) {
             }
         }
 
+        // Handle singularity shop purchase button clicks (if singularity shop panel is open)
+        if (!handled && m_ShowSingularityShop) {
+            f32 panelWidth = 900.0f;
+            f32 panelHeight = 650.0f;
+            f32 panelX = (1280.0f - panelWidth) / 2.0f;
+            f32 panelY = (720.0f - panelHeight) / 2.0f;
+
+            f32 upgradeStartY = panelY + 85.0f;
+            f32 upgradeX = panelX + 20.0f;
+            f32 upgradeWidth = panelWidth - 40.0f;
+            f32 upgradeHeight = 100.0f;
+            f32 upgradeSpacing = 10.0f;
+
+            auto& upgrades = m_SingularityShopManager.GetUpgrades();
+
+            for (size_t i = 0; i < upgrades.size(); i++) {
+                const auto& upgrade = upgrades[i];
+                f32 upgradeY = upgradeStartY + (upgradeHeight + upgradeSpacing) * i;
+
+                // Purchase button rectangle
+                Rect buyBtn(upgradeX + upgradeWidth - 120.0f, upgradeY + 55.0f, 110.0f, 35.0f);
+
+                if (buyBtn.Contains(mousePos) && !upgrade.IsMaxed()) {
+                    if (m_SingularityShopManager.Purchase(upgrade.id, this)) {
+                        Log::Infof("Purchased singularity upgrade: ", upgrade.name);
+                        UpdateResearchBonuses(); // Recalculate production with new multipliers
+                    }
+                    handled = true;
+                    break;
+                }
+            }
+        }
+
         // Handle navigation bar button clicks (only if no popup consumed the click)
         if (!handled) {
             f32 navY = 100.0f;
@@ -1063,6 +1111,30 @@ void GameState::UpdateUI(Input* input) {
             Log::Infof("Auto-prestige threshold: ", m_AutoPrestigeThreshold);
         }
     }
+
+    // Handle singularity collapse button clicks
+    if (mousePressed) {
+        // Calculate button position (must match RenderStations rendering)
+        f32 stationHeight = 150.0f;
+        f32 margin = 20.0f;
+        f32 startY = 160.0f;
+        f32 prestigeY = startY + m_Stations.size() * (stationHeight + margin) + 20.0f + m_ScrollOffset.y;
+
+        f32 collapseY = prestigeY + 115.0f;
+        if (!m_ResearchTree.IsResearched(ResearchID::AutoPrestige)) {
+            collapseY = prestigeY + 70.0f;
+        }
+
+        Rect collapseBtn(30.0f, collapseY, static_cast<f32>(1280.0f) - 60.0f, 60.0f);
+
+        if (collapseBtn.Contains(mousePos)) {
+            if (CalculateSingularitiesOnCollapse() > 0) {
+                PerformCollapse();
+            } else {
+                Log::Info("Not enough photons for collapse (need 10,000)");
+            }
+        }
+    }
 }
 
 void GameState::Render(Renderer* renderer) {
@@ -1077,6 +1149,7 @@ void GameState::Render(Renderer* renderer) {
     RenderBuyables(renderer);
     RenderChallenges(renderer);
     RenderEssenceShop(renderer);
+    RenderSingularityShop(renderer);
     RenderParticleEffects(renderer, 1.0/60.0); // Assume 60 FPS for particles
     RenderAchievementNotifications(renderer);
     RenderMilestoneNotifications(renderer);
@@ -1110,11 +1183,18 @@ void GameState::RenderResources(Renderer* renderer) {
     }
 
     // Draw Quantum Essence (permanent meta-currency) - top-right corner
-    Vec2 essencePos(static_cast<f32>(renderer->GetWidth()) - 250.0f, 10.0f);
+    Vec2 essencePos(static_cast<f32>(renderer->GetWidth()) - 500.0f, 10.0f);
     renderer->DrawText("Quantum Essence", essencePos, Color::Magenta(), 14.0f);
-    Vec2 essenceValuePos(static_cast<f32>(renderer->GetWidth()) - 250.0f, 30.0f);
+    Vec2 essenceValuePos(static_cast<f32>(renderer->GetWidth()) - 500.0f, 30.0f);
     std::string essenceStr = GameUtils::FormatNumber(m_QuantumEssence, m_NumberFormat);
     renderer->DrawText("💎 " + essenceStr, essenceValuePos, Color::Magenta() * 1.3f, 20.0f);
+
+    // Draw Singularities (second prestige layer) - top-right corner
+    Vec2 singularityPos(static_cast<f32>(renderer->GetWidth()) - 250.0f, 10.0f);
+    renderer->DrawText("Singularities", singularityPos, Color(0.5f, 0.0f, 1.0f, 1.0f), 14.0f);
+    Vec2 singularityValuePos(static_cast<f32>(renderer->GetWidth()) - 250.0f, 30.0f);
+    std::string singularityStr = GameUtils::FormatNumber(m_Timeline.singularities, m_NumberFormat);
+    renderer->DrawText("⭐ " + singularityStr, singularityValuePos, Color(0.8f, 0.0f, 1.0f, 1.0f), 20.0f);
 
     // Draw coherence bar
     f32 coherenceBarWidth = 200.0f;
@@ -1404,6 +1484,31 @@ void GameState::RenderStations(Renderer* renderer) {
         Vec2 plusTenTextPos(startX + (btnW + btnSpacing) * 3 + 14.0f, autoPrestigeY + 12.0f);
         renderer->DrawText("+10", plusTenTextPos, Color::White(), 12.0f);
     }
+
+    // ----------------------------------------------------------------------
+    // --- SINGULARITY COLLAPSE BUTTON ---
+    // ----------------------------------------------------------------------
+    f32 collapseY = prestigeY + 115.0f; // Below auto-prestige controls (or below prestige if no auto-prestige)
+    if (!m_ResearchTree.IsResearched(ResearchID::AutoPrestige)) {
+        collapseY = prestigeY + 70.0f; // Directly below prestige button
+    }
+
+    f64 singularitiesOnCollapse = CalculateSingularitiesOnCollapse();
+    bool canCollapse = singularitiesOnCollapse > 0;
+
+    // Collapse button - full width, cosmic purple theme
+    Rect collapseBtn(30.0f, collapseY, static_cast<f32>(renderer->GetWidth()) - 60.0f, 60.0f);
+    Color collapseColor = canCollapse ? Color(0.5f, 0.0f, 1.0f, 1.0f) : Color(0.2f, 0.0f, 0.3f, 0.5f);
+    renderer->DrawRect(collapseBtn, collapseColor * 0.3f, true);
+    renderer->DrawRect(collapseBtn, collapseColor, false);
+
+    std::string collapseText = canCollapse ?
+        "⭐ SINGULARITY COLLAPSE: RESET EVERYTHING (+" + std::to_string(static_cast<i64>(singularitiesOnCollapse)) + " SINGULARITIES)" :
+        "⭐ SINGULARITY COLLAPSE (Requires 10,000 photons)";
+
+    f32 collapseTextWidth = static_cast<f32>(collapseText.length()) * 8.0f;
+    Vec2 collapseTextPos(30.0f + (collapseBtn.width - collapseTextWidth) / 2.0f, collapseY + 22.0f);
+    renderer->DrawText(collapseText, collapseTextPos, canCollapse ? Color::White() : Color(0.5f, 0.5f, 0.5f, 1.0f), 16.0f);
 }
 
 void GameState::RenderUI(Renderer* renderer) {
@@ -1606,6 +1711,56 @@ void GameState::PerformPrestige() {
     m_Timeline.photons += photons;
     m_Timeline.completedResets++;
     m_Timeline.photonBonus = 1.0 + (m_Timeline.photons * 0.1); // 10% per photon
+
+    // Reset resources
+    for (int i = 0; i < 3; i++) {
+        m_Resources[i] = 0;
+    }
+
+    // Start with base qubits plus essence shop bonus
+    f64 startingQubits = 10.0 + m_EssenceShopManager.GetStartingQubits();
+    m_Resources[0] = startingQubits;
+
+    // Reset stations
+    for (auto& station : m_Stations) {
+        if (station.name != "Qubit Generator") {
+            station.unlocked = false;
+        }
+        station.level = 0;
+        station.currentProduction = 0;
+        station.superpositionValue = 0;
+        station.upgradeCost = station.upgradeCostMultiplier; // Reset cost
+    }
+
+    m_Coherence = m_MaxCoherence;
+}
+
+f64 GameState::CalculateSingularitiesOnCollapse() const {
+    // Formula: singularities = sqrt(photons) / 100
+    // Minimum requirement: 10,000 photons
+    if (m_Timeline.photons < 10000.0) {
+        return 0.0;
+    }
+
+    return std::sqrt(m_Timeline.photons) / 100.0;
+}
+
+void GameState::PerformCollapse() {
+    f64 singularities = CalculateSingularitiesOnCollapse();
+    if (singularities <= 0) {
+        Log::Warning("Not enough photons for singularity collapse (need 10,000)");
+        return;
+    }
+
+    Log::Infof("Performing singularity collapse! Gained ", singularities, " singularities");
+
+    m_Timeline.singularities += singularities;
+    m_Timeline.completedCollapses++;
+
+    // Reset photon layer
+    m_Timeline.photons = 0;
+    m_Timeline.photonBonus = 1.0;
+    m_Timeline.completedResets = 0;
 
     // Reset resources
     for (int i = 0; i < 3; i++) {
@@ -2521,13 +2676,16 @@ bool GameState::CanAffordResearch(ResearchID id) const {
     const ResearchNode* node = m_ResearchTree.GetNode(id);
     if (!node) return false;
 
-    // Check resource costs
-    if (GetResource(QuantumResource::Qubits) < node->qubitCost) return false;
-    if (GetResource(QuantumResource::Coherence) < node->coherenceCost) return false;
-    if (GetResource(QuantumResource::Entanglement) < node->entanglementCost) return false;
+    // Apply singularity shop research cost discount
+    f64 costMultiplier = m_SingularityShopManager.GetResearchCostMultiplier();
+
+    // Check resource costs (with discount applied)
+    if (GetResource(QuantumResource::Qubits) < node->qubitCost * costMultiplier) return false;
+    if (GetResource(QuantumResource::Coherence) < node->coherenceCost * costMultiplier) return false;
+    if (GetResource(QuantumResource::Entanglement) < node->entanglementCost * costMultiplier) return false;
 
     // Check photon cost
-    if (m_Timeline.photons < node->photonCost) return false;
+    if (m_Timeline.photons < node->photonCost * costMultiplier) return false;
 
     // Check if can be researched
     if (!m_ResearchTree.CanResearch(id, m_Timeline.completedResets)) return false;
@@ -2541,11 +2699,14 @@ bool GameState::PurchaseResearch(ResearchID id) {
     ResearchNode* node = m_ResearchTree.GetNode(id);
     if (!node) return false;
 
-    // Spend resources
-    SpendResource(QuantumResource::Qubits, node->qubitCost);
-    SpendResource(QuantumResource::Coherence, node->coherenceCost);
-    SpendResource(QuantumResource::Entanglement, node->entanglementCost);
-    m_Timeline.photons -= node->photonCost;
+    // Apply singularity shop research cost discount
+    f64 costMultiplier = m_SingularityShopManager.GetResearchCostMultiplier();
+
+    // Spend resources (with discount applied)
+    SpendResource(QuantumResource::Qubits, node->qubitCost * costMultiplier);
+    SpendResource(QuantumResource::Coherence, node->coherenceCost * costMultiplier);
+    SpendResource(QuantumResource::Entanglement, node->entanglementCost * costMultiplier);
+    m_Timeline.photons -= node->photonCost * costMultiplier;
 
     // Research it
     m_ResearchTree.Research(id);
@@ -3243,6 +3404,108 @@ void GameState::RenderEssenceShop(Renderer* renderer) {
             Color btnColor = canAfford ? Color::Magenta() : Color(0.3f, 0.3f, 0.3f, 1.0f);
             renderer->DrawRect(buyBtn, btnColor * 0.3f, true);
             renderer->DrawRect(buyBtn, canAfford ? Color::Magenta() : Color(0.4f, 0.4f, 0.4f, 1.0f), false);
+
+            Vec2 btnTextPos(buyBtn.x + 28.0f, buyBtn.y + 10.0f);
+            renderer->DrawText("PURCHASE", btnTextPos, Color::White(), 14.0f);
+        } else {
+            Vec2 maxedPos(upgradeX + 10.0f, upgradeY + 60.0f);
+            renderer->DrawText("MAXED OUT", maxedPos, Color::CoherenceGreen(), 16.0f);
+        }
+    }
+}
+
+void GameState::RenderSingularityShop(Renderer* renderer) {
+    if (!m_ShowSingularityShop) return;
+
+    // Background overlay
+    Rect bg(0, 0, static_cast<f32>(renderer->GetWidth()), static_cast<f32>(renderer->GetHeight()));
+    renderer->DrawRect(bg, Color(0.0f, 0.0f, 0.0f, 0.8f), true);
+
+    // Singularity shop panel
+    f32 panelWidth = 900.0f;
+    f32 panelHeight = 650.0f;
+    f32 panelX = (renderer->GetWidth() - panelWidth) / 2.0f;
+    f32 panelY = (renderer->GetHeight() - panelHeight) / 2.0f;
+
+    Rect panel(panelX, panelY, panelWidth, panelHeight);
+    renderer->DrawRect(panel, Color::DarkPanel(), true);
+    renderer->DrawRect(panel, Color(0.5f, 0.0f, 1.0f, 1.0f) * 0.8f, false);
+
+    // Title
+    Vec2 titlePos(panelX + 20.0f, panelY + 15.0f);
+    renderer->DrawText("⭐ SINGULARITY SHOP - COSMIC UPGRADES", titlePos, Color(0.8f, 0.0f, 1.0f, 1.0f), 22.0f);
+
+    // Close button (X) in top right
+    f32 closeBtnSize = 30.0f;
+    f32 closeBtnX = panelX + panelWidth - closeBtnSize - 10.0f;
+    f32 closeBtnY = panelY + 10.0f;
+    Rect closeBtn(closeBtnX, closeBtnY, closeBtnSize, closeBtnSize);
+
+    renderer->DrawRect(closeBtn, Color(0.3f, 0.1f, 0.1f, 0.8f), true);
+    renderer->DrawRect(closeBtn, Color(0.5f, 0.0f, 1.0f, 1.0f) * 0.8f, false);
+
+    Vec2 xPos(closeBtnX + 10.0f, closeBtnY + 8.0f);
+    renderer->DrawText("X", xPos, Color::White(), 16.0f);
+
+    // Hint text
+    Vec2 hintPos(panelX + panelWidth - 200.0f, panelY + 45.0f);
+    renderer->DrawText("(Click X or press ESC)", hintPos, Color(0.6f, 0.6f, 0.6f, 1.0f), 11.0f);
+
+    // Current singularities display
+    Vec2 singularityPos(panelX + 20.0f, panelY + 50.0f);
+    std::string singularityText = "Your Singularities: " + GameUtils::FormatNumber(m_Timeline.singularities, m_NumberFormat);
+    renderer->DrawText(singularityText, singularityPos, Color(0.8f, 0.0f, 1.0f, 1.0f) * 1.3f, 16.0f);
+
+    // Upgrades list
+    f32 upgradeStartY = panelY + 85.0f;
+    f32 upgradeX = panelX + 20.0f;
+    f32 upgradeWidth = panelWidth - 40.0f;
+    f32 upgradeHeight = 100.0f;
+    f32 upgradeSpacing = 10.0f;
+
+    auto& upgrades = m_SingularityShopManager.GetUpgrades();
+
+    for (size_t i = 0; i < upgrades.size(); i++) {
+        const auto& upgrade = upgrades[i];
+        f32 upgradeY = upgradeStartY + (upgradeHeight + upgradeSpacing) * i;
+
+        // Upgrade background
+        bool maxed = upgrade.IsMaxed();
+        Color upgradeBg = maxed ? Color(0.1f, 0.15f, 0.2f, 1.0f) : Color(0.1f, 0.1f, 0.15f, 1.0f);
+        Color upgradeBorder = maxed ? Color::CoherenceGreen() * 0.6f : Color(0.5f, 0.0f, 1.0f, 1.0f) * 0.6f;
+
+        Rect upgradeRect(upgradeX, upgradeY, upgradeWidth, upgradeHeight);
+        renderer->DrawRect(upgradeRect, upgradeBg, true);
+        renderer->DrawRect(upgradeRect, upgradeBorder, false);
+
+        // Upgrade name
+        Vec2 namePos(upgradeX + 10.0f, upgradeY + 10.0f);
+        renderer->DrawText(upgrade.name, namePos, Color::White(), 18.0f);
+
+        // Purchase count
+        std::string progressStr = upgrade.GetProgressString();
+        Vec2 progressPos(upgradeX + 400.0f, upgradeY + 10.0f);
+        renderer->DrawText("Owned: " + progressStr, progressPos, Color(0.8f, 0.0f, 1.0f, 1.0f), 14.0f);
+
+        // Description
+        Vec2 descPos(upgradeX + 10.0f, upgradeY + 35.0f);
+        renderer->DrawText(upgrade.description, descPos, Color(0.7f, 0.7f, 0.9f, 1.0f), 13.0f);
+
+        // Cost and Buy button
+        f64 cost = upgrade.GetCurrentCost();
+        bool canAfford = upgrade.CanAfford(m_Timeline.singularities);
+
+        if (!maxed) {
+            std::string costStr = GameUtils::FormatNumber(cost, m_NumberFormat) + " Singularities";
+            Vec2 costPos(upgradeX + 10.0f, upgradeY + 60.0f);
+            Color costColor = canAfford ? Color(0.8f, 0.0f, 1.0f, 1.0f) * 1.3f : Color(0.7f, 0.5f, 0.5f, 1.0f);
+            renderer->DrawText("Cost: " + costStr, costPos, costColor, 14.0f);
+
+            // Buy button
+            Rect buyBtn(upgradeX + upgradeWidth - 120.0f, upgradeY + 55.0f, 110.0f, 35.0f);
+            Color btnColor = canAfford ? Color(0.5f, 0.0f, 1.0f, 1.0f) : Color(0.3f, 0.3f, 0.3f, 1.0f);
+            renderer->DrawRect(buyBtn, btnColor * 0.3f, true);
+            renderer->DrawRect(buyBtn, canAfford ? Color(0.8f, 0.0f, 1.0f, 1.0f) : Color(0.4f, 0.4f, 0.4f, 1.0f), false);
 
             Vec2 btnTextPos(buyBtn.x + 28.0f, buyBtn.y + 10.0f);
             renderer->DrawText("PURCHASE", btnTextPos, Color::White(), 14.0f);
