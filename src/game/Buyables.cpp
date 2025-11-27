@@ -24,11 +24,12 @@ void BuyableManager::CreateProductionMultipliers(GameState* gameState) {
     (void)gameState; // Unused parameter - reserved for future use
 
     // Quantum Accelerator - 2x qubit production
+    // Rebalanced for gradual progression
     BuyableUpgrade quantumAccelerator;
     quantumAccelerator.id = "quantum_accelerator";
     quantumAccelerator.name = "Quantum Accelerator";
     quantumAccelerator.description = "Doubles qubit production rate";
-    quantumAccelerator.baseCost = 5000.0;
+    quantumAccelerator.baseCost = 25000.0; // Increased from 5000
     quantumAccelerator.costMultiplier = 2.5; // Gets expensive quickly
     quantumAccelerator.maxPurchases = -1; // Infinite
     quantumAccelerator.onPurchase = [](GameState* state) {
@@ -42,7 +43,7 @@ void BuyableManager::CreateProductionMultipliers(GameState* gameState) {
     coherenceAmplifier.id = "coherence_amplifier";
     coherenceAmplifier.name = "Coherence Amplifier";
     coherenceAmplifier.description = "Doubles coherence gain from observations";
-    coherenceAmplifier.baseCost = 100.0;
+    coherenceAmplifier.baseCost = 500.0; // Increased from 100
     coherenceAmplifier.costMultiplier = 3.0; // Very expensive scaling
     coherenceAmplifier.maxPurchases = -1; // Infinite
     coherenceAmplifier.onPurchase = [](GameState* state) {
@@ -56,7 +57,7 @@ void BuyableManager::CreateProductionMultipliers(GameState* gameState) {
     entanglementBooster.id = "entanglement_booster";
     entanglementBooster.name = "Entanglement Booster";
     entanglementBooster.description = "Doubles entanglement production";
-    entanglementBooster.baseCost = 50.0;
+    entanglementBooster.baseCost = 1000.0; // Increased from 50
     entanglementBooster.costMultiplier = 2.8;
     entanglementBooster.maxPurchases = -1; // Infinite
     entanglementBooster.onPurchase = [](GameState* state) {

@@ -304,6 +304,7 @@ void GameState::Initialize() {
 
 void GameState::InitializeStations() {
     // Station 1: Basic Qubit Generator
+    // Rebalanced for gradual progression like Shark Incremental
     ResearchStation station1;
     station1.name = "Qubit Generator";
     station1.description = "Generates qubits in superposition";
@@ -312,7 +313,7 @@ void GameState::InitializeStations() {
     station1.currentProduction = 1.0; // Start producing immediately
     station1.level = 1; // Start at level 1 for immediate passive income
     station1.upgradeCost = 10.0;
-    station1.upgradeCostMultiplier = 1.15;
+    station1.upgradeCostMultiplier = 1.5; // Increased from 1.15 for better balance
     station1.superpositionProbability = 0.7;
     station1.unlocked = true; // First one is unlocked
     m_Stations.push_back(station1);
@@ -324,11 +325,11 @@ void GameState::InitializeStations() {
     station2.resourceType = QuantumResource::Coherence;
     station2.baseProduction = 0.5;
     station2.level = 0;
-    station2.upgradeCost = 25.0;
-    station2.upgradeCostMultiplier = 1.18;
+    station2.upgradeCost = 50.0; // Increased from 25
+    station2.upgradeCostMultiplier = 1.6; // Increased from 1.18
     station2.superpositionProbability = 0.8;
     station2.unlocked = false;
-    station2.unlockCost = 50.0;
+    station2.unlockCost = 100.0; // Increased from 50
     m_Stations.push_back(station2);
 
     // Station 3: Entanglement Chamber
@@ -338,11 +339,11 @@ void GameState::InitializeStations() {
     station3.resourceType = QuantumResource::Entanglement;
     station3.baseProduction = 0.2;
     station3.level = 0;
-    station3.upgradeCost = 100.0;
-    station3.upgradeCostMultiplier = 1.2;
+    station3.upgradeCost = 250.0; // Increased from 100
+    station3.upgradeCostMultiplier = 1.7; // Increased from 1.2
     station3.superpositionProbability = 0.6;
     station3.unlocked = false;
-    station3.unlockCost = 150.0;
+    station3.unlockCost = 500.0; // Increased from 150
     m_Stations.push_back(station3);
 
     // Station 4: Advanced Qubit Synthesizer
@@ -352,11 +353,11 @@ void GameState::InitializeStations() {
     station4.resourceType = QuantumResource::Qubits;
     station4.baseProduction = 5.0;
     station4.level = 0;
-    station4.upgradeCost = 500.0;
-    station4.upgradeCostMultiplier = 1.25;
+    station4.upgradeCost = 1500.0; // Increased from 500
+    station4.upgradeCostMultiplier = 1.8; // Increased from 1.25
     station4.superpositionProbability = 0.5;
     station4.unlocked = false;
-    station4.unlockCost = 300.0;
+    station4.unlockCost = 2000.0; // Increased from 300
     m_Stations.push_back(station4);
 
     // Station 5: Quantum Supercomputer
@@ -366,11 +367,11 @@ void GameState::InitializeStations() {
     station5.resourceType = QuantumResource::Qubits;
     station5.baseProduction = 20.0;
     station5.level = 0;
-    station5.upgradeCost = 2000.0;
-    station5.upgradeCostMultiplier = 1.3;
+    station5.upgradeCost = 10000.0; // Increased from 2000
+    station5.upgradeCostMultiplier = 2.0; // Increased from 1.3
     station5.superpositionProbability = 0.4;
     station5.unlocked = false;
-    station5.unlockCost = 1000.0;
+    station5.unlockCost = 15000.0; // Increased from 1000
     m_Stations.push_back(station5);
 }
 
@@ -771,6 +772,9 @@ void GameState::UpdateUI(Input* input) {
 
         // Check close buttons for each popup (in reverse render order - check top-most first)
         bool handled = false;
+        if (!handled) handled = checkCloseButton(m_ShowSingularityShop, 900.0f, 650.0f, &m_ShowSingularityShop);
+        if (!handled) handled = checkCloseButton(m_ShowEssenceShop, 900.0f, 650.0f, &m_ShowEssenceShop);
+        if (!handled) handled = checkCloseButton(m_ShowChallenges, 900.0f, 650.0f, &m_ShowChallenges);
         if (!handled) handled = checkCloseButton(m_ShowBuyables, 900.0f, 600.0f, &m_ShowBuyables);
         if (!handled) handled = checkCloseButton(m_ShowMilestones, 950.0f, 670.0f, &m_ShowMilestones);
         if (!handled) handled = checkCloseButton(m_ShowResearch, 900.0f, 600.0f, &m_ShowResearch);
@@ -1687,10 +1691,12 @@ bool GameState::SpendEssence(f64 amount) {
 
 f64 GameState::CalculatePhotonsOnPrestige() const {
     // Photons based on total qubits earned
+    // Formula adjusted for better progression balance
     f64 totalQubits = m_Resources[0];
-    if (totalQubits < 1000.0) return 0;
+    if (totalQubits < 5000.0) return 0; // Increased from 1000 to slow early game
 
-    return std::floor(std::sqrt(totalQubits / 100.0));
+    // Reduced photon gain for more gradual progression
+    return std::floor(std::sqrt(totalQubits / 500.0)); // Increased divisor from 100 to 500
 }
 
 void GameState::PerformPrestige() {

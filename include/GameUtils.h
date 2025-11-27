@@ -48,24 +48,50 @@ inline std::string FormatNumber(f64 num, NumberFormat format = NumberFormat::Suf
     }
 
     // Suffix notation mode (default)
-    // Extended suffix support up to Decillion (10^33)
+    // Extended suffix support - following Shark Incremental style
     struct Suffix {
         f64 value;
         const char* name;
     };
 
     static const Suffix suffixes[] = {
-        {1e33, "Dc"},  // Decillion
-        {1e30, "No"},  // Nonillion
-        {1e27, "Oc"},  // Octillion
-        {1e24, "Sp"},  // Septillion
-        {1e21, "Sx"},  // Sextillion
-        {1e18, "Qi"},  // Quintillion
-        {1e15, "Qa"},  // Quadrillion
-        {1e12, "T"},   // Trillion
-        {1e9,  "B"},   // Billion
-        {1e6,  "M"},   // Million
-        {1e3,  "K"}    // Thousand
+        {1e303, "Cg"},  // Centillion
+        {1e153, "Uvg"}, // Unvigintillion
+        {1e120, "Uvg"}, // Unvigintillion
+        {1e102, "Tg"},  // Trigintillion
+        {1e99,  "Vg"},  // Vigintillion
+        {1e96,  "UDc"}, // Untrigintillion
+        {1e93,  "DTg"}, // Duotrigintillion
+        {1e90,  "TVg"}, // Trevigintillion
+        {1e87,  "UVg"}, // Unvigintillion
+        {1e84,  "DVg"}, // Duovigintillion
+        {1e81,  "TVg"}, // Trevigintillion
+        {1e78,  "QVg"}, // Quattuorvigintillion
+        {1e75,  "QiVg"},// Quinvigintillion
+        {1e72,  "SxVg"},// Sexvigintillion
+        {1e69,  "SpVg"},// Septvigintillion
+        {1e66,  "OcVg"},// Octovigintillion
+        {1e63,  "NoVg"},// Novevig intillion
+        {1e60,  "Vg"},  // Vigintillion
+        {1e57,  "UDc"}, // Undevigintillion
+        {1e54,  "DDc"}, // Duodevigintillion
+        {1e51,  "TDc"}, // Tredevigintillion
+        {1e48,  "QDc"}, // Quattuordevigintillion
+        {1e45,  "QiDc"},// Quindevigintillion
+        {1e42,  "SxDc"},// Sexdevigintillion
+        {1e39,  "SpDc"},// Septdevigintillion
+        {1e36,  "UDc"}, // Undecillion
+        {1e33,  "Dc"},  // Decillion
+        {1e30,  "No"},  // Nonillion
+        {1e27,  "Oc"},  // Octillion
+        {1e24,  "Sp"},  // Septillion
+        {1e21,  "Sx"},  // Sextillion
+        {1e18,  "Qi"},  // Quintillion
+        {1e15,  "Qa"},  // Quadrillion
+        {1e12,  "T"},   // Trillion
+        {1e9,   "B"},   // Billion
+        {1e6,   "M"},   // Million
+        {1e3,   "K"}    // Thousand
     };
 
     // Find appropriate suffix
