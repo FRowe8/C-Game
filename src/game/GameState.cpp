@@ -199,7 +199,9 @@ GameState::GameState()
       m_ShowAchievements(false), m_ShowStats(false), m_ShowResearch(false), m_ShowMilestones(false), m_ShowBuyables(false),
       m_NumberFormat(GameUtils::NumberFormat::Suffix),
       m_TotalTimePlayed(0), m_TimeSinceLastSave(0),
-      m_Coherence(100), m_MaxCoherence(100), m_CoherenceDecayRate(1.0) {
+      m_Coherence(100), m_MaxCoherence(100), m_CoherenceDecayRate(1.0),
+      m_BoostActive(false), m_BoostTimeRemaining(0), m_BoostCooldownRemaining(0),
+      m_BoostDuration(30.0), m_BoostCooldown(120.0), m_BoostMultiplier(2.0) {
 
     for (int i = 0; i < 3; i++) {
         m_Resources[i] = 0;
@@ -450,6 +452,22 @@ void GameState::Update(f64 deltaTime, Input* input, Renderer* renderer) {
     m_TimeSinceLastSave += deltaTime;
     m_TimeSinceLastEvent += deltaTime;
 
+    // Update boost timers
+    if (m_BoostActive) {
+        m_BoostTimeRemaining -= deltaTime;
+        if (m_BoostTimeRemaining <= 0) {
+            m_BoostActive = false;
+            m_BoostTimeRemaining = 0;
+            m_BoostCooldownRemaining = m_BoostCooldown;
+            Log::Info("Boost ended! Starting cooldown...");
+        }
+    } else if (m_BoostCooldownRemaining > 0) {
+        m_BoostCooldownRemaining -= deltaTime;
+        if (m_BoostCooldownRemaining < 0) {
+            m_BoostCooldownRemaining = 0;
+        }
+    }
+
     // Update statistics
     m_Statistics.UpdateSession(deltaTime);
 
@@ -493,6 +511,11 @@ void GameState::Update(f64 deltaTime, Input* input, Renderer* renderer) {
 void GameState::UpdateStations(f64 deltaTime) {
     // Apply prestige bonus
     f64 globalMultiplier = m_Timeline.photonBonus;
+
+    // Apply boost multiplier if active
+    if (m_BoostActive) {
+        globalMultiplier *= m_BoostMultiplier;
+    }
 
     // Check if Auto-Observer research is unlocked
     bool hasAutoObserver = m_ResearchTree.IsResearched(ResearchID::AutoObserver);
@@ -731,6 +754,25 @@ void GameState::UpdateUI(Input* input) {
                     break;  // Only handle one click per frame
                 }
             }
+        }
+    }
+
+    // Handle boost button click
+    if (mousePressed) {
+        // Boost button (from RenderUI)
+        f32 boostBtnWidth = 150.0f;
+        f32 boostBtnHeight = 38.0f;
+        f32 navY = 100.0f;
+        f32 navHeight = 50.0f;
+        f32 boostBtnX = 1280.0f - boostBtnWidth - 25.0f;  // Default screen width
+        f32 boostBtnY = navY + (navHeight - boostBtnHeight) * 0.5f;
+        Rect boostBtnRect(boostBtnX, boostBtnY, boostBtnWidth, boostBtnHeight);
+
+        if (boostBtnRect.Contains(mousePos) && !m_BoostActive && m_BoostCooldownRemaining <= 0) {
+            // Activate boost!
+            m_BoostActive = true;
+            m_BoostTimeRemaining = m_BoostDuration;
+            Log::Infof("Boost activated! 2x production for ", m_BoostDuration, " seconds!");
         }
     }
 
@@ -1067,6 +1109,48 @@ void GameState::RenderUI(Renderer* renderer) {
         Vec2 textPos(x + (btnWidth - textWidth) * 0.5f, btnY + (btnHeight - 12.0f) * 0.5f);
         renderer->DrawText(btn.label, textPos, Color::White(), 11.0f);
     }
+
+    // Boost button (right side of nav bar)
+    f32 boostBtnWidth = 150.0f;
+    f32 boostBtnHeight = 38.0f;
+    f32 boostBtnX = static_cast<f32>(renderer->GetWidth()) - boostBtnWidth - 25.0f;
+    f32 boostBtnY = navY + (navHeight - boostBtnHeight) * 0.5f;
+    Rect boostBtnRect(boostBtnX, boostBtnY, boostBtnWidth, boostBtnHeight);
+
+    // Determine boost button state and color
+    Color boostColor;
+    std::string boostText;
+    bool boostClickable = false;
+
+    if (m_BoostActive) {
+        boostColor = Color::CoherenceGreen();
+        boostText = "BOOST ACTIVE! " + std::to_string(static_cast<i32>(m_BoostTimeRemaining)) + "s";
+    } else if (m_BoostCooldownRemaining > 0) {
+        boostColor = Color(0.4f, 0.4f, 0.4f, 1.0f);
+        boostText = "COOLDOWN " + std::to_string(static_cast<i32>(m_BoostCooldownRemaining)) + "s";
+    } else {
+        boostColor = Color::NeonCyan();
+        boostText = "BOOST (2x)";
+        boostClickable = true;
+    }
+
+    // Draw boost button
+    renderer->DrawRect(boostBtnRect, boostColor * 0.3f, true);
+
+    if (m_BoostActive) {
+        // Pulsing glow when active
+        Rect glowRect(boostBtnX - 2.0f, boostBtnY - 2.0f, boostBtnWidth + 4.0f, boostBtnHeight + 4.0f);
+        renderer->DrawRect(glowRect, boostColor * 0.9f, false);
+    } else if (boostClickable) {
+        renderer->DrawRect(boostBtnRect, boostColor * 0.7f, false);
+    } else {
+        renderer->DrawRect(boostBtnRect, Color(0.3f, 0.3f, 0.3f, 1.0f), false);
+    }
+
+    // Button text
+    f32 boostTextWidth = boostText.length() * 5.5f;
+    Vec2 boostTextPos(boostBtnX + (boostBtnWidth - boostTextWidth) * 0.5f, boostBtnY + (boostBtnHeight - 12.0f) * 0.5f);
+    renderer->DrawText(boostText, boostTextPos, Color::White(), 12.0f);
 
     // Scroll indicator (bottom right corner - animated)
     if (m_ScrollOffset.y > -50.0f && !m_ShowAchievements && !m_ShowStats && !m_ShowResearch && !m_ShowMilestones) {

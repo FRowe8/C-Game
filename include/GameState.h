@@ -295,6 +295,14 @@ private:
     f64 m_MaxCoherence;
     f64 m_CoherenceDecayRate;
 
+    // Boost system (temporary production multiplier)
+    bool m_BoostActive;
+    f64 m_BoostTimeRemaining;
+    f64 m_BoostCooldownRemaining;
+    f64 m_BoostDuration;          // How long boost lasts (30 seconds)
+    f64 m_BoostCooldown;          // How long until can boost again (120 seconds)
+    f64 m_BoostMultiplier;        // Production multiplier during boost (2.0x)
+
     // Particle effects for visual feedback
     struct Particle {
         Vec2 position;
