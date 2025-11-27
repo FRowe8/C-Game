@@ -21,6 +21,8 @@ void BuyableManager::Initialize(GameState* gameState) {
 }
 
 void BuyableManager::CreateProductionMultipliers(GameState* gameState) {
+    (void)gameState; // Unused parameter - reserved for future use
+
     // Quantum Accelerator - 2x qubit production
     BuyableUpgrade quantumAccelerator;
     quantumAccelerator.id = "quantum_accelerator";
@@ -30,7 +32,7 @@ void BuyableManager::CreateProductionMultipliers(GameState* gameState) {
     quantumAccelerator.costMultiplier = 2.5; // Gets expensive quickly
     quantumAccelerator.maxPurchases = -1; // Infinite
     quantumAccelerator.onPurchase = [](GameState* state) {
-        // Effect applied in UpdateStations() by checking timesPurchased
+        (void)state; // Effect applied in UpdateStations() by checking timesPurchased
         Log::Info("Purchased Quantum Accelerator!");
     };
     m_Buyables.push_back(quantumAccelerator);
@@ -44,6 +46,7 @@ void BuyableManager::CreateProductionMultipliers(GameState* gameState) {
     coherenceAmplifier.costMultiplier = 3.0; // Very expensive scaling
     coherenceAmplifier.maxPurchases = -1; // Infinite
     coherenceAmplifier.onPurchase = [](GameState* state) {
+        (void)state; // Effect applied in UpdateStations() by checking timesPurchased
         Log::Info("Purchased Coherence Amplifier!");
     };
     m_Buyables.push_back(coherenceAmplifier);
@@ -57,6 +60,7 @@ void BuyableManager::CreateProductionMultipliers(GameState* gameState) {
     entanglementBooster.costMultiplier = 2.8;
     entanglementBooster.maxPurchases = -1; // Infinite
     entanglementBooster.onPurchase = [](GameState* state) {
+        (void)state; // Effect applied in UpdateStations() by checking timesPurchased
         Log::Info("Purchased Entanglement Booster!");
     };
     m_Buyables.push_back(entanglementBooster);
@@ -65,7 +69,7 @@ void BuyableManager::CreateProductionMultipliers(GameState* gameState) {
 bool BuyableManager::Purchase(const std::string& id, GameState* gameState) {
     BuyableUpgrade* buyable = GetBuyable(id);
     if (!buyable) {
-        Log::Warnf("Buyable not found: ", id);
+        Log::Warningf("Buyable not found: ", id);
         return false;
     }
 
