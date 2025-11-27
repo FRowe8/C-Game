@@ -362,7 +362,7 @@ void GameState::InitializeUI() {
     m_StationButtons.clear();
 
     // Create persistent buttons for each research station
-    // For each station, we create: unlock button (index 3*i), observe button (index 3*i+1), upgrade button (index 3*i+2)
+    // For each station, we create: unlock button (4*i), observe button (4*i+1), upgrade button (4*i+2), buy max button (4*i+3)
     for (size_t i = 0; i < m_Stations.size(); i++) {
         // Unlock Button
         UIButton unlockBtn;
@@ -402,6 +402,34 @@ void GameState::InitializeUI() {
             }
         };
         m_StationButtons.push_back(upgradeBtn);
+
+        // Buy Max Button
+        UIButton buyMaxBtn;
+        buyMaxBtn.text = "BUY MAX";
+        buyMaxBtn.color = Color::CoherenceGreen() * 0.7f;
+        buyMaxBtn.hoverColor = Color::CoherenceGreen();
+        buyMaxBtn.onClick = [this, i]() {
+            auto& station = m_Stations[i];
+            f64 currentQubits = GetResource(QuantumResource::Qubits);
+            i32 upgradesBought = 0;
+
+            // Keep buying while we can afford it
+            while (currentQubits >= station.upgradeCost && upgradesBought < 1000) { // Cap at 1000 to prevent infinite loops
+                if (SpendResource(QuantumResource::Qubits, station.upgradeCost)) {
+                    station.Upgrade();
+                    currentQubits = GetResource(QuantumResource::Qubits);
+                    upgradesBought++;
+                } else {
+                    break;
+                }
+            }
+
+            if (upgradesBought > 0) {
+                UpdateResearchBonuses(); // Recalculate production
+                Log::Infof("Bought ", upgradesBought, " upgrades for ", station.name, " (now level ", station.level, ")");
+            }
+        };
+        m_StationButtons.push_back(buyMaxBtn);
     }
 
     // Create Prestige Button (last button in the list)
@@ -466,8 +494,16 @@ void GameState::UpdateStations(f64 deltaTime) {
     // Apply prestige bonus
     f64 globalMultiplier = m_Timeline.photonBonus;
 
+    // Check if Auto-Observer research is unlocked
+    bool hasAutoObserver = m_ResearchTree.IsResearched(ResearchID::AutoObserver);
+
     for (auto& station : m_Stations) {
         station.Update(deltaTime * globalMultiplier);
+
+        // Auto-observe if research is unlocked and superposition is high enough
+        if (hasAutoObserver && station.unlocked && station.superpositionValue >= 10.0) {
+            station.Observe(this);
+        }
     }
 }
 
@@ -773,7 +809,7 @@ void GameState::RenderStations(Renderer* renderer) {
     f32 stationHeight = 150.0f;
     f32 margin = 20.0f;
 
-    // Counter for accessing persistent buttons (3 buttons per station + 1 prestige button)
+    // Counter for accessing persistent buttons (4 buttons per station + 1 prestige button)
     size_t buttonIdx = 0;
 
     for (size_t i = 0; i < m_Stations.size(); i++) {
@@ -786,7 +822,7 @@ void GameState::RenderStations(Renderer* renderer) {
             if (!station.unlocked) {
                 buttonIdx += 1; // Skip unlock button
             } else {
-                buttonIdx += 3; // Skip all three buttons
+                buttonIdx += 4; // Skip all four buttons (observe, upgrade, buy max, and skip unlock)
             }
             continue;
         }
@@ -797,7 +833,7 @@ void GameState::RenderStations(Renderer* renderer) {
             if (!station.unlocked) {
                 buttonIdx += 1;
             } else {
-                buttonIdx += 3;
+                buttonIdx += 4;
             }
             continue;
         }
@@ -807,7 +843,7 @@ void GameState::RenderStations(Renderer* renderer) {
             if (!station.unlocked) {
                 buttonIdx += 1;
             } else {
-                buttonIdx += 3;
+                buttonIdx += 4;
             }
             continue;
         }
@@ -855,8 +891,8 @@ void GameState::RenderStations(Renderer* renderer) {
 
             unlockBtn.Render(renderer);
 
-            // Skip observe and upgrade buttons
-            buttonIdx += 2;
+            // Skip observe, upgrade, and buy max buttons
+            buttonIdx += 3;
             continue;
         }
 
@@ -909,13 +945,21 @@ void GameState::RenderStations(Renderer* renderer) {
         observeBtn.enabled = station.superpositionValue > 0.1;
         observeBtn.Render(renderer);
 
-        // Get upgrade button (Right Button)
+        // Get upgrade button (Middle Button)
         UIButton& upgradeBtn = m_StationButtons[buttonIdx++];
-        upgradeBtn.bounds = Rect(stationRect.x + 240.0f, y + 85.0f, 250.0f, 45.0f);
-        upgradeBtn.text = "UPGRADE CORE (" + std::to_string(static_cast<i64>(station.upgradeCost)) + ")";
+        upgradeBtn.bounds = Rect(stationRect.x + 240.0f, y + 85.0f, 180.0f, 45.0f);
+        upgradeBtn.text = "UPGRADE (" + std::to_string(static_cast<i64>(station.upgradeCost)) + ")";
         upgradeBtn.enabled = m_Resources[0] >= station.upgradeCost;
         upgradeBtn.affordability = std::min(1.0, m_Resources[0] / station.upgradeCost);
         upgradeBtn.Render(renderer);
+
+        // Get buy max button (Right Button)
+        UIButton& buyMaxBtn = m_StationButtons[buttonIdx++];
+        buyMaxBtn.bounds = Rect(stationRect.x + 440.0f, y + 85.0f, 140.0f, 45.0f);
+        buyMaxBtn.text = "BUY MAX";
+        buyMaxBtn.enabled = m_Resources[0] >= station.upgradeCost;
+        buyMaxBtn.affordability = std::min(1.0, m_Resources[0] / station.upgradeCost);
+        buyMaxBtn.Render(renderer);
 
         // Progress bar showing how close to affording next upgrade
         f32 progressBarY = y + 135.0f;
