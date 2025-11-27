@@ -17,6 +17,7 @@ ResearchNode::ResearchNode()
     , unlocksFeature(false)
     , unlocked(false)
     , researched(false)
+    , autoResearch(false)
 {
 }
 
@@ -51,6 +52,7 @@ ResearchNode::ResearchNode(
   , unlocksFeature(_unlocksFeature)
   , unlocked(false)
   , researched(false)
+  , autoResearch(false)
 {
 }
 
@@ -249,12 +251,22 @@ void ResearchTree::Initialize()
     ));
 
     m_Nodes.push_back(ResearchNode(
+        ResearchID::AutoPrestige,
+        "Auto Prestige",
+        "Automatically prestige when photon threshold is reached.",
+        ResearchCategory::Automation,
+        350000.0, 175000.0, 75000.0, 7,
+        {ResearchID::AutoUpgrade}, 4,
+        1.0, 0.0, 0.0, true
+    ));
+
+    m_Nodes.push_back(ResearchNode(
         ResearchID::SmartInvestor,
         "Smart Investor",
         "AI optimizes resource investment automatically.",
         ResearchCategory::Automation,
         500000.0, 250000.0, 100000.0, 10,
-        {ResearchID::AutoUpgrade}, 5,
+        {ResearchID::AutoPrestige}, 5,
         1.0, 0.0, 0.0, true
     ));
 

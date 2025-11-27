@@ -42,6 +42,9 @@ struct ResearchStation {
     bool unlocked;
     f64 unlockCost;
 
+    // Automation
+    bool autoUpgrade; // Automatically upgrade when can afford 10x the cost
+
     ResearchStation();
     void Upgrade();
     void Observe(class GameState* state); // Collapse superposition
@@ -328,6 +331,9 @@ private:
     f64 m_BoostDuration;          // How long boost lasts (30 seconds)
     f64 m_BoostCooldown;          // How long until can boost again (120 seconds)
     f64 m_BoostMultiplier;        // Production multiplier during boost (2.0x)
+
+    // Auto-Prestige system (automatically prestige at photon threshold)
+    f64 m_AutoPrestigeThreshold;  // Minimum photons before auto-prestige (default: 10)
 
     // Particle effects for visual feedback
     struct Particle {

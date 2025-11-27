@@ -50,7 +50,7 @@ ResearchStation::ResearchStation()
     : baseProduction(0), currentProduction(0), level(0),
       upgradeCost(0), upgradeCostMultiplier(1.15f),
       superpositionValue(0), superpositionProbability(0.5f),
-      unlocked(false), unlockCost(0) {
+      unlocked(false), unlockCost(0), autoUpgrade(false) {
 }
 
 void ResearchStation::Upgrade() {
@@ -202,6 +202,7 @@ GameState::GameState()
       m_Coherence(100), m_MaxCoherence(100), m_CoherenceDecayRate(1.0),
       m_BoostActive(false), m_BoostTimeRemaining(0), m_BoostCooldownRemaining(0),
       m_BoostDuration(30.0), m_BoostCooldown(120.0), m_BoostMultiplier(2.0),
+      m_AutoPrestigeThreshold(10.0),
       m_QuantumEssence(0) {
 
     for (int i = 0; i < 3; i++) {
@@ -503,6 +504,26 @@ void GameState::Update(f64 deltaTime, Input* input, Renderer* renderer) {
     // Update stations
     UpdateStations(deltaTime);
 
+    // Auto-research if enabled (automatically purchase research when affordable)
+    auto availableResearch = m_ResearchTree.GetAvailableResearch(m_Timeline.completedResets);
+    for (const ResearchNode* node : availableResearch) {
+        if (node && node->autoResearch && !node->researched) {
+            // Try to purchase this research (PurchaseResearch handles all checks)
+            PurchaseResearch(node->id);
+            // Note: Only one research per frame to avoid spending all resources at once
+            break;
+        }
+    }
+
+    // Auto-prestige if enabled and threshold reached
+    if (m_ResearchTree.IsResearched(ResearchID::AutoPrestige)) {
+        f64 photonsOnPrestige = CalculatePhotonsOnPrestige();
+        if (photonsOnPrestige >= m_AutoPrestigeThreshold) {
+            PerformPrestige();
+            Log::Infof("Auto-prestige triggered at ", photonsOnPrestige, " photons");
+        }
+    }
+
     // Update coherence
     UpdateCoherence(deltaTime);
 
@@ -563,6 +584,9 @@ void GameState::UpdateStations(f64 deltaTime) {
     // Check if manual observation is disabled by challenge
     bool canManuallyObserve = !m_ChallengeManager.HasModifier(ChallengeModifier::NoObserve);
 
+    f64 currentQubits = GetResource(QuantumResource::Qubits);
+    bool canUpgrade = !m_ChallengeManager.HasModifier(ChallengeModifier::NoUpgrades);
+
     for (auto& station : m_Stations) {
         station.Update(deltaTime * globalMultiplier);
 
@@ -571,7 +595,28 @@ void GameState::UpdateStations(f64 deltaTime) {
         if (hasAutoObserver && station.unlocked && station.superpositionValue >= 10.0) {
             station.Observe(this);
         }
+
+        // Auto-upgrade if enabled and can afford 10x the cost (prevents spending all resources)
+        if (station.autoUpgrade && station.unlocked && canUpgrade) {
+            // Calculate effective upgrade cost (with challenge modifiers)
+            f64 effectiveCost = station.upgradeCost;
+            if (m_ChallengeManager.HasModifier(ChallengeModifier::ExpensiveUpgrades)) {
+                effectiveCost *= 3.0;
+            }
+
+            // Only auto-upgrade if we can afford 10x the cost (safety buffer)
+            f64 safeThreshold = effectiveCost * 10.0;
+            if (currentQubits >= safeThreshold) {
+                if (SpendResource(QuantumResource::Qubits, effectiveCost)) {
+                    station.Upgrade();
+                    currentQubits = GetResource(QuantumResource::Qubits); // Update current amount
+                }
+            }
+        }
     }
+
+    // Recalculate production if any auto-upgrades happened
+    UpdateResearchBonuses();
 }
 
 void GameState::UpdateCoherence(f64 deltaTime) {
@@ -738,8 +783,27 @@ void GameState::UpdateUI(Input* input) {
                 if (displayedCount >= maxDisplay) break;
 
                 f32 nodeY = nodeStartY + (nodeHeight + nodeSpacing) * displayedCount;
-                Rect nodeRect(nodeX, nodeY, nodeWidth, nodeHeight);
 
+                // Check AUTO toggle button first (top-right corner of node)
+                f32 autoToggleW = 60.0f;
+                f32 autoToggleH = 25.0f;
+                f32 autoToggleX = nodeX + nodeWidth - autoToggleW - 10.0f;
+                f32 autoToggleY = nodeY + 10.0f;
+                Rect autoToggleRect(autoToggleX, autoToggleY, autoToggleW, autoToggleH);
+
+                if (autoToggleRect.Contains(mousePos)) {
+                    // Toggle auto-research flag
+                    ResearchNode* mutableNode = m_ResearchTree.GetNode(node->id);
+                    if (mutableNode) {
+                        mutableNode->autoResearch = !mutableNode->autoResearch;
+                        Log::Infof(node->name, " auto-research: ", mutableNode->autoResearch ? "ON" : "OFF");
+                    }
+                    handled = true;
+                    break;
+                }
+
+                // Check node click for manual purchase
+                Rect nodeRect(nodeX, nodeY, nodeWidth, nodeHeight);
                 if (nodeRect.Contains(mousePos)) {
                     // Try to research this node
                     if (CanAffordResearch(node->id)) {
@@ -927,12 +991,76 @@ void GameState::UpdateUI(Input* input) {
         }
     }
 
+    // Handle auto-upgrade toggle button clicks
+    if (mousePressed) {
+        f32 startY = 160.0f;
+        f32 stationHeight = 150.0f;
+        f32 margin = 20.0f;
+
+        for (size_t i = 0; i < m_Stations.size(); i++) {
+            auto& station = m_Stations[i];
+            if (!station.unlocked) continue; // Only unlocked stations have auto-upgrade toggle
+
+            f32 y = startY + i * (stationHeight + margin) + m_ScrollOffset.y;
+
+            // Skip if off-screen
+            if (y + stationHeight < 100.0f || y > 720.0f) continue;
+
+            // Auto toggle button position (must match render position)
+            f32 stationWidth = 1280.0f - 60.0f; // Default screen width minus margins
+            f32 autoToggleSize = 60.0f;
+            f32 autoToggleX = 30.0f + stationWidth - autoToggleSize - 10.0f;
+            f32 autoToggleY = y + 10.0f;
+            Rect autoToggleRect(autoToggleX, autoToggleY, autoToggleSize, 25.0f);
+
+            if (autoToggleRect.Contains(mousePos)) {
+                station.autoUpgrade = !station.autoUpgrade;
+                Log::Infof(station.name, " auto-upgrade: ", station.autoUpgrade ? "ON" : "OFF");
+                break; // Only handle one click per frame
+            }
+        }
+    }
+
     // Update buttons
     for (auto& button : m_StationButtons) {
         button.Update(mousePos);
 
         if (button.WasClicked(mousePos, mousePressed) && button.onClick) {
             button.onClick();
+        }
+    }
+
+    // Handle auto-prestige threshold adjustment button clicks
+    if (mousePressed && m_ResearchTree.IsResearched(ResearchID::AutoPrestige)) {
+        // Calculate button positions (must match RenderStations rendering)
+        f32 stationHeight = 150.0f;
+        f32 margin = 20.0f;
+        f32 startY = 160.0f;
+        f32 prestigeY = startY + m_Stations.size() * (stationHeight + margin) + 20.0f + m_ScrollOffset.y;
+        f32 autoPrestigeY = prestigeY + 70.0f;
+
+        f32 btnW = 50.0f;
+        f32 btnH = 30.0f;
+        f32 btnSpacing = 10.0f;
+        f32 startX = 500.0f;
+
+        Rect minusTenRect(startX, autoPrestigeY + 5.0f, btnW, btnH);
+        Rect minusOneRect(startX + btnW + btnSpacing, autoPrestigeY + 5.0f, btnW, btnH);
+        Rect plusOneRect(startX + (btnW + btnSpacing) * 2, autoPrestigeY + 5.0f, btnW, btnH);
+        Rect plusTenRect(startX + (btnW + btnSpacing) * 3, autoPrestigeY + 5.0f, btnW, btnH);
+
+        if (minusTenRect.Contains(mousePos)) {
+            m_AutoPrestigeThreshold = std::max(1.0, m_AutoPrestigeThreshold - 10.0);
+            Log::Infof("Auto-prestige threshold: ", m_AutoPrestigeThreshold);
+        } else if (minusOneRect.Contains(mousePos)) {
+            m_AutoPrestigeThreshold = std::max(1.0, m_AutoPrestigeThreshold - 1.0);
+            Log::Infof("Auto-prestige threshold: ", m_AutoPrestigeThreshold);
+        } else if (plusOneRect.Contains(mousePos)) {
+            m_AutoPrestigeThreshold += 1.0;
+            Log::Infof("Auto-prestige threshold: ", m_AutoPrestigeThreshold);
+        } else if (plusTenRect.Contains(mousePos)) {
+            m_AutoPrestigeThreshold += 10.0;
+            Log::Infof("Auto-prestige threshold: ", m_AutoPrestigeThreshold);
         }
     }
 }
@@ -1172,6 +1300,20 @@ void GameState::RenderStations(Renderer* renderer) {
         buyMaxBtn.affordability = std::min(1.0, m_Resources[0] / effectiveUpgradeCost);
         buyMaxBtn.Render(renderer);
 
+        // Auto-upgrade toggle (small button in top-right corner of station panel)
+        f32 autoToggleSize = 60.0f;
+        f32 autoToggleX = stationRect.x + stationRect.width - autoToggleSize - 10.0f;
+        f32 autoToggleY = y + 10.0f;
+        Rect autoToggleRect(autoToggleX, autoToggleY, autoToggleSize, 25.0f);
+
+        Color autoToggleColor = station.autoUpgrade ? Color::CoherenceGreen() : Color(0.3f, 0.3f, 0.3f, 1.0f);
+        renderer->DrawRect(autoToggleRect, autoToggleColor * 0.4f, true);
+        renderer->DrawRect(autoToggleRect, autoToggleColor, false);
+
+        std::string autoText = station.autoUpgrade ? "AUTO" : "AUTO";
+        Vec2 autoTextPos(autoToggleX + 12.0f, autoToggleY + 6.0f);
+        renderer->DrawText(autoText, autoTextPos, Color::White(), 11.0f);
+
         // Progress bar showing how close to affording next upgrade
         f32 progressBarY = y + 135.0f;
         f32 progressBarWidth = stationRect.width - 40.0f;
@@ -1216,6 +1358,52 @@ void GameState::RenderStations(Renderer* renderer) {
     prestigeBtn.enabled = photonsOnPrestige > 0;
 
     prestigeBtn.Render(renderer);
+
+    // ----------------------------------------------------------------------
+    // --- AUTO-PRESTIGE CONTROLS ---
+    // ----------------------------------------------------------------------
+    if (m_ResearchTree.IsResearched(ResearchID::AutoPrestige)) {
+        f32 autoPrestigeY = prestigeY + 70.0f; // Below prestige button
+
+        // Label showing current threshold
+        std::string thresholdLabel = "Auto-Prestige Threshold: " + std::to_string(static_cast<i64>(m_AutoPrestigeThreshold)) + " photons";
+        Vec2 labelPos(40.0f, autoPrestigeY + 10.0f);
+        renderer->DrawText(thresholdLabel, labelPos, Color::QuantumPurple(), 14.0f);
+
+        // Adjustment buttons (right side)
+        f32 btnW = 50.0f;
+        f32 btnH = 30.0f;
+        f32 btnSpacing = 10.0f;
+        f32 startX = 500.0f;
+
+        // -10 button
+        Rect minusTenRect(startX, autoPrestigeY + 5.0f, btnW, btnH);
+        renderer->DrawRect(minusTenRect, Color(0.3f, 0.1f, 0.1f, 0.8f), true);
+        renderer->DrawRect(minusTenRect, Color::Red() * 0.6f, false);
+        Vec2 minusTenTextPos(startX + 14.0f, autoPrestigeY + 12.0f);
+        renderer->DrawText("-10", minusTenTextPos, Color::White(), 12.0f);
+
+        // -1 button
+        Rect minusOneRect(startX + btnW + btnSpacing, autoPrestigeY + 5.0f, btnW, btnH);
+        renderer->DrawRect(minusOneRect, Color(0.3f, 0.1f, 0.1f, 0.8f), true);
+        renderer->DrawRect(minusOneRect, Color::Red() * 0.6f, false);
+        Vec2 minusOneTextPos(startX + btnW + btnSpacing + 18.0f, autoPrestigeY + 12.0f);
+        renderer->DrawText("-1", minusOneTextPos, Color::White(), 12.0f);
+
+        // +1 button
+        Rect plusOneRect(startX + (btnW + btnSpacing) * 2, autoPrestigeY + 5.0f, btnW, btnH);
+        renderer->DrawRect(plusOneRect, Color(0.1f, 0.3f, 0.1f, 0.8f), true);
+        renderer->DrawRect(plusOneRect, Color::CoherenceGreen() * 0.6f, false);
+        Vec2 plusOneTextPos(startX + (btnW + btnSpacing) * 2 + 18.0f, autoPrestigeY + 12.0f);
+        renderer->DrawText("+1", plusOneTextPos, Color::White(), 12.0f);
+
+        // +10 button
+        Rect plusTenRect(startX + (btnW + btnSpacing) * 3, autoPrestigeY + 5.0f, btnW, btnH);
+        renderer->DrawRect(plusTenRect, Color(0.1f, 0.3f, 0.1f, 0.8f), true);
+        renderer->DrawRect(plusTenRect, Color::CoherenceGreen() * 0.6f, false);
+        Vec2 plusTenTextPos(startX + (btnW + btnSpacing) * 3 + 14.0f, autoPrestigeY + 12.0f);
+        renderer->DrawText("+10", plusTenTextPos, Color::White(), 12.0f);
+    }
 }
 
 void GameState::RenderUI(Renderer* renderer) {
@@ -2267,6 +2455,24 @@ void GameState::RenderResearchTree(Renderer* renderer) {
             Vec2 prereqPos(nodeX + 10.0f, costY + 18.0f);
             renderer->DrawText(prereqText, prereqPos, Color(0.7f, 0.7f, 0.7f, 1.0f), 10.0f);
         }
+
+        // Auto-research toggle button (top-right corner of node)
+        f32 autoToggleW = 60.0f;
+        f32 autoToggleH = 25.0f;
+        f32 autoToggleX = nodeX + nodeWidth - autoToggleW - 10.0f;
+        f32 autoToggleY = nodeY + 10.0f;
+        Rect autoToggleRect(autoToggleX, autoToggleY, autoToggleW, autoToggleH);
+
+        // Get mutable node pointer for checking autoResearch flag
+        ResearchNode* mutableNode = m_ResearchTree.GetNode(node->id);
+        bool autoEnabled = (mutableNode && mutableNode->autoResearch);
+
+        Color autoToggleColor = autoEnabled ? Color::CoherenceGreen() : Color(0.3f, 0.3f, 0.3f, 1.0f);
+        renderer->DrawRect(autoToggleRect, autoToggleColor * 0.4f, true);
+        renderer->DrawRect(autoToggleRect, autoToggleColor, false);
+
+        Vec2 autoTextPos(autoToggleX + 12.0f, autoToggleY + 6.0f);
+        renderer->DrawText("AUTO", autoTextPos, Color::White(), 11.0f);
 
         displayedCount++;
     }
