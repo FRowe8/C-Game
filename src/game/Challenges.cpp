@@ -135,6 +135,9 @@ bool ChallengeManager::CompleteChallenge(GameState* gameState) {
     challenge->active = false;
     m_CurrentChallengeId = "";
 
+    // Award Quantum Essence for completing challenge
+    gameState->AddEssence(5.0); // 5 essence per challenge completion
+
     Log::Infof("Completed challenge: ", challenge->name, " - ", challenge->rewardDescription);
     return true;
 }

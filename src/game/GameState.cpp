@@ -196,12 +196,13 @@ bool UIButton::WasClicked(const Vec2& mousePos, bool mousePressed) {
 GameState::GameState()
     : m_CurrentEvent(nullptr), m_TimeSinceLastEvent(0), m_EventCooldown(120.0),
       m_LastSaveTimestamp(0),
-      m_ShowAchievements(false), m_ShowStats(false), m_ShowResearch(false), m_ShowMilestones(false), m_ShowBuyables(false), m_ShowChallenges(false),
+      m_ShowAchievements(false), m_ShowStats(false), m_ShowResearch(false), m_ShowMilestones(false), m_ShowBuyables(false), m_ShowChallenges(false), m_ShowEssenceShop(false),
       m_NumberFormat(GameUtils::NumberFormat::Suffix),
       m_TotalTimePlayed(0), m_TimeSinceLastSave(0),
       m_Coherence(100), m_MaxCoherence(100), m_CoherenceDecayRate(1.0),
       m_BoostActive(false), m_BoostTimeRemaining(0), m_BoostCooldownRemaining(0),
-      m_BoostDuration(30.0), m_BoostCooldown(120.0), m_BoostMultiplier(2.0) {
+      m_BoostDuration(30.0), m_BoostCooldown(120.0), m_BoostMultiplier(2.0),
+      m_QuantumEssence(0) {
 
     for (int i = 0; i < 3; i++) {
         m_Resources[i] = 0;
@@ -278,6 +279,10 @@ void GameState::Initialize() {
     // Initialize Challenge System
     m_ChallengeManager.Initialize();
     Log::Info("Challenge system initialized");
+
+    // Initialize Essence Shop System
+    m_EssenceShopManager.Initialize(this);
+    Log::Info("Essence shop initialized");
 
     // Try to load save file
     std::string savePath = Platform::GetSaveDirectory() + "quantum_save.json";
@@ -521,6 +526,9 @@ void GameState::Update(f64 deltaTime, Input* input, Renderer* renderer) {
     // Check milestones
     CheckMilestones();
 
+    // Check for challenge completion
+    m_ChallengeManager.CompleteChallenge(this);
+
     // Update UI
     UpdateUI(input);
 
@@ -621,10 +629,11 @@ void GameState::UpdateUI(Input* input) {
     }
 
     // Keyboard shortcuts
-    // SDL_SCANCODE_A = 4, B = 5, C = 6, F = 9, M = 13, R = 15, S = 16, ESCAPE = 41
+    // SDL_SCANCODE_A = 4, B = 5, C = 6, E = 8, F = 9, M = 13, R = 15, S = 16, ESCAPE = 41
     const int KEY_A = 4;
     const int KEY_B = 5;
     const int KEY_C = 6;
+    const int KEY_E = 8;
     const int KEY_F = 9;
     const int KEY_M = 13;
     const int KEY_R = 15;
@@ -649,6 +658,9 @@ void GameState::UpdateUI(Input* input) {
     if (input->IsKeyPressed(KEY_C)) {
         m_ShowChallenges = !m_ShowChallenges;
     }
+    if (input->IsKeyPressed(KEY_E)) {
+        m_ShowEssenceShop = !m_ShowEssenceShop;
+    }
     if (input->IsKeyPressed(KEY_F)) {
         // Toggle number format between Suffix and Scientific
         m_NumberFormat = (m_NumberFormat == GameUtils::NumberFormat::Suffix)
@@ -663,6 +675,7 @@ void GameState::UpdateUI(Input* input) {
         m_ShowMilestones = false;
         m_ShowBuyables = false;
         m_ShowChallenges = false;
+        m_ShowEssenceShop = false;
     }
 
     // Handle popup close button clicks (X button in top-right of panels)
@@ -829,6 +842,39 @@ void GameState::UpdateUI(Input* input) {
             }
         }
 
+        // Handle essence shop purchase button clicks (if essence shop panel is open)
+        if (!handled && m_ShowEssenceShop) {
+            f32 panelWidth = 900.0f;
+            f32 panelHeight = 650.0f;
+            f32 panelX = (1280.0f - panelWidth) / 2.0f;
+            f32 panelY = (720.0f - panelHeight) / 2.0f;
+
+            f32 upgradeStartY = panelY + 85.0f;
+            f32 upgradeX = panelX + 20.0f;
+            f32 upgradeWidth = panelWidth - 40.0f;
+            f32 upgradeHeight = 100.0f;
+            f32 upgradeSpacing = 10.0f;
+
+            auto& upgrades = m_EssenceShopManager.GetUpgrades();
+
+            for (size_t i = 0; i < upgrades.size(); i++) {
+                const auto& upgrade = upgrades[i];
+                f32 upgradeY = upgradeStartY + (upgradeHeight + upgradeSpacing) * i;
+
+                // Purchase button rectangle
+                Rect buyBtn(upgradeX + upgradeWidth - 120.0f, upgradeY + 55.0f, 110.0f, 35.0f);
+
+                if (buyBtn.Contains(mousePos) && !upgrade.IsMaxed()) {
+                    if (m_EssenceShopManager.Purchase(upgrade.id, this)) {
+                        Log::Infof("Purchased essence upgrade: ", upgrade.name);
+                        UpdateResearchBonuses(); // Recalculate production with new multipliers
+                    }
+                    handled = true;
+                    break;
+                }
+            }
+        }
+
         // Handle navigation bar button clicks (only if no popup consumed the click)
         if (!handled) {
             f32 navY = 100.0f;
@@ -840,7 +886,7 @@ void GameState::UpdateUI(Input* input) {
             f32 startX = 25.0f;
 
             // Check each navigation button
-            for (int i = 0; i < 6; i++) {  // Updated to 6 buttons (added BUYABLES and CHALLENGES)
+            for (int i = 0; i < 7; i++) {  // 7 buttons (RESEARCH, ACHIEVEMENTS, STATS, MILESTONES, BUYABLES, CHALLENGES, ESSENCE)
                 f32 x = startX + i * (btnWidth + spacing);
                 Rect btnRect(x, btnY, btnWidth, btnHeight);
 
@@ -851,6 +897,8 @@ void GameState::UpdateUI(Input* input) {
                     else if (i == 2) m_ShowStats = !m_ShowStats;
                     else if (i == 3) m_ShowMilestones = !m_ShowMilestones;
                     else if (i == 4) m_ShowBuyables = !m_ShowBuyables;
+                    else if (i == 5) m_ShowChallenges = !m_ShowChallenges;
+                    else if (i == 6) m_ShowEssenceShop = !m_ShowEssenceShop;
                     handled = true;
                     break;  // Only handle one click per frame
                 }
@@ -900,6 +948,7 @@ void GameState::Render(Renderer* renderer) {
     RenderMilestones(renderer);
     RenderBuyables(renderer);
     RenderChallenges(renderer);
+    RenderEssenceShop(renderer);
     RenderParticleEffects(renderer, 1.0/60.0); // Assume 60 FPS for particles
     RenderAchievementNotifications(renderer);
     RenderMilestoneNotifications(renderer);
@@ -932,10 +981,17 @@ void GameState::RenderResources(Renderer* renderer) {
         xOffset += 250.0f;
     }
 
+    // Draw Quantum Essence (permanent meta-currency) - top-right corner
+    Vec2 essencePos(static_cast<f32>(renderer->GetWidth()) - 250.0f, 10.0f);
+    renderer->DrawText("Quantum Essence", essencePos, Color::Magenta(), 14.0f);
+    Vec2 essenceValuePos(static_cast<f32>(renderer->GetWidth()) - 250.0f, 30.0f);
+    std::string essenceStr = GameUtils::FormatNumber(m_QuantumEssence, m_NumberFormat);
+    renderer->DrawText("💎 " + essenceStr, essenceValuePos, Color::Magenta() * 1.3f, 20.0f);
+
     // Draw coherence bar
     f32 coherenceBarWidth = 200.0f;
     f32 coherenceBarHeight = 20.0f;
-    Vec2 coherenceBarPos(static_cast<f32>(renderer->GetWidth()) - coherenceBarWidth - 20.0f, 40.0f);
+    Vec2 coherenceBarPos(static_cast<f32>(renderer->GetWidth()) - coherenceBarWidth - 20.0f, 65.0f);
 
     renderer->DrawText("Coherence", Vec2(coherenceBarPos.x, coherenceBarPos.y - 20.0f), Color::White(), 14.0f);
 
@@ -1194,10 +1250,11 @@ void GameState::RenderUI(Renderer* renderer) {
         {"STATS (S)", &m_ShowStats, Color::EntanglementOrange()},
         {"MILESTONES (M)", &m_ShowMilestones, Color::NeonPink()},
         {"BUYABLES (B)", &m_ShowBuyables, Color::ElectricBlue()},
-        {"CHALLENGES (C)", &m_ShowChallenges, Color::Red()}
+        {"CHALLENGES (C)", &m_ShowChallenges, Color::Red()},
+        {"ESSENCE (E)", &m_ShowEssenceShop, Color::Magenta()}
     };
 
-    for (int i = 0; i < 6; i++) {
+    for (int i = 0; i < 7; i++) {
         auto& btn = navButtons[i];
         f32 x = startX + i * (btnWidth + spacing);
         Rect btnRect(x, btnY, btnWidth, btnHeight);
@@ -1322,6 +1379,19 @@ f64 GameState::GetResource(QuantumResource type) const {
     return m_Resources[static_cast<int>(type)];
 }
 
+void GameState::AddEssence(f64 amount) {
+    m_QuantumEssence += amount;
+    Log::Infof("Gained ", static_cast<i32>(amount), " Quantum Essence! Total: ", static_cast<i32>(m_QuantumEssence));
+}
+
+bool GameState::SpendEssence(f64 amount) {
+    if (m_QuantumEssence >= amount) {
+        m_QuantumEssence -= amount;
+        return true;
+    }
+    return false;
+}
+
 f64 GameState::CalculatePhotonsOnPrestige() const {
     // Photons based on total qubits earned
     f64 totalQubits = m_Resources[0];
@@ -1337,6 +1407,12 @@ void GameState::PerformPrestige() {
         return;
     }
 
+    // Apply photon doubling if purchased from essence shop
+    auto* photonDouble = m_EssenceShopManager.GetUpgrade("photon_double");
+    if (photonDouble && photonDouble->timesPurchased > 0) {
+        photons *= 2.0;
+    }
+
     Log::Infof("Performing prestige! Gained ", photons, " photons");
 
     m_Timeline.photons += photons;
@@ -1347,7 +1423,10 @@ void GameState::PerformPrestige() {
     for (int i = 0; i < 3; i++) {
         m_Resources[i] = 0;
     }
-    m_Resources[0] = 10.0; // Start with 10 qubits
+
+    // Start with base qubits plus essence shop bonus
+    f64 startingQubits = 10.0 + m_EssenceShopManager.GetStartingQubits();
+    m_Resources[0] = startingQubits;
 
     // Reset stations
     for (auto& station : m_Stations) {
@@ -1633,6 +1712,16 @@ void GameState::UnlockAchievement(AchievementID id) {
         m_Timeline.photonBonus = 1.0 + (m_Timeline.photons * 0.1);
     }
 
+    // Award Quantum Essence (based on achievement importance)
+    f64 essenceReward = 1.0; // Default: 1 essence
+    // Major achievements get more essence
+    if (id == AchievementID::QuantumMaster || id == AchievementID::Hoarder) {
+        essenceReward = 3.0; // Milestone achievements: 3 essence
+    } else if (id == AchievementID::FirstPrestige || id == AchievementID::Collector || id == AchievementID::WeekStreak) {
+        essenceReward = 2.0; // Important achievements: 2 essence
+    }
+    AddEssence(essenceReward);
+
     Log::Infof("Achievement Unlocked: ", ach->name);
 }
 
@@ -1753,6 +1842,10 @@ void GameState::CalculateOfflineProgress() {
 
     // Calculate offline production at reduced rate
     f64 offlineMultiplier = 0.5; // 50% efficiency while offline
+
+    // Apply essence shop offline progress boost
+    offlineMultiplier *= m_EssenceShopManager.GetOfflineProgressMultiplier();
+
     f64 offlineQubits = 0;
 
     for (const auto& station : m_Stations) {
@@ -2276,6 +2369,10 @@ void GameState::UpdateResearchBonuses() {
     // Apply challenge reward multipliers (permanent bonuses from completed challenges)
     f64 challengeBonus = m_ChallengeManager.GetTotalRewardMultiplier();
     productionMult *= challengeBonus;
+
+    // Apply essence shop production multiplier (permanent meta-upgrades)
+    f64 essenceBonus = m_EssenceShopManager.GetProductionMultiplier();
+    productionMult *= essenceBonus;
 
     // Calculate buyable multipliers for each resource type
     // Each purchase doubles production (2^timesPurchased)
@@ -2845,6 +2942,107 @@ void GameState::RenderChallenges(Renderer* renderer) {
                 Vec2 btnTextPos(actionBtn.x + 30.0f, actionBtn.y + 8.0f);
                 renderer->DrawText("ENTER", btnTextPos, Color::White(), 14.0f);
             }
+        }
+    }
+}
+void GameState::RenderEssenceShop(Renderer* renderer) {
+    if (!m_ShowEssenceShop) return;
+
+    // Background overlay
+    Rect bg(0, 0, static_cast<f32>(renderer->GetWidth()), static_cast<f32>(renderer->GetHeight()));
+    renderer->DrawRect(bg, Color(0.0f, 0.0f, 0.0f, 0.8f), true);
+
+    // Essence shop panel
+    f32 panelWidth = 900.0f;
+    f32 panelHeight = 650.0f;
+    f32 panelX = (renderer->GetWidth() - panelWidth) / 2.0f;
+    f32 panelY = (renderer->GetHeight() - panelHeight) / 2.0f;
+
+    Rect panel(panelX, panelY, panelWidth, panelHeight);
+    renderer->DrawRect(panel, Color::DarkPanel(), true);
+    renderer->DrawRect(panel, Color::Magenta() * 0.8f, false);
+
+    // Title
+    Vec2 titlePos(panelX + 20.0f, panelY + 15.0f);
+    renderer->DrawText("💎 ESSENCE SHOP - PERMANENT UPGRADES", titlePos, Color::Magenta(), 22.0f);
+
+    // Close button (X) in top right
+    f32 closeBtnSize = 30.0f;
+    f32 closeBtnX = panelX + panelWidth - closeBtnSize - 10.0f;
+    f32 closeBtnY = panelY + 10.0f;
+    Rect closeBtn(closeBtnX, closeBtnY, closeBtnSize, closeBtnSize);
+
+    renderer->DrawRect(closeBtn, Color(0.3f, 0.1f, 0.1f, 0.8f), true);
+    renderer->DrawRect(closeBtn, Color::Magenta() * 0.8f, false);
+
+    Vec2 xPos(closeBtnX + 10.0f, closeBtnY + 8.0f);
+    renderer->DrawText("X", xPos, Color::White(), 16.0f);
+
+    // Hint text
+    Vec2 hintPos(panelX + panelWidth - 200.0f, panelY + 45.0f);
+    renderer->DrawText("(Click X or press E/ESC)", hintPos, Color(0.6f, 0.6f, 0.6f, 1.0f), 11.0f);
+
+    // Current essence display
+    Vec2 essencePos(panelX + 20.0f, panelY + 50.0f);
+    std::string essenceText = "Your Quantum Essence: " + GameUtils::FormatNumber(m_QuantumEssence, m_NumberFormat);
+    renderer->DrawText(essenceText, essencePos, Color::Magenta() * 1.3f, 16.0f);
+
+    // Upgrades list
+    f32 upgradeStartY = panelY + 85.0f;
+    f32 upgradeX = panelX + 20.0f;
+    f32 upgradeWidth = panelWidth - 40.0f;
+    f32 upgradeHeight = 100.0f;
+    f32 upgradeSpacing = 10.0f;
+
+    auto& upgrades = m_EssenceShopManager.GetUpgrades();
+
+    for (size_t i = 0; i < upgrades.size(); i++) {
+        const auto& upgrade = upgrades[i];
+        f32 upgradeY = upgradeStartY + (upgradeHeight + upgradeSpacing) * i;
+
+        // Upgrade background
+        bool maxed = upgrade.IsMaxed();
+        Color upgradeBg = maxed ? Color(0.1f, 0.2f, 0.15f, 1.0f) : Color(0.15f, 0.15f, 0.2f, 1.0f);
+        Color upgradeBorder = maxed ? Color::CoherenceGreen() * 0.6f : Color::Magenta() * 0.6f;
+
+        Rect upgradeRect(upgradeX, upgradeY, upgradeWidth, upgradeHeight);
+        renderer->DrawRect(upgradeRect, upgradeBg, true);
+        renderer->DrawRect(upgradeRect, upgradeBorder, false);
+
+        // Upgrade name
+        Vec2 namePos(upgradeX + 10.0f, upgradeY + 10.0f);
+        renderer->DrawText(upgrade.name, namePos, Color::White(), 18.0f);
+
+        // Purchase count
+        std::string progressStr = upgrade.GetProgressString();
+        Vec2 progressPos(upgradeX + 400.0f, upgradeY + 10.0f);
+        renderer->DrawText("Owned: " + progressStr, progressPos, Color::Magenta(), 14.0f);
+
+        // Description
+        Vec2 descPos(upgradeX + 10.0f, upgradeY + 35.0f);
+        renderer->DrawText(upgrade.description, descPos, Color(0.8f, 0.8f, 0.9f, 1.0f), 13.0f);
+
+        // Cost and Buy button
+        f64 cost = upgrade.GetCurrentCost();
+        bool canAfford = upgrade.CanAfford(m_QuantumEssence);
+
+        if (!maxed) {
+            std::string costStr = GameUtils::FormatNumber(cost, m_NumberFormat) + " Essence";
+            Vec2 costPos(upgradeX + 10.0f, upgradeY + 60.0f);
+            Color costColor = canAfford ? Color::Magenta() * 1.3f : Color(0.7f, 0.5f, 0.5f, 1.0f);
+            renderer->DrawText("Cost: " + costStr, costPos, costColor, 14.0f);
+
+            // Buy button
+            Rect buyBtn(upgradeX + upgradeWidth - 120.0f, upgradeY + 55.0f, 110.0f, 35.0f);
+            Color btnColor = canAfford ? Color::Magenta() : Color(0.3f, 0.3f, 0.3f, 1.0f);
+            renderer->DrawRect(buyBtn, btnColor * 0.3f, true);
+            renderer->DrawRect(buyBtn, canAfford ? Color::Magenta() : Color(0.4f, 0.4f, 0.4f, 1.0f), false);
+
+            Vec2 btnTextPos(buyBtn.x + 28.0f, buyBtn.y + 10.0f);
+            renderer->DrawText("PURCHASE", btnTextPos, Color::White(), 14.0f);
+        } else {
+            Vec2 maxedPos(upgradeX + 10.0f, upgradeY + 60.0f);
+            renderer->DrawText("MAXED OUT", maxedPos, Color::CoherenceGreen(), 16.0f);
         }
     }
 }

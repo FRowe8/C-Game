@@ -5,6 +5,7 @@
 #include "Milestones.h"
 #include "Buyables.h"
 #include "Challenges.h"
+#include "EssenceShop.h"
 #include "GameUtils.h"
 #include <vector>
 #include <string>
@@ -182,6 +183,11 @@ public:
     bool SpendResource(QuantumResource type, f64 amount);
     f64 GetResource(QuantumResource type) const;
 
+    // Quantum Essence management (permanent meta-currency)
+    void AddEssence(f64 amount);
+    bool SpendEssence(f64 amount);
+    f64 GetEssence() const { return m_QuantumEssence; }
+
     // Save/Load
     bool Save(const std::string& filepath);
     bool Load(const std::string& filepath);
@@ -223,6 +229,9 @@ public:
     // Challenge System
     ChallengeManager& GetChallengeManager() { return m_ChallengeManager; }
 
+    // Essence Shop System
+    EssenceShopManager& GetEssenceShopManager() { return m_EssenceShopManager; }
+
 private:
     void InitializeStations();
     void InitializeUI();
@@ -242,6 +251,7 @@ private:
     void RenderMilestoneNotifications(Renderer* renderer);
     void RenderBuyables(Renderer* renderer);
     void RenderChallenges(Renderer* renderer);
+    void RenderEssenceShop(Renderer* renderer);
 
     // Particle system helpers
     void SpawnParticle(const Vec2& position, const Color& color, f64 lifetime = 1.0);
@@ -281,6 +291,12 @@ private:
     // Challenge System
     ChallengeManager m_ChallengeManager;
 
+    // Quantum Essence (permanent meta-currency)
+    f64 m_QuantumEssence; // Never lost on prestige
+
+    // Essence Shop System
+    EssenceShopManager m_EssenceShopManager;
+
     // Offline progress
     i64 m_LastSaveTimestamp;
 
@@ -293,6 +309,7 @@ private:
     bool m_ShowMilestones;
     bool m_ShowBuyables;
     bool m_ShowChallenges;
+    bool m_ShowEssenceShop;
     GameUtils::NumberFormat m_NumberFormat; // Toggle between suffix (1.23M) and scientific (1.23e6)
 
     // Game time
