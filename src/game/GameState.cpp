@@ -1856,26 +1856,30 @@ void GameState::RenderUI(Renderer* renderer) {
     f32 moreBtnX = static_cast<f32>(renderer->GetWidth()) - boostBtnWidth - moreBtnWidth - 35.0f;
     Rect moreBtnRect(moreBtnX, btnY, moreBtnWidth, btnHeight);
 
-    Color moreColor = m_ShowMoreMenu ? Color::NeonCyan() : Color(0.5f, 0.5f, 0.5f, 1.0f);
-    renderer->DrawRect(moreBtnRect, moreColor * 0.25f, true);
+    // More visible colors for hamburger menu
+    Color moreColor = m_ShowMoreMenu ? Color::NeonCyan() : Color(0.3f, 0.4f, 0.5f, 1.0f); // Subtle blue-gray tint
+    Color moreBgColor = m_ShowMoreMenu ? (moreColor * 0.4f) : (moreColor * 0.35f); // Brighter background
+    renderer->DrawRect(moreBtnRect, moreBgColor, true);
 
     if (m_ShowMoreMenu) {
         Rect glowRect(moreBtnX - 2.0f, btnY - 2.0f, moreBtnWidth + 4.0f, btnHeight + 4.0f);
         renderer->DrawRect(glowRect, Color::NeonCyan() * 0.9f, false);
     } else {
-        renderer->DrawRect(moreBtnRect, Color::DarkBorder(), false);
+        // More visible border when inactive
+        renderer->DrawRect(moreBtnRect, Color(0.4f, 0.5f, 0.6f, 0.8f), false);
     }
 
-    // Hamburger icon (three lines)
+    // Hamburger icon (three lines) - brighter and more visible
     f32 lineWidth = 30.0f;
     f32 lineHeight = 3.0f;
     f32 lineSpacing = 8.0f;
     f32 lineStartX = moreBtnX + (moreBtnWidth - lineWidth) * 0.5f;
     f32 lineStartY = btnY + (btnHeight - (lineHeight * 3 + lineSpacing * 2)) * 0.5f;
 
+    Color lineColor = m_ShowMoreMenu ? Color::NeonCyan() : Color(0.8f, 0.9f, 1.0f, 1.0f); // Bright cyan-white
     for (int i = 0; i < 3; i++) {
         Rect line(lineStartX, lineStartY + i * (lineHeight + lineSpacing), lineWidth, lineHeight);
-        renderer->DrawRect(line, Color::White(), true);
+        renderer->DrawRect(line, lineColor, true);
     }
 
     // Boost button (right side of nav bar) - BIGGER for touch
