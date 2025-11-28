@@ -248,6 +248,10 @@ public:
     SingularityShopManager& GetSingularityShopManager() { return m_SingularityShopManager; }
     QuantumTimeline& GetTimeline() { return m_Timeline; }
 
+    // Combo System (public so ResearchStation::Observe can use it)
+    void AddComboPoint();
+    f64 GetComboMultiplier() const;
+
 private:
     void InitializeStations();
     void InitializeUI();
@@ -386,15 +390,13 @@ private:
     f64 m_PrestigeFlashTimer;  // For screen flash effect
     bool m_PrestigeFlashActive;
 
-    // Helper methods for new systems
+    // Helper methods for new systems (private)
     void SpawnQuantumAnomaly();
     void UpdateQuantumAnomalies(f64 deltaTime);
     void RenderQuantumAnomalies(Renderer* renderer);
     void ClickQuantumAnomaly(const Vec2& clickPos);
 
-    void AddComboPoint();
     void ResetCombo();
-    f64 GetComboMultiplier() const;
 
     Color GetStationTierColor(i32 level) const;
     void SpawnResourceParticles(const Vec2& start, const Vec2& end, const Color& color, i32 count);

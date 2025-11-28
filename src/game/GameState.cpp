@@ -233,8 +233,8 @@ GameState::GameState()
       m_Coherence(100), m_MaxCoherence(100), m_CoherenceDecayRate(1.0),
       m_BoostActive(false), m_BoostTimeRemaining(0), m_BoostCooldownRemaining(0),
       m_BoostDuration(30.0), m_BoostCooldown(120.0), m_BoostMultiplier(2.0),
-      m_AutoPrestigeThreshold(10.0),
       m_QuantumEssence(0),
+      m_AutoPrestigeThreshold(10.0),
       m_TimeSinceLastAnomaly(0), m_AnomalySpawnInterval(45.0),
       m_ComboCount(0), m_ComboTimeRemaining(0), m_ComboWindow(5.0),
       m_PrestigeFlashTimer(0), m_PrestigeFlashActive(false) {
@@ -747,7 +747,8 @@ void GameState::UpdateUI(Input* input) {
 
         // Viewport = screen height - fixed top area (resources 100px + nav 80px)
         f32 fixedTopArea = 180.0f;
-        f32 viewportHeight = static_cast<f32>(renderer->GetHeight()) - fixedTopArea;
+        f32 screenHeight = 720.0f; // Default screen height
+        f32 viewportHeight = screenHeight - fixedTopArea;
 
         f32 minScroll = -(contentHeight - viewportHeight);
         if (minScroll > 0) minScroll = 0; // If content fits on screen, don't allow scrolling
@@ -3897,21 +3898,3 @@ void GameState::SpawnResourceParticles(const Vec2& start, const Vec2& end, const
 }
 
 // Update particles (fade out over time)
-void GameState::UpdateParticles(f64 deltaTime) {
-    for (auto it = m_Particles.begin(); it != m_Particles.end();) {
-        it->lifetime += static_cast<f32>(deltaTime);
-        it->position.x += it->velocity.x * static_cast<f32>(deltaTime);
-        it->position.y += it->velocity.y * static_cast<f32>(deltaTime);
-
-        // Fade out based on lifetime
-        f32 lifeRatio = it->lifetime / it->maxLifetime;
-        it->color.a = 1.0f - lifeRatio;
-
-        // Remove if dead
-        if (it->lifetime >= it->maxLifetime) {
-            it = m_Particles.erase(it);
-        } else {
-            ++it;
-        }
-    }
-}
