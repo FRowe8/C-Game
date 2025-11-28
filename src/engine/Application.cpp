@@ -245,6 +245,16 @@ void Application::Shutdown() {
 
     Log::Info("Shutting down application...");
 
+    // CRITICAL: Save game state before shutdown
+    if (m_GameState) {
+        std::string savePath = Platform::GetSaveDirectory() + "quantum_save.json";
+        if (m_GameState->Save(savePath)) {
+            Log::Info("Final save completed successfully");
+        } else {
+            Log::Error("Failed to save game state on shutdown");
+        }
+    }
+
 #ifdef __EMSCRIPTEN__
     // Sync filesystem to IndexedDB before shutdown (save to browser storage)
     printf("=== Syncing saves to IndexedDB ===\n");

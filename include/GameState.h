@@ -341,6 +341,7 @@ private:
     // Game time
     f64 m_TotalTimePlayed;
     f64 m_TimeSinceLastSave;
+    f64 m_TimeSinceLastPrestige; // Track time for fastest prestige achievement
 
     // Coherence decay
     f64 m_Coherence;

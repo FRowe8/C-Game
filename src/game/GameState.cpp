@@ -9,6 +9,10 @@
 #include <cmath>
 #include <algorithm>
 
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#endif
+
 // Achievement implementation
 Achievement::Achievement()
     : id(AchievementID::FirstQubit), unlocked(false),
@@ -230,7 +234,7 @@ GameState::GameState()
       m_LastSaveTimestamp(0),
       m_ShowAchievements(false), m_ShowStats(false), m_ShowResearch(false), m_ShowMilestones(false), m_ShowBuyables(false), m_ShowChallenges(false), m_ShowEssenceShop(false), m_ShowSingularityShop(false), m_ShowMoreMenu(false),
       m_NumberFormat(GameUtils::NumberFormat::Suffix),
-      m_TotalTimePlayed(0), m_TimeSinceLastSave(0),
+      m_TotalTimePlayed(0), m_TimeSinceLastSave(0), m_TimeSinceLastPrestige(0),
       m_Coherence(100), m_MaxCoherence(100), m_CoherenceDecayRate(1.0),
       m_BoostActive(false), m_BoostTimeRemaining(0), m_BoostCooldownRemaining(0),
       m_BoostDuration(30.0), m_BoostCooldown(120.0), m_BoostMultiplier(2.0),
@@ -541,6 +545,9 @@ void GameState::Update(f64 deltaTime, Input* input, Renderer* renderer) {
     // Update statistics
     m_Statistics.UpdateSession(deltaTime);
 
+    // Track time for fastest prestige achievement
+    m_TimeSinceLastPrestige += deltaTime;
+
     // Update stations
     UpdateStations(deltaTime);
 
@@ -622,11 +629,24 @@ void GameState::Update(f64 deltaTime, Input* input, Renderer* renderer) {
     // Update UI
     UpdateUI(input);
 
-    // Auto-save every 30 seconds
-    if (m_TimeSinceLastSave >= 30.0) {
+    // Auto-save every 10 seconds (reduced from 30 for more frequent saves)
+    if (m_TimeSinceLastSave >= 10.0) {
         std::string savePath = Platform::GetSaveDirectory() + "quantum_save.json";
-        Save(savePath);
+        if (Save(savePath)) {
+            Log::Debug("Auto-save successful");
+        }
         m_TimeSinceLastSave = 0;
+
+#ifdef __EMSCRIPTEN__
+        // For Emscripten, trigger IndexedDB sync after each save
+        EM_ASM(
+            FS.syncfs(false, function(err) {
+                if (err) {
+                    console.error('Error syncing to IndexedDB:', err);
+                }
+            });
+        );
+#endif
     }
 }
 
@@ -1989,6 +2009,13 @@ void GameState::PerformPrestige() {
     }
 
     Log::Infof("Performing prestige! Gained ", photons, " photons");
+
+    // TRACK FASTEST PRESTIGE: Update achievement tracking
+    if (m_TimeSinceLastPrestige < m_Statistics.fastestPrestige) {
+        m_Statistics.fastestPrestige = m_TimeSinceLastPrestige;
+        Log::Infof("New fastest prestige record: ", GameUtils::FormatTime(m_TimeSinceLastPrestige));
+    }
+    m_TimeSinceLastPrestige = 0.0; // Reset timer for next run
 
     // VISUAL EFFECTS: Screen flash and particle explosion!
     m_PrestigeFlashActive = true;
