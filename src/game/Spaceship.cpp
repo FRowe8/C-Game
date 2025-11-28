@@ -9,11 +9,13 @@ ShipPart::ShipPart()
     : name("Empty Slot"), description("No part installed"),
       slot(PartSlot::Hull), rarity(PartRarity::Common),
       powerBonus(0), combatBonus(0), dropRateBonus(0),
-      repairContribution(0), installed(false), tier(1) {
+      repairContribution(0), installed(false), tier(1),
+      enhancementLevel(0), stars(1) {
 }
 
 ShipPart::ShipPart(PartSlot slotType, PartRarity rarityTier)
-    : slot(slotType), rarity(rarityTier), installed(false) {
+    : slot(slotType), rarity(rarityTier), installed(false),
+      enhancementLevel(0), stars(1) {
 
     // Set tier based on rarity
     tier = static_cast<i32>(rarity) + 1; // 1-5
@@ -119,6 +121,22 @@ const char* ShipPart::GetSlotName() const {
         case PartSlot::Shields: return "Shields";
         default: return "Unknown";
     }
+}
+
+// Enhancement helper methods
+f64 ShipPart::GetEnhancementMultiplier() const {
+    // Each enhancement level adds 10% to base stats
+    return 1.0 + (enhancementLevel * 0.10);
+}
+
+f64 ShipPart::GetStarMultiplier() const {
+    // Each star beyond 1 adds 25% to base stats
+    return 1.0 + ((stars - 1) * 0.25);
+}
+
+f64 ShipPart::GetTotalMultiplier() const {
+    // Total multiplier is enhancement * star multipliers
+    return GetEnhancementMultiplier() * GetStarMultiplier();
 }
 
 // Spaceship Implementation
@@ -256,9 +274,11 @@ void Spaceship::RecalculateBonuses() {
 
     for (i32 i = 0; i < static_cast<i32>(PartSlot::COUNT); i++) {
         if (m_InstalledParts[i] != nullptr) {
-            m_TotalPowerBonus += m_InstalledParts[i]->powerBonus;
-            m_TotalCombatBonus += m_InstalledParts[i]->combatBonus;
-            m_TotalDropRateBonus += m_InstalledParts[i]->dropRateBonus;
+            // Apply enhancement and star multipliers to bonuses
+            f64 multiplier = m_InstalledParts[i]->GetTotalMultiplier();
+            m_TotalPowerBonus += m_InstalledParts[i]->powerBonus * multiplier;
+            m_TotalCombatBonus += m_InstalledParts[i]->combatBonus * multiplier;
+            m_TotalDropRateBonus += m_InstalledParts[i]->dropRateBonus * multiplier;
         }
     }
 }
