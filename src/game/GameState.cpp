@@ -375,6 +375,10 @@ void GameState::Initialize() {
     // Initialize enhancement system
     m_EnhancementSystem.Initialize();
 
+    // Initialize feature unlock manager
+    m_UnlockManager.Initialize();
+    m_UnlockManager.CheckUnlocks(m_PlayerLevel);
+
     Log::Info("Game state initialized");
 }
 
@@ -563,6 +567,9 @@ void GameState::Update(f64 deltaTime, Input* input, Renderer* renderer) {
     m_TotalTimePlayed += deltaTime;
     m_TimeSinceLastSave += deltaTime;
     m_TimeSinceLastEvent += deltaTime;
+
+    // Update feature unlock manager (handles notifications)
+    m_UnlockManager.Update(deltaTime);
 
     // Update boost timers
     if (m_BoostActive) {
@@ -787,6 +794,41 @@ void GameState::UpdateCoherence(f64 deltaTime) {
 void GameState::UpdateUI(Input* input) {
     Vec2 mousePos = input->GetMousePosition();
     bool mousePressed = input->IsMouseButtonPressed(MouseButton::Left);
+
+    // ESC key to close overlays (highest priority)
+    const int KEY_ESC = 41; // SDL_SCANCODE_ESCAPE
+    if (input->IsKeyPressed(KEY_ESC)) {
+        // Close overlays in priority order (most recently opened first)
+        if (m_ShowEnhancement) { m_ShowEnhancement = false; }
+        else if (m_ShowSkills) { m_ShowSkills = false; }
+        else if (m_ShowGatcha) { m_ShowGatcha = false; }
+        else if (m_ShowCombat) { m_ShowCombat = false; }
+        else if (m_ShowSpaceship) { m_ShowSpaceship = false; }
+        else if (m_ShowChallenges) { m_ShowChallenges = false; }
+        else if (m_ShowBuyables) { m_ShowBuyables = false; }
+        else if (m_ShowMilestones) { m_ShowMilestones = false; }
+        else if (m_ShowResearch) { m_ShowResearch = false; }
+        else if (m_ShowEssenceShop) { m_ShowEssenceShop = false; }
+        else if (m_ShowSingularityShop) { m_ShowSingularityShop = false; }
+        else if (m_ShowAchievements) { m_ShowAchievements = false; }
+        else if (m_ShowStats) { m_ShowStats = false; }
+        else if (m_ShowMoreMenu) { m_ShowMoreMenu = false; } // Close hamburger menu last
+    }
+
+    // Handle unlock notification clicks (click to dismiss)
+    if (mousePressed && m_UnlockManager.HasActiveNotification()) {
+        f32 screenWidth = static_cast<f32>(input->GetWindowWidth());
+        f32 notifWidth = 400.0f;
+        f32 notifHeight = 100.0f;
+        f32 notifX = (screenWidth - notifWidth) * 0.5f;
+        f32 notifY = 100.0f;
+
+        Rect notifRect(notifX, notifY, notifWidth, notifHeight);
+        if (notifRect.Contains(Vec2(mousePos.x, mousePos.y))) {
+            m_UnlockManager.DismissNotification(0); // Dismiss the first (topmost) notification
+            return; // Don't process other clicks this frame
+        }
+    }
 
     // Scrolling support
     if (!m_ShowAchievements && !m_ShowStats && !m_ShowResearch && !m_ShowMilestones) {
@@ -1407,21 +1449,93 @@ void GameState::UpdateUI(Input* input) {
 
     // Handle combat UI clicks
     if (m_ShowCombat && m_CombatSystem.IsInCombat()) {
+        // Check close button first (44px button in top-right, mobile-first design)
+        if (mousePressed) {
+            f32 panelWidth = 900.0f;
+            f32 panelHeight = 600.0f;
+            f32 panelX = (static_cast<f32>(input->GetWindowWidth()) - panelWidth) * 0.5f;
+            f32 panelY = (static_cast<f32>(input->GetWindowHeight()) - panelHeight) * 0.5f;
+
+            f32 closeBtnSize = 44.0f;
+            f32 closeBtnX = panelX + panelWidth - closeBtnSize - 10.0f;
+            f32 closeBtnY = panelY + 10.0f;
+
+            Rect closeBtn(closeBtnX, closeBtnY, closeBtnSize, closeBtnSize);
+            if (closeBtn.Contains(Vec2(mousePos.x, mousePos.y))) {
+                m_ShowCombat = false;
+                return;
+            }
+        }
+
         m_CombatSystem.HandleClick(mousePos.x, mousePos.y, mousePressed);
     }
 
     // Handle gatcha UI clicks
     if (m_ShowGatcha) {
+        // Check close button first (44px button in top-right, mobile-first design)
+        if (mousePressed) {
+            f32 panelWidth = 950.0f;
+            f32 panelHeight = 700.0f;
+            f32 panelX = (static_cast<f32>(input->GetWindowWidth()) - panelWidth) * 0.5f;
+            f32 panelY = (static_cast<f32>(input->GetWindowHeight()) - panelHeight) * 0.5f;
+
+            f32 closeBtnSize = 44.0f;
+            f32 closeBtnX = panelX + panelWidth - closeBtnSize - 10.0f;
+            f32 closeBtnY = panelY + 10.0f;
+
+            Rect closeBtn(closeBtnX, closeBtnY, closeBtnSize, closeBtnSize);
+            if (closeBtn.Contains(Vec2(mousePos.x, mousePos.y))) {
+                m_ShowGatcha = false;
+                return;
+            }
+        }
+
         m_GatchaSystem.HandleClick(mousePos.x, mousePos.y, mousePressed, this);
     }
 
     // Handle skill tree UI clicks
     if (m_ShowSkills) {
+        // Check close button first (44px button in top-right, mobile-first design)
+        if (mousePressed) {
+            f32 panelWidth = 1000.0f;
+            f32 panelHeight = 700.0f;
+            f32 panelX = (static_cast<f32>(input->GetWindowWidth()) - panelWidth) * 0.5f;
+            f32 panelY = (static_cast<f32>(input->GetWindowHeight()) - panelHeight) * 0.5f;
+
+            f32 closeBtnSize = 44.0f;
+            f32 closeBtnX = panelX + panelWidth - closeBtnSize - 10.0f;
+            f32 closeBtnY = panelY + 10.0f;
+
+            Rect closeBtn(closeBtnX, closeBtnY, closeBtnSize, closeBtnSize);
+            if (closeBtn.Contains(Vec2(mousePos.x, mousePos.y))) {
+                m_ShowSkills = false;
+                return;
+            }
+        }
+
         m_SkillTree.HandleClick(mousePos.x, mousePos.y, mousePressed, this);
     }
 
     // Handle enhancement UI clicks
     if (m_ShowEnhancement) {
+        // Check close button first (44px button in top-right, mobile-first design)
+        if (mousePressed) {
+            f32 panelWidth = 900.0f;
+            f32 panelHeight = 700.0f;
+            f32 panelX = (static_cast<f32>(input->GetWindowWidth()) - panelWidth) * 0.5f;
+            f32 panelY = (static_cast<f32>(input->GetWindowHeight()) - panelHeight) * 0.5f;
+
+            f32 closeBtnSize = 44.0f;
+            f32 closeBtnX = panelX + panelWidth - closeBtnSize - 10.0f;
+            f32 closeBtnY = panelY + 10.0f;
+
+            Rect closeBtn(closeBtnX, closeBtnY, closeBtnSize, closeBtnSize);
+            if (closeBtn.Contains(Vec2(mousePos.x, mousePos.y))) {
+                m_ShowEnhancement = false;
+                return;
+            }
+        }
+
         m_EnhancementSystem.HandleClick(mousePos.x, mousePos.y, mousePressed, this);
     }
 }
@@ -1511,6 +1625,9 @@ void GameState::Render(Renderer* renderer) {
     RenderParticleEffects(renderer, 1.0/60.0); // Assume 60 FPS for particles
     RenderAchievementNotifications(renderer);
     RenderMilestoneNotifications(renderer);
+
+    // Feature unlock notifications (render on top)
+    m_UnlockManager.RenderNotifications(renderer);
 
     // Prestige flash effect (screen overlay, on top of everything)
     if (m_PrestigeFlashActive) {
@@ -4435,6 +4552,9 @@ void GameState::AddXP(f64 amount) {
         m_PlayerLevel++;
 
         Log::Infof("LEVEL UP! You are now level ", m_PlayerLevel);
+
+        // Check for unlocked features
+        m_UnlockManager.OnLevelUp(m_PlayerLevel);
 
         // Award Stellar Shards on level up!
         i32 shardsEarned = 1 + (m_PlayerLevel / 10); // 1 shard + bonus every 10 levels

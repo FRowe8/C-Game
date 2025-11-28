@@ -14,6 +14,7 @@
 #include "GatchaSystem.h"
 #include "SkillTree.h"
 #include "EnhancementSystem.h"
+#include "FeatureUnlockManager.h"
 #include <vector>
 #include <string>
 #include <functional>
@@ -281,6 +282,10 @@ public:
     // Enhancement System
     EnhancementSystem& GetEnhancementSystem() { return m_EnhancementSystem; }
 
+    // Feature Unlock Manager
+    FeatureUnlockManager& GetUnlockManager() { return m_UnlockManager; }
+    const FeatureUnlockManager& GetUnlockManager() const { return m_UnlockManager; }
+
     // Combo System (public so ResearchStation::Observe can use it)
     void AddComboPoint();
     f64 GetComboMultiplier() const;
@@ -375,6 +380,9 @@ private:
 
     // Enhancement System
     EnhancementSystem m_EnhancementSystem;
+
+    // Feature Unlock Manager
+    FeatureUnlockManager m_UnlockManager;
 
     // Offline progress
     i64 m_LastSaveTimestamp;
