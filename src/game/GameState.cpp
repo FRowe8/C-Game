@@ -250,7 +250,7 @@ GameState::GameState()
       m_QuantumEssence(0),
       m_PlayerLevel(1), m_PlayerXP(0.0),
       m_LastSaveTimestamp(0),
-      m_ShowAchievements(false), m_ShowStats(false), m_ShowResearch(false), m_ShowMilestones(false), m_ShowBuyables(false), m_ShowChallenges(false), m_ShowEssenceShop(false), m_ShowSingularityShop(false), m_ShowSpaceship(false), m_ShowCombat(false), m_ShowMoreMenu(false),
+      m_ShowAchievements(false), m_ShowStats(false), m_ShowResearch(false), m_ShowMilestones(false), m_ShowBuyables(false), m_ShowChallenges(false), m_ShowEssenceShop(false), m_ShowSingularityShop(false), m_ShowSpaceship(false), m_ShowCombat(false), m_ShowGatcha(false), m_ShowMoreMenu(false),
       m_NumberFormat(GameUtils::NumberFormat::Suffix),
       m_TotalTimePlayed(0), m_TimeSinceLastSave(0), m_TimeSinceLastPrestige(0),
       m_Coherence(100), m_MaxCoherence(100), m_CoherenceDecayRate(1.0),
@@ -364,6 +364,10 @@ void GameState::Initialize() {
             CalculateOfflineProgress(); // Calculate what happened while away
         }
     }
+
+    // Give starting currency for gatcha system (for testing)
+    m_GatchaSystem.AddStellarShards(50); // Start with 50 shards for testing
+    m_GatchaSystem.AddSummonTickets(5);  // Start with 5 tickets
 
     Log::Info("Game state initialized");
 }
@@ -654,6 +658,9 @@ void GameState::Update(f64 deltaTime, Input* input, Renderer* renderer) {
             }
         }
     }
+
+    // Update gatcha system
+    m_GatchaSystem.Update(deltaTime);
 
     // Update combo timer
     if (m_ComboTimeRemaining > 0) {
@@ -1188,7 +1195,7 @@ void GameState::UpdateUI(Input* input) {
             // Handle MORE menu popup clicks
             if (!handled && m_ShowMoreMenu) {
                 f32 menuWidth = 250.0f;
-                f32 menuHeight = 280.0f; // Increased from 210 to fit 4 items
+                f32 menuHeight = 350.0f; // Increased from 280 to fit 5 items
                 f32 moreBtnWidth = 80.0f;
                 f32 boostBtnWidth = 200.0f;
                 f32 moreBtnX = 1280.0f - boostBtnWidth - moreBtnWidth - 35.0f;
@@ -1231,6 +1238,15 @@ void GameState::UpdateUI(Input* input) {
                     // Start combat and show combat screen
                     StartRandomCombat();
                     m_ShowCombat = true;
+                    m_ShowMoreMenu = false; // Close menu after selection
+                    handled = true;
+                }
+
+                // Summon button
+                itemY += itemHeight + 10.0f;
+                Rect summonRect(menuX + 10.0f, itemY, menuWidth - 20.0f, itemHeight);
+                if (summonRect.Contains(mousePos)) {
+                    m_ShowGatcha = !m_ShowGatcha;
                     m_ShowMoreMenu = false; // Close menu after selection
                     handled = true;
                 }
@@ -1366,6 +1382,11 @@ void GameState::UpdateUI(Input* input) {
     if (m_ShowCombat && m_CombatSystem.IsInCombat()) {
         m_CombatSystem.HandleClick(mousePos.x, mousePos.y, mousePressed);
     }
+
+    // Handle gatcha UI clicks
+    if (m_ShowGatcha) {
+        m_GatchaSystem.HandleClick(mousePos.x, mousePos.y, mousePressed, this);
+    }
 }
 
 void GameState::Render(Renderer* renderer) {
@@ -1442,6 +1463,7 @@ void GameState::Render(Renderer* renderer) {
     RenderSingularityShop(renderer);
     RenderSpaceship(renderer);
     RenderCombat(renderer); // Combat overlay renders on top
+    RenderGatcha(renderer); // Gatcha overlay renders on top
     RenderParticleEffects(renderer, 1.0/60.0); // Assume 60 FPS for particles
     RenderAchievementNotifications(renderer);
     RenderMilestoneNotifications(renderer);
@@ -1980,10 +2002,10 @@ void GameState::RenderUI(Renderer* renderer) {
         renderer->DrawText("v v v", arrowPos2, glowColor, 14.0f);
     }
 
-    // MORE Menu Popup (shows Achievements, Singularity Shop, Spaceship, and Combat)
+    // MORE Menu Popup (shows Achievements, Singularity Shop, Spaceship, Combat, and Summon)
     if (m_ShowMoreMenu) {
         f32 menuWidth = 250.0f;
-        f32 menuHeight = 280.0f; // Increased from 210 to fit 4 items
+        f32 menuHeight = 350.0f; // Increased from 280 to fit 5 items
         f32 menuX = moreBtnX;
         f32 menuY = navY + navHeight + 5.0f;
 
@@ -2038,6 +2060,17 @@ void GameState::RenderUI(Renderer* renderer) {
         f32 battleTextWidth = strlen("BATTLE") * 7.5f;
         Vec2 battleTextPos(menuX + (menuWidth - battleTextWidth) * 0.5f, itemY + (itemHeight - 16.0f) * 0.5f + 2.0f);
         renderer->DrawText("BATTLE", battleTextPos, Color::White(), 16.0f);
+
+        // Summon/Gatcha button
+        itemY += itemHeight + 10.0f;
+        Rect summonRect(menuX + 10.0f, itemY, menuWidth - 20.0f, itemHeight);
+        Color summonColor = m_ShowGatcha ? Color(1.0f, 0.3f, 1.0f, 1.0f) : Color(0.3f, 0.3f, 0.3f, 1.0f); // Magenta color
+        renderer->DrawRect(summonRect, summonColor * 0.3f, true);
+        renderer->DrawRect(summonRect, summonColor, false);
+
+        f32 summonTextWidth = strlen("SUMMON") * 7.5f;
+        Vec2 summonTextPos(menuX + (menuWidth - summonTextWidth) * 0.5f, itemY + (itemHeight - 16.0f) * 0.5f + 2.0f);
+        renderer->DrawText("SUMMON", summonTextPos, Color::White(), 16.0f);
     }
 }
 
@@ -4319,18 +4352,29 @@ f64 GameState::GetXPForNextLevel() const {
 
 void GameState::AddXP(f64 amount) {
     m_PlayerXP += amount;
-    
+
     // Check for level up
     f64 xpRequired = GetXPForNextLevel();
     while (m_PlayerXP >= xpRequired && m_PlayerLevel < 100) {
         m_PlayerXP -= xpRequired;
         m_PlayerLevel++;
-        
+
         Log::Infof("LEVEL UP! You are now level ", m_PlayerLevel);
-        
+
+        // Award Stellar Shards on level up!
+        i32 shardsEarned = 1 + (m_PlayerLevel / 10); // 1 shard + bonus every 10 levels
+        m_GatchaSystem.AddStellarShards(shardsEarned);
+        Log::Infof("Earned ", shardsEarned, " Stellar Shards!");
+
+        // Award Summon Tickets at milestone levels
+        if (m_PlayerLevel % 10 == 0) {
+            m_GatchaSystem.AddSummonTickets(1);
+            Log::Info("Earned 1 Summon Ticket!");
+        }
+
         // Spawn celebration particles
         SpawnParticleBurst(Vec2(640.0f, 360.0f), Color(1.0f, 0.9f, 0.0f, 1.0f), 30);
-        
+
         // Recalculate for next level
         xpRequired = GetXPForNextLevel();
     }
@@ -4359,4 +4403,11 @@ void GameState::RenderCombat(Renderer* renderer) {
     char levelText[64];
     snprintf(levelText, sizeof(levelText), "Level %d - %.0f / %.0f XP", m_PlayerLevel, m_PlayerXP, GetXPForNextLevel());
     renderer->DrawText(levelText, Vec2(xpBarX + 5.0f, xpBarY + 5.0f), Color::White(), 14.0f);
+}
+
+void GameState::RenderGatcha(Renderer* renderer) {
+    if (!m_ShowGatcha) return;
+    
+    // Render the gatcha UI
+    m_GatchaSystem.RenderSummonUI(renderer, this);
 }

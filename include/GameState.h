@@ -11,6 +11,7 @@
 #include "Spaceship.h"
 #include "CombatSystem.h"
 #include "Enemy.h"
+#include "GatchaSystem.h"
 #include <vector>
 #include <string>
 #include <functional>
@@ -269,6 +270,9 @@ public:
     f64 GetXPForNextLevel() const;
     void AddXP(f64 amount);
 
+    // Gatcha/Summon System
+    GatchaSystem& GetGatchaSystem() { return m_GatchaSystem; }
+
     // Combo System (public so ResearchStation::Observe can use it)
     void AddComboPoint();
     f64 GetComboMultiplier() const;
@@ -296,6 +300,7 @@ private:
     void RenderSingularityShop(Renderer* renderer);
     void RenderSpaceship(Renderer* renderer);
     void RenderCombat(Renderer* renderer);
+    void RenderGatcha(Renderer* renderer);
 
     // Particle system helpers
     void SpawnParticle(const Vec2& position, const Color& color, f64 lifetime = 1.0);
@@ -353,6 +358,9 @@ private:
     i32 m_PlayerLevel;
     f64 m_PlayerXP;
 
+    // Gatcha System
+    GatchaSystem m_GatchaSystem;
+
     // Offline progress
     i64 m_LastSaveTimestamp;
 
@@ -369,6 +377,7 @@ private:
     bool m_ShowSingularityShop;
     bool m_ShowSpaceship;
     bool m_ShowCombat;
+    bool m_ShowGatcha;
     bool m_ShowMoreMenu; // Overflow menu for less frequent pages
     GameUtils::NumberFormat m_NumberFormat; // Toggle between suffix (1.23M) and scientific (1.23e6)
 
