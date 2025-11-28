@@ -308,6 +308,16 @@ void CombatSystem::RenderCombatUI(Renderer* renderer) {
 
     // Title
     renderer->DrawText("COMBAT", Vec2(panelX + panelWidth * 0.5f - 60.0f, yOffset), Color::NeonCyan(), 24.0f);
+
+    // Close button (top-right, 44px for mobile-first touch target)
+    f32 closeBtnSize = 44.0f;
+    f32 closeBtnX = panelX + panelWidth - closeBtnSize - 10.0f;
+    f32 closeBtnY = panelY + 10.0f;
+    Rect closeBtn(closeBtnX, closeBtnY, closeBtnSize, closeBtnSize);
+    renderer->DrawRect(closeBtn, Color(0.3f, 0.1f, 0.1f, 0.8f), true);
+    renderer->DrawRect(closeBtn, Color(1.0f, 0.3f, 0.3f, 1.0f), false);
+    renderer->DrawText("X", Vec2(closeBtnX + 14.0f, closeBtnY + 10.0f), Color::White(), 20.0f);
+
     yOffset += 35.0f;
 
     // Player section (left side)

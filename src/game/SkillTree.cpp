@@ -544,6 +544,15 @@ void SkillTreeSystem::RenderSkillTree(Renderer* renderer, GameState* state) {
     renderer->DrawText("SKILL TREE", Vec2(panelX + panelWidth * 0.5f - 80.0f, panelY + 15.0f),
                      Color::NeonCyan(), 24.0f);
 
+    // Close button (top-right, 44px for mobile-first touch target)
+    f32 closeBtnSize = 44.0f;
+    f32 closeBtnX = panelX + panelWidth - closeBtnSize - 10.0f;
+    f32 closeBtnY = panelY + 10.0f;
+    Rect closeBtn(closeBtnX, closeBtnY, closeBtnSize, closeBtnSize);
+    renderer->DrawRect(closeBtn, Color(0.3f, 0.1f, 0.1f, 0.8f), true);
+    renderer->DrawRect(closeBtn, Color(1.0f, 0.3f, 0.3f, 1.0f), false);
+    renderer->DrawText("X", Vec2(closeBtnX + 14.0f, closeBtnY + 10.0f), Color::White(), 20.0f);
+
     // Render components
     RenderBranchTabs(renderer, panelX, panelY, panelWidth);
     RenderSkillNodes(renderer, state, panelX, panelY, panelWidth);
