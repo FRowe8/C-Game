@@ -226,6 +226,7 @@ bool UIButton::WasClicked(const Vec2& mousePos, bool mousePressed) {
 // GameState implementation
 GameState::GameState()
     : m_CurrentEvent(nullptr), m_TimeSinceLastEvent(0), m_EventCooldown(120.0),
+      m_QuantumEssence(0),
       m_LastSaveTimestamp(0),
       m_ShowAchievements(false), m_ShowStats(false), m_ShowResearch(false), m_ShowMilestones(false), m_ShowBuyables(false), m_ShowChallenges(false), m_ShowEssenceShop(false), m_ShowSingularityShop(false), m_ShowMoreMenu(false),
       m_NumberFormat(GameUtils::NumberFormat::Suffix),
@@ -233,7 +234,6 @@ GameState::GameState()
       m_Coherence(100), m_MaxCoherence(100), m_CoherenceDecayRate(1.0),
       m_BoostActive(false), m_BoostTimeRemaining(0), m_BoostCooldownRemaining(0),
       m_BoostDuration(30.0), m_BoostCooldown(120.0), m_BoostMultiplier(2.0),
-      m_QuantumEssence(0),
       m_AutoPrestigeThreshold(10.0),
       m_TimeSinceLastAnomaly(0), m_AnomalySpawnInterval(45.0),
       m_ComboCount(0), m_ComboTimeRemaining(0), m_ComboWindow(5.0),
@@ -652,6 +652,7 @@ void GameState::UpdateStations(f64 deltaTime) {
 
     // Check if manual observation is disabled by challenge
     bool canManuallyObserve = !m_ChallengeManager.HasModifier(ChallengeModifier::NoObserve);
+    (void)canManuallyObserve; // Reserved for future use
 
     f64 currentQubits = GetResource(QuantumResource::Qubits);
     bool canUpgrade = !m_ChallengeManager.HasModifier(ChallengeModifier::NoUpgrades);
@@ -1788,6 +1789,7 @@ void GameState::RenderUI(Renderer* renderer) {
     }
 
     // MORE menu button (hamburger menu for overflow items) - far right before boost
+    f32 boostBtnWidth = 200.0f; // Declare early for positioning
     f32 moreBtnWidth = 80.0f;
     f32 moreBtnX = static_cast<f32>(renderer->GetWidth()) - boostBtnWidth - moreBtnWidth - 35.0f;
     Rect moreBtnRect(moreBtnX, btnY, moreBtnWidth, btnHeight);
@@ -1815,7 +1817,7 @@ void GameState::RenderUI(Renderer* renderer) {
     }
 
     // Boost button (right side of nav bar) - BIGGER for touch
-    f32 boostBtnWidth = 200.0f; // Increased from 150px
+    // boostBtnWidth already declared earlier for menu positioning
     f32 boostBtnHeight = 60.0f; // Increased from 38px to match nav buttons
     f32 boostBtnX = static_cast<f32>(renderer->GetWidth()) - boostBtnWidth - 25.0f;
     f32 boostBtnY = navY + (navHeight - boostBtnHeight) * 0.5f;
