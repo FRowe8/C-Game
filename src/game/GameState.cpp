@@ -237,7 +237,8 @@ GameState::GameState()
       m_AutoPrestigeThreshold(10.0),
       m_TimeSinceLastAnomaly(0), m_AnomalySpawnInterval(45.0),
       m_ComboCount(0), m_ComboTimeRemaining(0), m_ComboWindow(5.0),
-      m_PrestigeFlashTimer(0), m_PrestigeFlashActive(false) {
+      m_PrestigeFlashTimer(0), m_PrestigeFlashActive(false),
+      m_LastThemeUnlocked(0) {
 
     for (int i = 0; i < 3; i++) {
         m_Resources[i] = 0;
@@ -1272,6 +1273,26 @@ void GameState::UpdateUI(Input* input) {
 }
 
 void GameState::Render(Renderer* renderer) {
+    // PHASE D: Dynamic background theme based on game progress
+    Color bgTint(0.0f, 0.0f, 0.0f, 0.1f); // Default: subtle dark overlay
+
+    if (m_Timeline.singularities >= 50.0) {
+        // Cosmic Void theme (50+ singularities)
+        bgTint = Color(0.05f, 0.0f, 0.15f, 0.15f); // Deep purple tint
+    } else if (m_Timeline.singularities >= 10.0) {
+        // Cosmic Observatory theme (10+ singularities)
+        bgTint = Color(0.0f, 0.05f, 0.15f, 0.12f); // Deep blue tint
+    } else if (m_Timeline.photons >= 100.0) {
+        // Quantum Facility theme (100+ photons)
+        bgTint = Color(0.0f, 0.1f, 0.1f, 0.1f); // Cyan tint
+    }
+
+    // Apply background tint
+    if (bgTint.a > 0.0f) {
+        Rect fullScreen(0, 0, static_cast<f32>(renderer->GetWidth()), static_cast<f32>(renderer->GetHeight()));
+        renderer->DrawRect(fullScreen, bgTint, true);
+    }
+
     RenderResources(renderer);  // Fixed at top (0-100px)
     RenderUI(renderer);          // Navigation bar (100-150px) - BEFORE stations so it's on top
     RenderStations(renderer);    // Scrollable area (starts at 150px)
@@ -3054,10 +3075,24 @@ void GameState::UpdateResearchBonuses() {
 void GameState::AddPhotons(f64 amount) {
     m_Timeline.photons += amount;
     m_Timeline.photonBonus = 1.0 + (m_Timeline.photons * 0.1);
-    
+
     // Apply PhotonMultiplier research bonus
     if (m_ResearchTree.IsResearched(ResearchID::PhotonMultiplier)) {
         m_Timeline.photonBonus *= 1.5;
+    }
+
+    // PHASE D: Check for theme unlocks
+    if (m_Timeline.photons >= 100.0 && m_LastThemeUnlocked < 1) {
+        m_LastThemeUnlocked = 1;
+        Log::Info("🎨 NEW THEME UNLOCKED: Quantum Facility! Your lab has a cyan glow.");
+    }
+    if (m_Timeline.singularities >= 10.0 && m_LastThemeUnlocked < 2) {
+        m_LastThemeUnlocked = 2;
+        Log::Info("🌌 NEW THEME UNLOCKED: Cosmic Observatory! Deep space blue surrounds you.");
+    }
+    if (m_Timeline.singularities >= 50.0 && m_LastThemeUnlocked < 3) {
+        m_LastThemeUnlocked = 3;
+        Log::Info("⚫ NEW THEME UNLOCKED: Cosmic Void! You've entered the purple abyss.");
     }
 }
 
@@ -4014,3 +4049,9 @@ void GameState::SpawnResourceParticles(const Vec2& start, const Vec2& end, const
 }
 
 // Update particles (fade out over time)
+
+// ============================================================================
+// PHASE C & D: COLLECTION SYSTEM & BIOME/THEMES
+// ============================================================================
+
+// These will be implemented at the end of the file to keep code organized

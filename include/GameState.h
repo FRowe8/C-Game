@@ -391,6 +391,9 @@ private:
     f64 m_PrestigeFlashTimer;  // For screen flash effect
     bool m_PrestigeFlashActive;
 
+    // Theme System (Phase D)
+    i32 m_LastThemeUnlocked; // Track which theme was last unlocked (0=none, 1=facility, 2=observatory, 3=void)
+
     // Helper methods for new systems (private)
     void SpawnQuantumAnomaly();
     void UpdateQuantumAnomalies(f64 deltaTime);
