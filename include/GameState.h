@@ -394,6 +394,7 @@ private:
     bool m_ShowCombat;
     bool m_ShowGatcha;
     bool m_ShowSkills;
+    bool m_ShowEnhancement;
     bool m_ShowMoreMenu; // Overflow menu for less frequent pages
     GameUtils::NumberFormat m_NumberFormat; // Toggle between suffix (1.23M) and scientific (1.23e6)
 
