@@ -35,7 +35,7 @@ public:
     CombatSystem();
 
     // Combat flow
-    void StartCombat(Enemy* enemy, i32 playerLevel, const Spaceship* ship);
+    void StartCombat(Enemy* enemy, i32 playerLevel, const Spaceship* ship, class GameState* state = nullptr);
     void EndCombat();
     void Update(f64 deltaTime);
 

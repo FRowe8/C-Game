@@ -250,7 +250,7 @@ GameState::GameState()
       m_QuantumEssence(0),
       m_PlayerLevel(1), m_PlayerXP(0.0),
       m_LastSaveTimestamp(0),
-      m_ShowAchievements(false), m_ShowStats(false), m_ShowResearch(false), m_ShowMilestones(false), m_ShowBuyables(false), m_ShowChallenges(false), m_ShowEssenceShop(false), m_ShowSingularityShop(false), m_ShowSpaceship(false), m_ShowCombat(false), m_ShowGatcha(false), m_ShowMoreMenu(false),
+      m_ShowAchievements(false), m_ShowStats(false), m_ShowResearch(false), m_ShowMilestones(false), m_ShowBuyables(false), m_ShowChallenges(false), m_ShowEssenceShop(false), m_ShowSingularityShop(false), m_ShowSpaceship(false), m_ShowCombat(false), m_ShowGatcha(false), m_ShowSkills(false), m_ShowMoreMenu(false),
       m_NumberFormat(GameUtils::NumberFormat::Suffix),
       m_TotalTimePlayed(0), m_TimeSinceLastSave(0), m_TimeSinceLastPrestige(0),
       m_Coherence(100), m_MaxCoherence(100), m_CoherenceDecayRate(1.0),
@@ -368,6 +368,9 @@ void GameState::Initialize() {
     // Give starting currency for gatcha system (for testing)
     m_GatchaSystem.AddStellarShards(50); // Start with 50 shards for testing
     m_GatchaSystem.AddSummonTickets(5);  // Start with 5 tickets
+
+    // Initialize skill tree system
+    m_SkillTree.Initialize();
 
     Log::Info("Game state initialized");
 }
@@ -662,6 +665,9 @@ void GameState::Update(f64 deltaTime, Input* input, Renderer* renderer) {
     // Update gatcha system
     m_GatchaSystem.Update(deltaTime);
 
+    // Update skill tree system
+    m_SkillTree.Update(deltaTime);
+
     // Update combo timer
     if (m_ComboTimeRemaining > 0) {
         m_ComboTimeRemaining -= deltaTime;
@@ -718,6 +724,9 @@ void GameState::UpdateStations(f64 deltaTime) {
     if (m_ChallengeManager.HasModifier(ChallengeModifier::SlowTime)) {
         globalMultiplier *= 0.5; // Time runs at half speed (same effect)
     }
+
+    // Apply skill tree production bonus
+    globalMultiplier *= m_SkillTree.GetProductionMultiplier();
 
     // Check if Auto-Observer research is unlocked
     bool hasAutoObserver = m_ResearchTree.IsResearched(ResearchID::AutoObserver);
@@ -1195,7 +1204,7 @@ void GameState::UpdateUI(Input* input) {
             // Handle MORE menu popup clicks
             if (!handled && m_ShowMoreMenu) {
                 f32 menuWidth = 250.0f;
-                f32 menuHeight = 350.0f; // Increased from 280 to fit 5 items
+                f32 menuHeight = 420.0f; // Increased from 350 to fit 6 items
                 f32 moreBtnWidth = 80.0f;
                 f32 boostBtnWidth = 200.0f;
                 f32 moreBtnX = 1280.0f - boostBtnWidth - moreBtnWidth - 35.0f;
@@ -1247,6 +1256,15 @@ void GameState::UpdateUI(Input* input) {
                 Rect summonRect(menuX + 10.0f, itemY, menuWidth - 20.0f, itemHeight);
                 if (summonRect.Contains(mousePos)) {
                     m_ShowGatcha = !m_ShowGatcha;
+                    m_ShowMoreMenu = false; // Close menu after selection
+                    handled = true;
+                }
+
+                // Skills button
+                itemY += itemHeight + 10.0f;
+                Rect skillsRect(menuX + 10.0f, itemY, menuWidth - 20.0f, itemHeight);
+                if (skillsRect.Contains(mousePos)) {
+                    m_ShowSkills = !m_ShowSkills;
                     m_ShowMoreMenu = false; // Close menu after selection
                     handled = true;
                 }
@@ -1387,6 +1405,11 @@ void GameState::UpdateUI(Input* input) {
     if (m_ShowGatcha) {
         m_GatchaSystem.HandleClick(mousePos.x, mousePos.y, mousePressed, this);
     }
+
+    // Handle skill tree UI clicks
+    if (m_ShowSkills) {
+        m_SkillTree.HandleClick(mousePos.x, mousePos.y, mousePressed, this);
+    }
 }
 
 void GameState::Render(Renderer* renderer) {
@@ -1464,6 +1487,7 @@ void GameState::Render(Renderer* renderer) {
     RenderSpaceship(renderer);
     RenderCombat(renderer); // Combat overlay renders on top
     RenderGatcha(renderer); // Gatcha overlay renders on top
+    RenderSkillTree(renderer); // Skill tree overlay renders on top
     RenderParticleEffects(renderer, 1.0/60.0); // Assume 60 FPS for particles
     RenderAchievementNotifications(renderer);
     RenderMilestoneNotifications(renderer);
@@ -2002,10 +2026,10 @@ void GameState::RenderUI(Renderer* renderer) {
         renderer->DrawText("v v v", arrowPos2, glowColor, 14.0f);
     }
 
-    // MORE Menu Popup (shows Achievements, Singularity Shop, Spaceship, Combat, and Summon)
+    // MORE Menu Popup (shows Achievements, Singularity Shop, Spaceship, Combat, Summon, and Skills)
     if (m_ShowMoreMenu) {
         f32 menuWidth = 250.0f;
-        f32 menuHeight = 350.0f; // Increased from 280 to fit 5 items
+        f32 menuHeight = 420.0f; // Increased from 350 to fit 6 items
         f32 menuX = moreBtnX;
         f32 menuY = navY + navHeight + 5.0f;
 
@@ -2071,6 +2095,17 @@ void GameState::RenderUI(Renderer* renderer) {
         f32 summonTextWidth = strlen("SUMMON") * 7.5f;
         Vec2 summonTextPos(menuX + (menuWidth - summonTextWidth) * 0.5f, itemY + (itemHeight - 16.0f) * 0.5f + 2.0f);
         renderer->DrawText("SUMMON", summonTextPos, Color::White(), 16.0f);
+
+        // Skills button
+        itemY += itemHeight + 10.0f;
+        Rect skillsRect(menuX + 10.0f, itemY, menuWidth - 20.0f, itemHeight);
+        Color skillsColor = m_ShowSkills ? Color(0.0f, 1.0f, 0.5f, 1.0f) : Color(0.3f, 0.3f, 0.3f, 1.0f); // Green color
+        renderer->DrawRect(skillsRect, skillsColor * 0.3f, true);
+        renderer->DrawRect(skillsRect, skillsColor, false);
+
+        f32 skillsTextWidth = strlen("SKILLS") * 7.5f;
+        Vec2 skillsTextPos(menuX + (menuWidth - skillsTextWidth) * 0.5f, itemY + (itemHeight - 16.0f) * 0.5f + 2.0f);
+        renderer->DrawText("SKILLS", skillsTextPos, Color::White(), 16.0f);
     }
 }
 
@@ -4301,9 +4336,9 @@ void GameState::SpawnResourceParticles(const Vec2& start, const Vec2& end, const
 void GameState::StartRandomCombat() {
     // Generate random enemy based on player level
     m_CurrentEnemy = EnemyGenerator::GenerateEnemy(m_PlayerLevel);
-    
-    // Start combat with current enemy
-    m_CombatSystem.StartCombat(&m_CurrentEnemy, m_PlayerLevel, &m_Spaceship);
+
+    // Start combat with current enemy (pass this to apply skill bonuses)
+    m_CombatSystem.StartCombat(&m_CurrentEnemy, m_PlayerLevel, &m_Spaceship, this);
     
     Log::Infof("Starting combat with ", m_CurrentEnemy.GetName());
 }
@@ -4372,6 +4407,10 @@ void GameState::AddXP(f64 amount) {
             Log::Info("Earned 1 Summon Ticket!");
         }
 
+        // Award Skill Points on level up!
+        m_SkillTree.AddSkillPoints(1);
+        Log::Info("Earned 1 Skill Point!");
+
         // Spawn celebration particles
         SpawnParticleBurst(Vec2(640.0f, 360.0f), Color(1.0f, 0.9f, 0.0f, 1.0f), 30);
 
@@ -4407,7 +4446,14 @@ void GameState::RenderCombat(Renderer* renderer) {
 
 void GameState::RenderGatcha(Renderer* renderer) {
     if (!m_ShowGatcha) return;
-    
+
     // Render the gatcha UI
     m_GatchaSystem.RenderSummonUI(renderer, this);
+}
+
+void GameState::RenderSkillTree(Renderer* renderer) {
+    if (!m_ShowSkills) return;
+
+    // Render the skill tree UI
+    m_SkillTree.RenderSkillTree(renderer, this);
 }

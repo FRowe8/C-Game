@@ -2,6 +2,7 @@
 #include "Renderer.h"
 #include "Logger.h"
 #include "Spaceship.h"
+#include "GameState.h"
 #include <cstdlib>
 #include <cmath>
 
@@ -16,7 +17,7 @@ CombatSystem::CombatSystem()
       m_CombatTime(0.0) {
 }
 
-void CombatSystem::StartCombat(Enemy* enemy, i32 playerLevel, const Spaceship* ship) {
+void CombatSystem::StartCombat(Enemy* enemy, i32 playerLevel, const Spaceship* ship, GameState* state) {
     if (!enemy) {
         Log::Error("Cannot start combat: null enemy");
         return;
@@ -41,12 +42,20 @@ void CombatSystem::StartCombat(Enemy* enemy, i32 playerLevel, const Spaceship* s
         m_ShipCombatBonus = 0.0;
     }
 
+    // Get skill tree bonuses
+    f64 skillDamageMultiplier = 1.0;
+    f64 skillHPMultiplier = 1.0;
+    if (state) {
+        skillDamageMultiplier = state->GetSkillTree().GetDamageMultiplier();
+        skillHPMultiplier = state->GetSkillTree().GetMaxHPMultiplier();
+    }
+
     // Base stats scale with level
     f64 levelScale = 1.0 + (playerLevel * 0.1); // 10% per level
 
-    m_PlayerMaxHP = 100.0 * levelScale * (1.0 + m_ShipPowerBonus / 100.0);
+    m_PlayerMaxHP = 100.0 * levelScale * (1.0 + m_ShipPowerBonus / 100.0) * skillHPMultiplier;
     m_PlayerCurrentHP = m_PlayerMaxHP;
-    m_PlayerAttack = 20.0 * levelScale * (1.0 + (m_ShipCombatBonus + m_ShipPowerBonus) / 100.0);
+    m_PlayerAttack = 20.0 * levelScale * (1.0 + (m_ShipCombatBonus + m_ShipPowerBonus) / 100.0) * skillDamageMultiplier;
     m_PlayerDefense = 10.0 * levelScale * (1.0 + m_ShipPowerBonus / 100.0);
     m_PlayerSpeed = 15.0 + playerLevel * 0.3;
 
