@@ -92,6 +92,17 @@ void ResearchStation::Observe(GameState* state) {
         collapsedValue *= (0.5 + roll * 0.5) * observeBonus;
     }
 
+    // Critical Observation chance! (10% chance for 2-5x multiplier)
+    f64 criticalRoll = static_cast<f64>(rand()) / RAND_MAX;
+    bool isCritical = criticalRoll < 0.10;
+
+    if (isCritical) {
+        // Critical success! 2x to 5x multiplier
+        f64 critMultiplier = 2.0 + (static_cast<f64>(rand() % 4)); // 2, 3, 4, or 5x
+        collapsedValue *= critMultiplier;
+        Log::Infof("CRITICAL OBSERVATION! ", critMultiplier, "x reward!");
+    }
+
     state->AddResource(resourceType, collapsedValue);
     superpositionValue = 0;
 
@@ -100,8 +111,27 @@ void ResearchStation::Observe(GameState* state) {
     stats.totalObservations++;
     stats.sessionObservations++;
 
-    // Spawn particles for visual feedback
-    // (Will be called from GameState with renderer access)
+    // Add combo point for observation
+    state->AddComboPoint();
+
+    // Spawn particles for visual feedback (flying to resource counter)
+    // Determine particle color based on resource type
+    Color particleColor;
+    if (resourceType == QuantumResource::Qubits) {
+        particleColor = Color::QuantumBlue();
+    } else if (resourceType == QuantumResource::Coherence) {
+        particleColor = Color::CoherenceGreen();
+    } else {
+        particleColor = Color::EntanglementOrange();
+    }
+
+    // Spawn more particles for critical observations
+    i32 particleCount = isCritical ? 20 : 5;
+
+    // Note: Particles will be spawned from station position to resource counter
+    // This requires access to station position, which we'll handle in the button onClick
+    (void)particleColor; // Suppress unused warning - will be used when we have position
+    (void)particleCount;
 }
 
 void ResearchStation::Update(f64 deltaTime) {
@@ -204,7 +234,10 @@ GameState::GameState()
       m_BoostActive(false), m_BoostTimeRemaining(0), m_BoostCooldownRemaining(0),
       m_BoostDuration(30.0), m_BoostCooldown(120.0), m_BoostMultiplier(2.0),
       m_AutoPrestigeThreshold(10.0),
-      m_QuantumEssence(0) {
+      m_QuantumEssence(0),
+      m_TimeSinceLastAnomaly(0), m_AnomalySpawnInterval(45.0),
+      m_ComboCount(0), m_ComboTimeRemaining(0), m_ComboWindow(5.0),
+      m_PrestigeFlashTimer(0), m_PrestigeFlashActive(false) {
 
     for (int i = 0; i < 3; i++) {
         m_Resources[i] = 0;
@@ -564,6 +597,26 @@ void GameState::Update(f64 deltaTime, Input* input, Renderer* renderer) {
 
     // Check for challenge completion
     m_ChallengeManager.CompleteChallenge(this);
+
+    // Update visual effects systems
+    UpdateQuantumAnomalies(deltaTime);
+    UpdateParticles(deltaTime);
+
+    // Update combo timer
+    if (m_ComboTimeRemaining > 0) {
+        m_ComboTimeRemaining -= deltaTime;
+        if (m_ComboTimeRemaining <= 0) {
+            ResetCombo();
+        }
+    }
+
+    // Update prestige flash effect
+    if (m_PrestigeFlashActive) {
+        m_PrestigeFlashTimer -= deltaTime;
+        if (m_PrestigeFlashTimer <= 0) {
+            m_PrestigeFlashActive = false;
+        }
+    }
 
     // Update UI
     UpdateUI(input);
@@ -1005,6 +1058,13 @@ void GameState::UpdateUI(Input* input) {
             }
         }
 
+        // Handle Quantum Anomaly clicks (active gameplay - high priority)
+        if (!handled) {
+            ClickQuantumAnomaly(mousePos);
+            // Note: ClickQuantumAnomaly internally checks if a click was successful
+            // We don't set handled=true here because we want other UI elements to still work
+        }
+
         // Handle navigation bar button clicks (only if no popup consumed the click)
         if (!handled) {
             f32 navY = 100.0f;
@@ -1164,6 +1224,45 @@ void GameState::Render(Renderer* renderer) {
     RenderResources(renderer);  // Fixed at top (0-100px)
     RenderUI(renderer);          // Navigation bar (100-150px) - BEFORE stations so it's on top
     RenderStations(renderer);    // Scrollable area (starts at 150px)
+
+    // Render active gameplay elements (before popups)
+    RenderQuantumAnomalies(renderer); // Clickable orbs
+
+    // Render particles (visual feedback)
+    for (const auto& particle : m_Particles) {
+        f32 size = 3.0f + (1.0f - particle.lifetime / particle.maxLifetime) * 3.0f;
+        renderer->DrawCircle(particle.position, size, particle.color, true);
+    }
+
+    // Render combo counter (top-right, above everything)
+    if (m_ComboCount > 1) {
+        std::string comboText = std::to_string(m_ComboCount) + "x COMBO!";
+        Vec2 comboPos(static_cast<f32>(renderer->GetWidth()) - 150.0f, 180.0f);
+
+        // Pulsing effect for high combos
+        f32 pulseScale = 1.0f + 0.1f * sinf(m_ComboTimeRemaining * 10.0f);
+        f32 fontSize = 18.0f * pulseScale;
+
+        // Color based on combo level
+        Color comboColor = (m_ComboCount >= 5) ? Color(1.0f, 0.8f, 0.0f, 1.0f) : // Gold for 5+
+                          (m_ComboCount >= 3) ? Color(1.0f, 0.0f, 1.0f, 1.0f) : // Magenta for 3-4
+                          Color::NeonCyan(); // Cyan for 2
+
+        renderer->DrawText(comboText, comboPos, comboColor, fontSize);
+
+        // Time remaining bar
+        f32 barWidth = 100.0f;
+        f32 barHeight = 6.0f;
+        Vec2 barPos(static_cast<f32>(renderer->GetWidth()) - 140.0f, 200.0f);
+        Rect barBg(barPos.x, barPos.y, barWidth, barHeight);
+        renderer->DrawRect(barBg, Color(0.2f, 0.2f, 0.2f, 0.8f), true);
+
+        f32 timeRatio = static_cast<f32>(m_ComboTimeRemaining / m_ComboWindow);
+        Rect barFill(barPos.x, barPos.y, barWidth * timeRatio, barHeight);
+        renderer->DrawRect(barFill, comboColor, true);
+    }
+
+    // Render panels/popups (on top of gameplay)
     RenderActiveEvent(renderer);
     RenderAchievements(renderer);
     RenderStatistics(renderer);
@@ -1176,6 +1275,14 @@ void GameState::Render(Renderer* renderer) {
     RenderParticleEffects(renderer, 1.0/60.0); // Assume 60 FPS for particles
     RenderAchievementNotifications(renderer);
     RenderMilestoneNotifications(renderer);
+
+    // Prestige flash effect (screen overlay, on top of everything)
+    if (m_PrestigeFlashActive) {
+        f32 alpha = static_cast<f32>(m_PrestigeFlashTimer / 0.5); // Fade over 0.5 seconds
+        Color flashColor(1.0f, 1.0f, 1.0f, alpha * 0.3f); // White flash, max 30% opacity
+        Rect fullScreen(0, 0, static_cast<f32>(renderer->GetWidth()), static_cast<f32>(renderer->GetHeight()));
+        renderer->DrawRect(fullScreen, flashColor, true);
+    }
 }
 
 void GameState::RenderResources(Renderer* renderer) {
@@ -1284,11 +1391,14 @@ void GameState::RenderStations(Renderer* renderer) {
         // Define the main panel area
         Rect stationRect(30.0f, y, static_cast<f32>(renderer->GetWidth()) - 60.0f, stationHeight);
 
-        // --- New Glass-Panel Background ---
+        // --- New Glass-Panel Background with Tier Colors ---
         Color bgColor, borderColor;
         if (station.unlocked) {
-            bgColor = Color(0.1f, 0.12f, 0.18f, 0.8f); 
-            borderColor = Color::QuantumBlue() * 0.7f;
+            bgColor = Color(0.1f, 0.12f, 0.18f, 0.8f);
+
+            // Use tier-based color based on station level!
+            Color tierColor = GetStationTierColor(station.level);
+            borderColor = tierColor * 0.7f;
             borderColor.a = 0.8f;
         } else {
             bgColor = Color(0.15f, 0.1f, 0.1f, 0.6f);
@@ -1739,6 +1849,15 @@ void GameState::PerformPrestige() {
     }
 
     Log::Infof("Performing prestige! Gained ", photons, " photons");
+
+    // VISUAL EFFECTS: Screen flash and particle explosion!
+    m_PrestigeFlashActive = true;
+    m_PrestigeFlashTimer = 0.5; // 0.5 second flash
+
+    // Particle explosion from center of screen
+    Vec2 centerPos(640.0f, 360.0f);
+    SpawnParticleBurst(centerPos, Color::Magenta(), 50);
+    SpawnParticleBurst(centerPos, Color(1.0f, 0.8f, 0.0f, 1.0f), 30); // Gold particles too
 
     m_Timeline.photons += photons;
     m_Timeline.completedResets++;
@@ -3544,6 +3663,255 @@ void GameState::RenderSingularityShop(Renderer* renderer) {
         } else {
             Vec2 maxedPos(upgradeX + 10.0f, upgradeY + 60.0f);
             renderer->DrawText("MAXED OUT", maxedPos, Color::CoherenceGreen(), 16.0f);
+        }
+    }
+}
+
+// ============================================================================
+// VISUAL EFFECTS & ACTIVE GAMEPLAY SYSTEMS
+// ============================================================================
+
+// Quantum Anomaly System - Clickable orbs for active rewards
+void GameState::SpawnQuantumAnomaly() {
+    QuantumAnomaly anomaly;
+
+    // Random position (avoid edges and fixed UI areas)
+    f32 marginX = 100.0f;
+    f32 marginY = 250.0f; // Avoid top resource/nav area
+    anomaly.position.x = marginX + (rand() % (1280 - static_cast<i32>(marginX * 2)));
+    anomaly.position.y = marginY + (rand() % (720 - static_cast<i32>(marginY * 2)));
+
+    // Size and lifetime
+    anomaly.radius = 20.0f + (rand() % 15); // 20-35px radius
+    anomaly.lifetime = 0.0f;
+    anomaly.maxLifetime = 10.0f; // 10 seconds to click it
+
+    // Reward multiplier (higher = better reward)
+    i32 rarity = rand() % 100;
+    if (rarity < 60) {
+        // Common: 10-30x production
+        anomaly.rewardMultiplier = 10.0 + (rand() % 21);
+        anomaly.color = Color(0.0f, 0.8f, 1.0f, 1.0f); // Cyan
+    } else if (rarity < 85) {
+        // Uncommon: 30-60x production
+        anomaly.rewardMultiplier = 30.0 + (rand() % 31);
+        anomaly.color = Color(0.2f, 1.0f, 0.2f, 1.0f); // Green
+    } else if (rarity < 95) {
+        // Rare: 60-100x production
+        anomaly.rewardMultiplier = 60.0 + (rand() % 41);
+        anomaly.color = Color(1.0f, 0.0f, 1.0f, 1.0f); // Magenta
+    } else {
+        // Legendary: 100-200x production
+        anomaly.rewardMultiplier = 100.0 + (rand() % 101);
+        anomaly.color = Color(1.0f, 0.8f, 0.0f, 1.0f); // Gold
+    }
+
+    anomaly.clicked = false;
+    m_Anomalies.push_back(anomaly);
+
+    Log::Infof("Quantum Anomaly spawned! Reward: ", anomaly.rewardMultiplier, "x");
+}
+
+void GameState::UpdateQuantumAnomalies(f64 deltaTime) {
+    // Update existing anomalies
+    for (auto it = m_Anomalies.begin(); it != m_Anomalies.end();) {
+        it->lifetime += deltaTime;
+
+        // Remove if expired or clicked
+        if (it->lifetime >= it->maxLifetime || it->clicked) {
+            if (it->lifetime >= it->maxLifetime && !it->clicked) {
+                Log::Info("Quantum Anomaly expired...");
+            }
+            it = m_Anomalies.erase(it);
+        } else {
+            ++it;
+        }
+    }
+
+    // Spawn new anomalies periodically
+    m_TimeSinceLastAnomaly += deltaTime;
+    if (m_TimeSinceLastAnomaly >= m_AnomalySpawnInterval) {
+        SpawnQuantumAnomaly();
+        m_TimeSinceLastAnomaly = 0.0;
+        // Randomize next spawn time (30-60 seconds)
+        m_AnomalySpawnInterval = 30.0 + (rand() % 31);
+    }
+}
+
+void GameState::RenderQuantumAnomalies(Renderer* renderer) {
+    for (const auto& anomaly : m_Anomalies) {
+        f32 lifeRatio = 1.0f - (anomaly.lifetime / anomaly.maxLifetime);
+
+        // Pulsing effect (makes it more noticeable)
+        f32 pulseScale = 1.0f + 0.2f * sinf(anomaly.lifetime * 5.0f);
+        f32 currentRadius = anomaly.radius * pulseScale;
+
+        // Outer glow (larger, transparent)
+        Color glowColor = anomaly.color;
+        glowColor.a = 0.3f * lifeRatio;
+        renderer->DrawCircle(anomaly.position, currentRadius * 1.5f, glowColor, true);
+
+        // Inner core (bright, opaque)
+        Color coreColor = anomaly.color;
+        coreColor.a = 0.9f * lifeRatio;
+        renderer->DrawCircle(anomaly.position, currentRadius, coreColor, true);
+
+        // White center dot
+        renderer->DrawCircle(anomaly.position, currentRadius * 0.3f, Color::White(), true);
+
+        // Show reward multiplier above it
+        std::string rewardText = std::to_string(static_cast<i32>(anomaly.rewardMultiplier)) + "x";
+        Vec2 textPos(anomaly.position.x - 15.0f, anomaly.position.y - currentRadius - 20.0f);
+        renderer->DrawText(rewardText, textPos, Color::White(), 14.0f);
+
+        // Lifetime bar below it
+        f32 barWidth = anomaly.radius * 2.0f;
+        f32 barHeight = 4.0f;
+        Vec2 barPos(anomaly.position.x - barWidth / 2.0f, anomaly.position.y + currentRadius + 10.0f);
+
+        // Background
+        Rect barBg(barPos.x, barPos.y, barWidth, barHeight);
+        renderer->DrawRect(barBg, Color(0.2f, 0.2f, 0.2f, 0.8f), true);
+
+        // Fill
+        Rect barFill(barPos.x, barPos.y, barWidth * lifeRatio, barHeight);
+        renderer->DrawRect(barFill, anomaly.color, true);
+    }
+}
+
+void GameState::ClickQuantumAnomaly(const Vec2& clickPos) {
+    for (auto& anomaly : m_Anomalies) {
+        if (anomaly.clicked) continue;
+
+        // Check if click is within anomaly circle
+        f32 dx = clickPos.x - anomaly.position.x;
+        f32 dy = clickPos.y - anomaly.position.y;
+        f32 distSq = dx * dx + dy * dy;
+        f32 radiusSq = anomaly.radius * anomaly.radius;
+
+        if (distSq <= radiusSq) {
+            // Clicked! Award bonus resources
+            anomaly.clicked = true;
+
+            // Calculate reward based on current total production
+            f64 totalProduction = 0.0;
+            for (const auto& station : m_Stations) {
+                if (station.unlocked) {
+                    totalProduction += station.currentProduction;
+                }
+            }
+
+            // Give reward equal to N seconds of production
+            f64 secondsWorth = anomaly.rewardMultiplier;
+            f64 qubitReward = totalProduction * secondsWorth * m_Timeline.photonBonus;
+
+            AddResource(QuantumResource::Qubits, qubitReward);
+
+            // Visual feedback: particle burst
+            SpawnParticleBurst(anomaly.position, anomaly.color, 30);
+
+            // Add combo point
+            AddComboPoint();
+
+            Log::Infof("Anomaly claimed! Gained ", qubitReward, " qubits (", anomaly.rewardMultiplier, "x)");
+
+            return; // Only click one anomaly per click
+        }
+    }
+}
+
+// Combo System - Reward multiple interactions
+void GameState::AddComboPoint() {
+    m_ComboCount++;
+    m_ComboTimeRemaining = m_ComboWindow; // Reset timer (5 seconds)
+
+    if (m_ComboCount >= 3) {
+        Log::Infof("COMBO x", m_ComboCount, "!");
+    }
+}
+
+void GameState::ResetCombo() {
+    if (m_ComboCount > 0) {
+        Log::Info("Combo broken!");
+    }
+    m_ComboCount = 0;
+    m_ComboTimeRemaining = 0.0;
+}
+
+f64 GameState::GetComboMultiplier() const {
+    if (m_ComboCount <= 1) return 1.0;
+
+    // 2 combo = 1.2x, 3 combo = 1.5x, 4 combo = 2.0x, 5+ combo = 2.5x
+    if (m_ComboCount == 2) return 1.2;
+    if (m_ComboCount == 3) return 1.5;
+    if (m_ComboCount == 4) return 2.0;
+    return 2.5;
+}
+
+// Station Visual Tiers - Color changes based on level
+Color GameState::GetStationTierColor(i32 level) const {
+    if (level < 10) {
+        // Tier 1: Quantum Blue (default)
+        return Color::QuantumBlue();
+    } else if (level < 25) {
+        // Tier 2: Neon Cyan
+        return Color::NeonCyan();
+    } else if (level < 50) {
+        // Tier 3: Electric Purple
+        return Color(0.5f, 0.0f, 1.0f, 1.0f);
+    } else if (level < 100) {
+        // Tier 4: Magenta/Pink
+        return Color::Magenta();
+    } else {
+        // Tier 5: Cosmic Gold
+        return Color(1.0f, 0.8f, 0.0f, 1.0f);
+    }
+}
+
+// Flying Resource Particles - Visual feedback for production
+void GameState::SpawnResourceParticles(const Vec2& start, const Vec2& end, const Color& color, i32 count) {
+    for (i32 i = 0; i < count; i++) {
+        Particle p;
+        p.position = start;
+
+        // Calculate velocity to reach end point
+        Vec2 direction(end.x - start.x, end.y - start.y);
+        f32 distance = sqrtf(direction.x * direction.x + direction.y * direction.y);
+
+        if (distance > 0.1f) {
+            direction.x /= distance;
+            direction.y /= distance;
+
+            // Speed varies slightly for visual variety
+            f32 speed = 300.0f + (rand() % 100);
+            p.velocity.x = direction.x * speed;
+            p.velocity.y = direction.y * speed;
+        }
+
+        p.color = color;
+        p.maxLifetime = 0.8f + (rand() % 40) / 100.0f; // 0.8-1.2 seconds
+        p.lifetime = 0.0f;
+
+        m_Particles.push_back(p);
+    }
+}
+
+// Update particles (fade out over time)
+void GameState::UpdateParticles(f64 deltaTime) {
+    for (auto it = m_Particles.begin(); it != m_Particles.end();) {
+        it->lifetime += static_cast<f32>(deltaTime);
+        it->position.x += it->velocity.x * static_cast<f32>(deltaTime);
+        it->position.y += it->velocity.y * static_cast<f32>(deltaTime);
+
+        // Fade out based on lifetime
+        f32 lifeRatio = it->lifetime / it->maxLifetime;
+        it->color.a = 1.0f - lifeRatio;
+
+        // Remove if dead
+        if (it->lifetime >= it->maxLifetime) {
+            it = m_Particles.erase(it);
+        } else {
+            ++it;
         }
     }
 }

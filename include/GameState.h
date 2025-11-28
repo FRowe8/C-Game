@@ -362,4 +362,40 @@ private:
         f32 maxLifetime;
     };
     std::vector<Particle> m_Particles;
+
+    // Quantum Anomaly System (clickable orbs for active gameplay)
+    struct QuantumAnomaly {
+        Vec2 position;
+        f32 radius;
+        f32 lifetime;
+        f32 maxLifetime;
+        f64 rewardMultiplier;  // How much bonus (10-100x production)
+        Color color;
+        bool clicked;
+    };
+    std::vector<QuantumAnomaly> m_Anomalies;
+    f64 m_TimeSinceLastAnomaly;
+    f64 m_AnomalySpawnInterval;  // How often anomalies spawn (30-60 seconds)
+
+    // Combo System (reward multiple clicks in sequence)
+    i32 m_ComboCount;
+    f64 m_ComboTimeRemaining;
+    f64 m_ComboWindow;  // 5 seconds to maintain combo
+
+    // Visual Effects State
+    f64 m_PrestigeFlashTimer;  // For screen flash effect
+    bool m_PrestigeFlashActive;
+
+    // Helper methods for new systems
+    void SpawnQuantumAnomaly();
+    void UpdateQuantumAnomalies(f64 deltaTime);
+    void RenderQuantumAnomalies(Renderer* renderer);
+    void ClickQuantumAnomaly(const Vec2& clickPos);
+
+    void AddComboPoint();
+    void ResetCombo();
+    f64 GetComboMultiplier() const;
+
+    Color GetStationTierColor(i32 level) const;
+    void SpawnResourceParticles(const Vec2& start, const Vec2& end, const Color& color, i32 count);
 };
