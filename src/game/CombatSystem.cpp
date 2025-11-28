@@ -2,6 +2,7 @@
 #include "Renderer.h"
 #include "Logger.h"
 #include "Spaceship.h"
+#include "GameState.h"
 #include <cstdlib>
 #include <cmath>
 
@@ -16,7 +17,7 @@ CombatSystem::CombatSystem()
       m_CombatTime(0.0) {
 }
 
-void CombatSystem::StartCombat(Enemy* enemy, i32 playerLevel, const Spaceship* ship) {
+void CombatSystem::StartCombat(Enemy* enemy, i32 playerLevel, const Spaceship* ship, GameState* state) {
     if (!enemy) {
         Log::Error("Cannot start combat: null enemy");
         return;
@@ -41,12 +42,20 @@ void CombatSystem::StartCombat(Enemy* enemy, i32 playerLevel, const Spaceship* s
         m_ShipCombatBonus = 0.0;
     }
 
+    // Get skill tree bonuses
+    f64 skillDamageMultiplier = 1.0;
+    f64 skillHPMultiplier = 1.0;
+    if (state) {
+        skillDamageMultiplier = state->GetSkillTree().GetDamageMultiplier();
+        skillHPMultiplier = state->GetSkillTree().GetMaxHPMultiplier();
+    }
+
     // Base stats scale with level
     f64 levelScale = 1.0 + (playerLevel * 0.1); // 10% per level
 
-    m_PlayerMaxHP = 100.0 * levelScale * (1.0 + m_ShipPowerBonus / 100.0);
+    m_PlayerMaxHP = 100.0 * levelScale * (1.0 + m_ShipPowerBonus / 100.0) * skillHPMultiplier;
     m_PlayerCurrentHP = m_PlayerMaxHP;
-    m_PlayerAttack = 20.0 * levelScale * (1.0 + (m_ShipCombatBonus + m_ShipPowerBonus) / 100.0);
+    m_PlayerAttack = 20.0 * levelScale * (1.0 + (m_ShipCombatBonus + m_ShipPowerBonus) / 100.0) * skillDamageMultiplier;
     m_PlayerDefense = 10.0 * levelScale * (1.0 + m_ShipPowerBonus / 100.0);
     m_PlayerSpeed = 15.0 + playerLevel * 0.3;
 
@@ -426,8 +435,8 @@ void CombatSystem::HandleClick(f32 mouseX, f32 mouseY, bool mousePressed) {
 
     // Attack button
     Rect attackBtn(panelX + 30.0f, btnY, btnWidth, btnHeight);
-    if (mouseX >= attackBtn.x && mouseX <= attackBtn.x + attackBtn.w &&
-        mouseY >= attackBtn.y && mouseY <= attackBtn.y + attackBtn.h) {
+    if (mouseX >= attackBtn.x && mouseX <= attackBtn.x + attackBtn.width &&
+        mouseY >= attackBtn.y && mouseY <= attackBtn.y + attackBtn.height) {
         if (mousePressed) {
             PlayerAttack();
         }
@@ -436,8 +445,8 @@ void CombatSystem::HandleClick(f32 mouseX, f32 mouseY, bool mousePressed) {
 
     // Defend button
     Rect defendBtn(panelX + 30.0f + btnWidth + btnSpacing, btnY, btnWidth, btnHeight);
-    if (mouseX >= defendBtn.x && mouseX <= defendBtn.x + defendBtn.w &&
-        mouseY >= defendBtn.y && mouseY <= defendBtn.y + defendBtn.h) {
+    if (mouseX >= defendBtn.x && mouseX <= defendBtn.x + defendBtn.width &&
+        mouseY >= defendBtn.y && mouseY <= defendBtn.y + defendBtn.height) {
         if (mousePressed) {
             PlayerDefend();
         }
@@ -446,8 +455,8 @@ void CombatSystem::HandleClick(f32 mouseX, f32 mouseY, bool mousePressed) {
 
     // Special button
     Rect specialBtn(panelX + 30.0f + (btnWidth + btnSpacing) * 2, btnY, btnWidth, btnHeight);
-    if (mouseX >= specialBtn.x && mouseX <= specialBtn.x + specialBtn.w &&
-        mouseY >= specialBtn.y && mouseY <= specialBtn.y + specialBtn.h) {
+    if (mouseX >= specialBtn.x && mouseX <= specialBtn.x + specialBtn.width &&
+        mouseY >= specialBtn.y && mouseY <= specialBtn.y + specialBtn.height) {
         if (mousePressed) {
             PlayerSpecialAttack();
         }
