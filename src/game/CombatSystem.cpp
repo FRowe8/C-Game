@@ -435,8 +435,8 @@ void CombatSystem::HandleClick(f32 mouseX, f32 mouseY, bool mousePressed) {
 
     // Attack button
     Rect attackBtn(panelX + 30.0f, btnY, btnWidth, btnHeight);
-    if (mouseX >= attackBtn.x && mouseX <= attackBtn.x + attackBtn.w &&
-        mouseY >= attackBtn.y && mouseY <= attackBtn.y + attackBtn.h) {
+    if (mouseX >= attackBtn.x && mouseX <= attackBtn.x + attackBtn.width &&
+        mouseY >= attackBtn.y && mouseY <= attackBtn.y + attackBtn.height) {
         if (mousePressed) {
             PlayerAttack();
         }
@@ -445,8 +445,8 @@ void CombatSystem::HandleClick(f32 mouseX, f32 mouseY, bool mousePressed) {
 
     // Defend button
     Rect defendBtn(panelX + 30.0f + btnWidth + btnSpacing, btnY, btnWidth, btnHeight);
-    if (mouseX >= defendBtn.x && mouseX <= defendBtn.x + defendBtn.w &&
-        mouseY >= defendBtn.y && mouseY <= defendBtn.y + defendBtn.h) {
+    if (mouseX >= defendBtn.x && mouseX <= defendBtn.x + defendBtn.width &&
+        mouseY >= defendBtn.y && mouseY <= defendBtn.y + defendBtn.height) {
         if (mousePressed) {
             PlayerDefend();
         }
@@ -455,8 +455,8 @@ void CombatSystem::HandleClick(f32 mouseX, f32 mouseY, bool mousePressed) {
 
     // Special button
     Rect specialBtn(panelX + 30.0f + (btnWidth + btnSpacing) * 2, btnY, btnWidth, btnHeight);
-    if (mouseX >= specialBtn.x && mouseX <= specialBtn.x + specialBtn.w &&
-        mouseY >= specialBtn.y && mouseY <= specialBtn.y + specialBtn.h) {
+    if (mouseX >= specialBtn.x && mouseX <= specialBtn.x + specialBtn.width &&
+        mouseY >= specialBtn.y && mouseY <= specialBtn.y + specialBtn.height) {
         if (mousePressed) {
             PlayerSpecialAttack();
         }
