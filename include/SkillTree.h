@@ -149,7 +149,7 @@ private:
     void InitializeSkills();
     void RenderBranchTabs(Renderer* renderer, f32 panelX, f32 panelY, f32 panelWidth);
     void RenderSkillNodes(Renderer* renderer, GameState* state, f32 panelX, f32 panelY, f32 panelWidth);
-    void RenderSkillInfo(Renderer* renderer, f32 panelX, f32 panelY, f32 panelWidth);
+    void RenderSkillInfo(Renderer* renderer, f32 panelX, f32 panelY, f32 panelWidth, f32 panelHeight);
     void RenderSkillConnections(Renderer* renderer, f32 nodeStartX, f32 nodeStartY, f32 nodeWidth, f32 nodeHeight);
 
     Color GetBranchColor(SkillBranch branch) const;
