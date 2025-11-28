@@ -9,6 +9,10 @@
 #include <cmath>
 #include <algorithm>
 
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#endif
+
 // Achievement implementation
 Achievement::Achievement()
     : id(AchievementID::FirstQubit), unlocked(false),
@@ -42,7 +46,8 @@ QuantumEvent::QuantumEvent()
 
 // QuantumTimeline implementation
 QuantumTimeline::QuantumTimeline()
-    : completedResets(0), photons(0), photonBonus(1.0) {
+    : completedResets(0), photons(0), photonBonus(1.0),
+      completedCollapses(0), singularities(0) {
 }
 
 // ResearchStation implementation
@@ -50,7 +55,7 @@ ResearchStation::ResearchStation()
     : baseProduction(0), currentProduction(0), level(0),
       upgradeCost(0), upgradeCostMultiplier(1.15f),
       superpositionValue(0), superpositionProbability(0.5f),
-      unlocked(false), unlockCost(0) {
+      unlocked(false), unlockCost(0), autoUpgrade(false) {
 }
 
 void ResearchStation::Upgrade() {
@@ -91,6 +96,17 @@ void ResearchStation::Observe(GameState* state) {
         collapsedValue *= (0.5 + roll * 0.5) * observeBonus;
     }
 
+    // Critical Observation chance! (10% chance for 2-5x multiplier)
+    f64 criticalRoll = static_cast<f64>(rand()) / RAND_MAX;
+    bool isCritical = criticalRoll < 0.10;
+
+    if (isCritical) {
+        // Critical success! 2x to 5x multiplier
+        f64 critMultiplier = 2.0 + (static_cast<f64>(rand() % 4)); // 2, 3, 4, or 5x
+        collapsedValue *= critMultiplier;
+        Log::Infof("CRITICAL OBSERVATION! ", critMultiplier, "x reward!");
+    }
+
     state->AddResource(resourceType, collapsedValue);
     superpositionValue = 0;
 
@@ -99,8 +115,44 @@ void ResearchStation::Observe(GameState* state) {
     stats.totalObservations++;
     stats.sessionObservations++;
 
-    // Spawn particles for visual feedback
-    // (Will be called from GameState with renderer access)
+    // Add combo point for observation
+    state->AddComboPoint();
+
+    // Ship part drop chance! (20% base chance + bonus from ship's drop rate bonus)
+    f64 partDropChance = 0.20; // 20% base chance
+    f64 shipDropBonus = state->GetSpaceship().GetTotalDropRateBonus() / 100.0; // Convert % to decimal
+    partDropChance += shipDropBonus;
+
+    // Higher level stations have slightly better drop chances
+    partDropChance += (level / 100.0) * 0.05; // +5% per 100 levels
+
+    f64 partDropRoll = static_cast<f64>(rand()) / RAND_MAX;
+    if (partDropRoll < partDropChance) {
+        // Drop a ship part!
+        ShipPart droppedPart = ShipPartGenerator::GenerateRandomPart();
+        state->GetSpaceship().AddPart(droppedPart);
+
+        Log::Infof("Ship part dropped: ", droppedPart.GetRarityName(), " ", droppedPart.name);
+    }
+
+    // Spawn particles for visual feedback (flying to resource counter)
+    // Determine particle color based on resource type
+    Color particleColor;
+    if (resourceType == QuantumResource::Qubits) {
+        particleColor = Color::QuantumBlue();
+    } else if (resourceType == QuantumResource::Coherence) {
+        particleColor = Color::CoherenceGreen();
+    } else {
+        particleColor = Color::EntanglementOrange();
+    }
+
+    // Spawn more particles for critical observations
+    i32 particleCount = isCritical ? 20 : 5;
+
+    // Note: Particles will be spawned from station position to resource counter
+    // This requires access to station position, which we'll handle in the button onClick
+    (void)particleColor; // Suppress unused warning - will be used when we have position
+    (void)particleCount;
 }
 
 void ResearchStation::Update(f64 deltaTime) {
@@ -115,83 +167,74 @@ void UIButton::Update(const Vec2& mousePos) {
     hovered = enabled && bounds.Contains(mousePos);
 }
 
+// In UIButton implementation
+
 void UIButton::Render(Renderer* renderer) {
-    // Determine button colors based on state
-    Color renderColor, borderColor, shadowColor;
+    // --- 1. Determine Button Colors and State ---
+    Color renderColor, borderColor, textColor;
+    f32 baseAlpha = 0.85f;
 
     if (!enabled) {
-        // Disabled state: dark gray
-        renderColor = Color(0.25f, 0.25f, 0.28f, 0.6f);
-        borderColor = Color(0.4f, 0.4f, 0.45f, 0.8f);
-        shadowColor = Color(0.0f, 0.0f, 0.0f, 0.3f);
+        // Disabled: Color-code based on affordability (how close to affording)
+        if (affordability >= 0.75) {
+            // Close to affording (75-99%) - Yellow tint
+            renderColor = Color(0.25f, 0.25f, 0.1f, baseAlpha * 0.5f);
+            borderColor = Color::Yellow() * 0.4f;
+            textColor = Color(0.9f, 0.9f, 0.6f, 1.0f);
+        } else if (affordability >= 0.5) {
+            // Halfway there (50-74%) - Orange tint
+            renderColor = Color(0.25f, 0.15f, 0.1f, baseAlpha * 0.5f);
+            borderColor = Color::EntanglementOrange() * 0.4f;
+            textColor = Color(0.9f, 0.7f, 0.5f, 1.0f);
+        } else {
+            // Far from affording (<50%) - Red/gray tint
+            renderColor = Color(0.2f, 0.1f, 0.1f, baseAlpha * 0.5f);
+            borderColor = Color(0.4f, 0.2f, 0.2f, baseAlpha * 0.5f);
+            textColor = Color(0.7f, 0.5f, 0.5f, 1.0f);
+        }
     } else if (hovered) {
-        // Hovered state: brighter with glow
-        renderColor = hoverColor * 1.1f;
-        renderColor.a = 0.95f;
-        borderColor = Color::White() * 0.9f;
-        shadowColor = hoverColor * 0.8f;
-        shadowColor.a = 0.6f;
+        // Hovered: Brighter color, strong white border, strong glow
+        renderColor = hoverColor * 0.9f;
+        renderColor.a = baseAlpha + 0.1f;
+        borderColor = Color::White() * 0.8f;
+        textColor = Color::White();
     } else {
-        // Normal state
+        // Normal: Standard color
         renderColor = color;
-        renderColor.a = 0.85f;
-        borderColor = Color::White() * 0.6f;
-        shadowColor = Color(0.0f, 0.0f, 0.0f, 0.4f);
+        renderColor.a = baseAlpha;
+        borderColor = color * 1.5f; // Slight color-matched border
+        borderColor.a = 0.5f;
+        textColor = Color::White();
     }
 
-    // Draw shadow (offset slightly down and right for depth)
-    Rect shadowRect = bounds;
-    shadowRect.x += 3.0f;
-    shadowRect.y += 3.0f;
-    renderer->DrawRect(shadowRect, shadowColor, true);
+    // --- 2. Draw Background (Subtle flat fill) ---
+    // Use a single, slightly transparent fill for a 'glass' effect
+    renderer->DrawRect(bounds, renderColor, true);
 
-    // Draw button background with subtle gradient effect
-    // Top half - slightly lighter
-    Rect topHalf(bounds.x, bounds.y, bounds.width, bounds.height * 0.5f);
-    Color topColor = renderColor * 1.15f;
-    topColor.a = renderColor.a;
-    renderer->DrawRect(topHalf, topColor, true);
-
-    // Bottom half - normal color
-    Rect bottomHalf(bounds.x, bounds.y + bounds.height * 0.5f, bounds.width, bounds.height * 0.5f);
-    renderer->DrawRect(bottomHalf, renderColor, true);
-
-    // Draw multiple borders for depth effect
-    // Outer border (thicker)
+    // --- 3. Draw Border ---
     renderer->DrawRect(bounds, borderColor, false);
-
-    // Inner highlight border (creates 3D effect)
-    Rect innerBorder(bounds.x + 2.0f, bounds.y + 2.0f,
-                     bounds.width - 4.0f, bounds.height - 4.0f);
-    Color highlightColor = hovered ? Color::White() * 0.4f : Color::White() * 0.2f;
-    renderer->DrawRect(innerBorder, highlightColor, false);
-
-    // Draw glow effect on hover
+    
+    // --- 4. Draw Hover Glow (for modern feedback) ---
     if (hovered && enabled) {
-        Rect glowRect(bounds.x - 2.0f, bounds.y - 2.0f,
-                      bounds.width + 4.0f, bounds.height + 4.0f);
+        // Create a distinct glow effect outside the main button
+        Rect glowRect(bounds.x - 1.0f, bounds.y - 1.0f,
+                      bounds.width + 2.0f, bounds.height + 2.0f);
         Color glowColor = hoverColor;
-        glowColor.a = 0.3f;
+        glowColor.a = 0.3f; // Less opaque glow
         renderer->DrawRect(glowRect, glowColor, false);
     }
 
-    // Draw text (properly centered)
+    // --- 5. Draw Text (Perfectly Centered for professionalism) ---
     Vec2 textPos = bounds.Center();
-    // Approximate text width based on character count (will be better with TTF)
+    
+    // NOTE: This text rendering part still relies on a rough text width estimate.
+    // For true professionalism, this must be replaced with accurate font rendering metrics (e.g., proper TTF text size calculation).
     f32 approxTextWidth = text.length() * 9.0f; // Rough estimate for 16pt font
+    
     textPos.x -= approxTextWidth * 0.5f;
-    textPos.y -= 8.0f;
+    textPos.y -= 8.0f; // Adjust for vertical centering (font-dependent)
 
-    // Text with subtle shadow for readability
-    if (enabled) {
-        // Text shadow
-        Vec2 shadowTextPos = textPos;
-        shadowTextPos.x += 1.0f;
-        shadowTextPos.y += 1.0f;
-        renderer->DrawText(text, shadowTextPos, Color(0.0f, 0.0f, 0.0f, 0.7f), 16.0f);
-    }
-
-    Color textColor = enabled ? Color::White() : Color(0.6f, 0.6f, 0.6f, 1.0f);
+    // No text shadow for a flatter, cleaner look
     renderer->DrawText(text, textPos, textColor, 16.0f);
 }
 
@@ -203,10 +246,20 @@ bool UIButton::WasClicked(const Vec2& mousePos, bool mousePressed) {
 
 // GameState implementation
 GameState::GameState()
-    : m_TotalTimePlayed(0), m_TimeSinceLastSave(0),
+    : m_CurrentEvent(nullptr), m_TimeSinceLastEvent(0), m_EventCooldown(120.0),
+      m_QuantumEssence(0),
+      m_LastSaveTimestamp(0),
+      m_ShowAchievements(false), m_ShowStats(false), m_ShowResearch(false), m_ShowMilestones(false), m_ShowBuyables(false), m_ShowChallenges(false), m_ShowEssenceShop(false), m_ShowSingularityShop(false), m_ShowSpaceship(false), m_ShowMoreMenu(false),
+      m_NumberFormat(GameUtils::NumberFormat::Suffix),
+      m_TotalTimePlayed(0), m_TimeSinceLastSave(0), m_TimeSinceLastPrestige(0),
       m_Coherence(100), m_MaxCoherence(100), m_CoherenceDecayRate(1.0),
-      m_CurrentEvent(nullptr), m_TimeSinceLastEvent(0), m_EventCooldown(120.0),
-      m_LastSaveTimestamp(0), m_ShowAchievements(false), m_ShowStats(false), m_ShowResearch(false), m_ShowMilestones(false) {
+      m_BoostActive(false), m_BoostTimeRemaining(0), m_BoostCooldownRemaining(0),
+      m_BoostDuration(30.0), m_BoostCooldown(120.0), m_BoostMultiplier(2.0),
+      m_AutoPrestigeThreshold(10.0),
+      m_TimeSinceLastAnomaly(0), m_AnomalySpawnInterval(45.0),
+      m_ComboCount(0), m_ComboTimeRemaining(0), m_ComboWindow(5.0),
+      m_PrestigeFlashTimer(0), m_PrestigeFlashActive(false),
+      m_LastThemeUnlocked(0) {
 
     for (int i = 0; i < 3; i++) {
         m_Resources[i] = 0;
@@ -247,6 +300,12 @@ void GameState::Initialize() {
         {AchievementID::Collector, "Collector", "Unlock all station types", 5, 10000, 10},
         {AchievementID::EventHunter, "Event Hunter", "Experience 50 events", 50, 5000, 5},
         {AchievementID::WeekStreak, "Dedicated", "Play 7 days in a row", 7, 20000, 15},
+        // Spaceship achievements
+        {AchievementID::FirstShipPart, "Salvage Crew", "Acquire your first ship part", 1, 500, 1},
+        {AchievementID::ShipOperational, "Flight Ready", "Repair ship to 25%", 1, 2000, 3},
+        {AchievementID::ShipFullyRepaired, "Master Engineer", "Fully repair the ship", 1, 10000, 10},
+        {AchievementID::FirstLegendaryPart, "Legendary Find", "Discover a legendary part", 1, 5000, 5},
+        {AchievementID::PartCollector, "Junkyard King", "Collect 50 ship parts", 50, 20000, 15},
     };
 
     m_Achievements.clear();
@@ -276,6 +335,26 @@ void GameState::Initialize() {
     m_MilestoneSystem.Initialize();
     Log::Info("Milestone system initialized");
 
+    // Initialize Buyables System
+    m_BuyableManager.Initialize(this);
+    Log::Info("Buyables system initialized");
+
+    // Initialize Challenge System
+    m_ChallengeManager.Initialize();
+    Log::Info("Challenge system initialized");
+
+    // Initialize Essence Shop System
+    m_EssenceShopManager.Initialize(this);
+    Log::Info("Essence shop initialized");
+
+    // Initialize Singularity Shop System
+    m_SingularityShopManager.Initialize(this);
+    Log::Info("Singularity shop initialized");
+
+    // Initialize Spaceship System
+    m_Spaceship.Initialize();
+    Log::Info("Spaceship system initialized");
+
     // Try to load save file
     std::string savePath = Platform::GetSaveDirectory() + "quantum_save.json";
     if (Platform::FileExists(savePath)) {
@@ -290,15 +369,16 @@ void GameState::Initialize() {
 
 void GameState::InitializeStations() {
     // Station 1: Basic Qubit Generator
+    // Rebalanced for gradual progression like Shark Incremental
     ResearchStation station1;
     station1.name = "Qubit Generator";
     station1.description = "Generates qubits in superposition";
     station1.resourceType = QuantumResource::Qubits;
     station1.baseProduction = 1.0;
-    station1.currentProduction = 0;
-    station1.level = 0;
+    station1.currentProduction = 1.0; // Start producing immediately
+    station1.level = 1; // Start at level 1 for immediate passive income
     station1.upgradeCost = 10.0;
-    station1.upgradeCostMultiplier = 1.15;
+    station1.upgradeCostMultiplier = 1.5; // Increased from 1.15 for better balance
     station1.superpositionProbability = 0.7;
     station1.unlocked = true; // First one is unlocked
     m_Stations.push_back(station1);
@@ -310,11 +390,11 @@ void GameState::InitializeStations() {
     station2.resourceType = QuantumResource::Coherence;
     station2.baseProduction = 0.5;
     station2.level = 0;
-    station2.upgradeCost = 25.0;
-    station2.upgradeCostMultiplier = 1.18;
+    station2.upgradeCost = 50.0; // Increased from 25
+    station2.upgradeCostMultiplier = 1.6; // Increased from 1.18
     station2.superpositionProbability = 0.8;
     station2.unlocked = false;
-    station2.unlockCost = 50.0;
+    station2.unlockCost = 100.0; // Increased from 50
     m_Stations.push_back(station2);
 
     // Station 3: Entanglement Chamber
@@ -324,11 +404,11 @@ void GameState::InitializeStations() {
     station3.resourceType = QuantumResource::Entanglement;
     station3.baseProduction = 0.2;
     station3.level = 0;
-    station3.upgradeCost = 100.0;
-    station3.upgradeCostMultiplier = 1.2;
+    station3.upgradeCost = 250.0; // Increased from 100
+    station3.upgradeCostMultiplier = 1.7; // Increased from 1.2
     station3.superpositionProbability = 0.6;
     station3.unlocked = false;
-    station3.unlockCost = 150.0;
+    station3.unlockCost = 500.0; // Increased from 150
     m_Stations.push_back(station3);
 
     // Station 4: Advanced Qubit Synthesizer
@@ -338,11 +418,11 @@ void GameState::InitializeStations() {
     station4.resourceType = QuantumResource::Qubits;
     station4.baseProduction = 5.0;
     station4.level = 0;
-    station4.upgradeCost = 500.0;
-    station4.upgradeCostMultiplier = 1.25;
+    station4.upgradeCost = 1500.0; // Increased from 500
+    station4.upgradeCostMultiplier = 1.8; // Increased from 1.25
     station4.superpositionProbability = 0.5;
     station4.unlocked = false;
-    station4.unlockCost = 300.0;
+    station4.unlockCost = 2000.0; // Increased from 300
     m_Stations.push_back(station4);
 
     // Station 5: Quantum Supercomputer
@@ -352,29 +432,180 @@ void GameState::InitializeStations() {
     station5.resourceType = QuantumResource::Qubits;
     station5.baseProduction = 20.0;
     station5.level = 0;
-    station5.upgradeCost = 2000.0;
-    station5.upgradeCostMultiplier = 1.3;
+    station5.upgradeCost = 10000.0; // Increased from 2000
+    station5.upgradeCostMultiplier = 2.0; // Increased from 1.3
     station5.superpositionProbability = 0.4;
     station5.unlocked = false;
-    station5.unlockCost = 1000.0;
+    station5.unlockCost = 15000.0; // Increased from 1000
     m_Stations.push_back(station5);
 }
 
 void GameState::InitializeUI() {
     m_ScrollOffset = Vec2(0, 0);
-    // UI buttons will be created dynamically during rendering
+    m_StationButtons.clear();
+
+    // Create persistent buttons for each research station
+    // For each station, we create: unlock button (4*i), observe button (4*i+1), upgrade button (4*i+2), buy max button (4*i+3)
+    for (size_t i = 0; i < m_Stations.size(); i++) {
+        // Unlock Button
+        UIButton unlockBtn;
+        unlockBtn.text = "Unlock";
+        unlockBtn.color = Color::QuantumBlue() * 0.7f;
+        unlockBtn.hoverColor = Color::QuantumBlue();
+        unlockBtn.onClick = [this, i]() {
+            if (SpendResource(QuantumResource::Qubits, m_Stations[i].unlockCost)) {
+                m_Stations[i].unlocked = true;
+                m_Stations[i].level = 0;
+                Log::Infof("Unlocked: ", m_Stations[i].name);
+            }
+        };
+        m_StationButtons.push_back(unlockBtn);
+
+        // Observe Button
+        UIButton observeBtn;
+        observeBtn.text = "OBSERVE";
+        observeBtn.color = Color::QuantumPurple() * 0.7f;
+        observeBtn.hoverColor = Color::QuantumPurple();
+        observeBtn.onClick = [this, i]() {
+            auto& st = m_Stations[i];
+            st.Observe(this);
+            Log::Infof("Observed ", st.name);
+        };
+        m_StationButtons.push_back(observeBtn);
+
+        // Upgrade Button
+        UIButton upgradeBtn;
+        upgradeBtn.text = "Upgrade";
+        upgradeBtn.color = Color::EntanglementOrange() * 0.7f;
+        upgradeBtn.hoverColor = Color::EntanglementOrange();
+        upgradeBtn.onClick = [this, i]() {
+            // Calculate effective upgrade cost with challenge modifiers
+            f64 effectiveCost = m_Stations[i].upgradeCost;
+            if (m_ChallengeManager.HasModifier(ChallengeModifier::ExpensiveUpgrades)) {
+                effectiveCost *= 3.0;
+            }
+
+            if (SpendResource(QuantumResource::Qubits, effectiveCost)) {
+                m_Stations[i].Upgrade();
+                UpdateResearchBonuses(); // Recalculate production
+                Log::Infof("Upgraded ", m_Stations[i].name, " to level ", m_Stations[i].level);
+            }
+        };
+        m_StationButtons.push_back(upgradeBtn);
+
+        // Buy Max Button
+        UIButton buyMaxBtn;
+        buyMaxBtn.text = "BUY MAX";
+        buyMaxBtn.color = Color::CoherenceGreen() * 0.7f;
+        buyMaxBtn.hoverColor = Color::CoherenceGreen();
+        buyMaxBtn.onClick = [this, i]() {
+            auto& station = m_Stations[i];
+            f64 currentQubits = GetResource(QuantumResource::Qubits);
+            i32 upgradesBought = 0;
+
+            // Check if expensive upgrades modifier is active
+            bool expensiveUpgrades = m_ChallengeManager.HasModifier(ChallengeModifier::ExpensiveUpgrades);
+
+            // Keep buying while we can afford it
+            while (upgradesBought < 1000) { // Cap at 1000 to prevent infinite loops
+                // Calculate effective upgrade cost with challenge modifiers
+                f64 effectiveCost = station.upgradeCost;
+                if (expensiveUpgrades) {
+                    effectiveCost *= 3.0;
+                }
+
+                if (currentQubits >= effectiveCost) {
+                    if (SpendResource(QuantumResource::Qubits, effectiveCost)) {
+                        station.Upgrade();
+                        currentQubits = GetResource(QuantumResource::Qubits);
+                        upgradesBought++;
+                    } else {
+                        break;
+                    }
+                } else {
+                    break;
+                }
+            }
+
+            if (upgradesBought > 0) {
+                UpdateResearchBonuses(); // Recalculate production
+                Log::Infof("Bought ", upgradesBought, " upgrades for ", station.name, " (now level ", station.level, ")");
+            }
+        };
+        m_StationButtons.push_back(buyMaxBtn);
+    }
+
+    // Create Prestige Button (last button in the list)
+    UIButton prestigeBtn;
+    prestigeBtn.text = "PRESTIGE";
+    prestigeBtn.color = Color::Magenta() * 0.5f;
+    prestigeBtn.hoverColor = Color::Magenta();
+    prestigeBtn.onClick = [this]() {
+        PerformPrestige();
+    };
+    m_StationButtons.push_back(prestigeBtn);
 }
 
 void GameState::Update(f64 deltaTime, Input* input, Renderer* renderer) {
+    (void)renderer; // Unused parameter - reserved for future use
+
     m_TotalTimePlayed += deltaTime;
     m_TimeSinceLastSave += deltaTime;
     m_TimeSinceLastEvent += deltaTime;
 
+    // Update boost timers
+    if (m_BoostActive) {
+        m_BoostTimeRemaining -= deltaTime;
+        if (m_BoostTimeRemaining <= 0) {
+            m_BoostActive = false;
+            m_BoostTimeRemaining = 0;
+            m_BoostCooldownRemaining = m_BoostCooldown;
+            Log::Info("Boost ended! Starting cooldown...");
+        }
+    } else if (m_BoostCooldownRemaining > 0) {
+        m_BoostCooldownRemaining -= deltaTime;
+        if (m_BoostCooldownRemaining < 0) {
+            m_BoostCooldownRemaining = 0;
+        }
+    }
+
     // Update statistics
     m_Statistics.UpdateSession(deltaTime);
 
+    // Track time for fastest prestige achievement
+    m_TimeSinceLastPrestige += deltaTime;
+
     // Update stations
     UpdateStations(deltaTime);
+
+    // Auto-research if enabled (automatically purchase research when affordable)
+    auto availableResearch = m_ResearchTree.GetAvailableResearch(m_Timeline.completedResets);
+    for (const ResearchNode* node : availableResearch) {
+        if (node && node->autoResearch && !node->researched) {
+            // Try to purchase this research (PurchaseResearch handles all checks)
+            PurchaseResearch(node->id);
+            // Note: Only one research per frame to avoid spending all resources at once
+            break;
+        }
+    }
+
+    // Passive photon generation from singularities
+    f64 photonGenRate = m_SingularityShopManager.GetPhotonGenerationRate();
+    if (photonGenRate > 0 && m_Timeline.singularities > 0) {
+        // photonGenRate is the multiplier per singularity
+        // Total generation = photonGenRate * singularities * deltaTime
+        f64 photonsGained = photonGenRate * m_Timeline.singularities * deltaTime;
+        AddPhotons(photonsGained);
+    }
+
+    // Auto-prestige if enabled and threshold reached
+    if (m_ResearchTree.IsResearched(ResearchID::AutoPrestige)) {
+        f64 photonsOnPrestige = CalculatePhotonsOnPrestige();
+        if (photonsOnPrestige >= m_AutoPrestigeThreshold) {
+            PerformPrestige();
+            Log::Infof("Auto-prestige triggered at ", photonsOnPrestige, " photons");
+        }
+    }
 
     // Update coherence
     UpdateCoherence(deltaTime);
@@ -399,14 +630,50 @@ void GameState::Update(f64 deltaTime, Input* input, Renderer* renderer) {
     // Check milestones
     CheckMilestones();
 
+    // Check for challenge completion
+    m_ChallengeManager.CompleteChallenge(this);
+
+    // Update visual effects systems
+    UpdateQuantumAnomalies(deltaTime);
+    UpdateParticles(deltaTime);
+
+    // Update combo timer
+    if (m_ComboTimeRemaining > 0) {
+        m_ComboTimeRemaining -= deltaTime;
+        if (m_ComboTimeRemaining <= 0) {
+            ResetCombo();
+        }
+    }
+
+    // Update prestige flash effect
+    if (m_PrestigeFlashActive) {
+        m_PrestigeFlashTimer -= deltaTime;
+        if (m_PrestigeFlashTimer <= 0) {
+            m_PrestigeFlashActive = false;
+        }
+    }
+
     // Update UI
     UpdateUI(input);
 
-    // Auto-save every 30 seconds
-    if (m_TimeSinceLastSave >= 30.0) {
+    // Auto-save every 10 seconds (reduced from 30 for more frequent saves)
+    if (m_TimeSinceLastSave >= 10.0) {
         std::string savePath = Platform::GetSaveDirectory() + "quantum_save.json";
-        Save(savePath);
+        if (Save(savePath)) {
+            Log::Debug("Auto-save successful");
+        }
         m_TimeSinceLastSave = 0;
+
+#ifdef __EMSCRIPTEN__
+        // For Emscripten, trigger IndexedDB sync after each save
+        EM_ASM(
+            FS.syncfs(false, function(err) {
+                if (err) {
+                    console.error('Error syncing to IndexedDB:', err);
+                }
+            });
+        );
+#endif
     }
 }
 
@@ -414,28 +681,138 @@ void GameState::UpdateStations(f64 deltaTime) {
     // Apply prestige bonus
     f64 globalMultiplier = m_Timeline.photonBonus;
 
+    // Apply boost multiplier if active
+    if (m_BoostActive) {
+        globalMultiplier *= m_BoostMultiplier;
+    }
+
+    // Apply challenge modifiers
+    if (m_ChallengeManager.HasModifier(ChallengeModifier::HalfProduction)) {
+        globalMultiplier *= 0.5; // Half production rate
+    }
+    if (m_ChallengeManager.HasModifier(ChallengeModifier::SlowTime)) {
+        globalMultiplier *= 0.5; // Time runs at half speed (same effect)
+    }
+
+    // Check if Auto-Observer research is unlocked
+    bool hasAutoObserver = m_ResearchTree.IsResearched(ResearchID::AutoObserver);
+
+    // Check if manual observation is disabled by challenge
+    bool canManuallyObserve = !m_ChallengeManager.HasModifier(ChallengeModifier::NoObserve);
+    (void)canManuallyObserve; // Reserved for future use
+
+    f64 currentQubits = GetResource(QuantumResource::Qubits);
+    bool canUpgrade = !m_ChallengeManager.HasModifier(ChallengeModifier::NoUpgrades);
+
     for (auto& station : m_Stations) {
         station.Update(deltaTime * globalMultiplier);
+
+        // Auto-observe if research is unlocked and superposition is high enough
+        // Auto-observe still works even in NoObserve challenge (only manual is disabled)
+        if (hasAutoObserver && station.unlocked && station.superpositionValue >= 10.0) {
+            station.Observe(this);
+        }
+
+        // Auto-upgrade if enabled and can afford 10x the cost (prevents spending all resources)
+        if (station.autoUpgrade && station.unlocked && canUpgrade) {
+            // Calculate effective upgrade cost (with challenge modifiers)
+            f64 effectiveCost = station.upgradeCost;
+            if (m_ChallengeManager.HasModifier(ChallengeModifier::ExpensiveUpgrades)) {
+                effectiveCost *= 3.0;
+            }
+
+            // Only auto-upgrade if we can afford 10x the cost (safety buffer)
+            f64 safeThreshold = effectiveCost * 10.0;
+            if (currentQubits >= safeThreshold) {
+                if (SpendResource(QuantumResource::Qubits, effectiveCost)) {
+                    station.Upgrade();
+                    currentQubits = GetResource(QuantumResource::Qubits); // Update current amount
+                }
+            }
+        }
     }
+
+    // Recalculate production if any auto-upgrades happened
+    UpdateResearchBonuses();
 }
 
 void GameState::UpdateCoherence(f64 deltaTime) {
+    // Check if coherence is disabled by challenge
+    if (m_ChallengeManager.HasModifier(ChallengeModifier::NoCoherence)) {
+        m_Coherence = 0;
+        return;
+    }
+
     // Coherence slowly decays
     m_Coherence -= m_CoherenceDecayRate * deltaTime;
     if (m_Coherence < 0) m_Coherence = 0;
 
-    // Coherence affects production
-    f64 coherenceMultiplier = m_Coherence / m_MaxCoherence;
-    // Apply to stations (already done in UpdateStations)
+    // Coherence affects production (applied in UpdateStations)
 }
 
 void GameState::UpdateUI(Input* input) {
     Vec2 mousePos = input->GetMousePosition();
     bool mousePressed = input->IsMouseButtonPressed(MouseButton::Left);
 
+    // Scrolling support
+    if (!m_ShowAchievements && !m_ShowStats && !m_ShowResearch && !m_ShowMilestones) {
+        // Mouse wheel scrolling (desktop)
+        f32 mouseWheel = input->GetMouseWheel();
+        if (mouseWheel != 0) {
+            m_ScrollOffset.y += mouseWheel * 50.0f; // Increased scroll speed
+        }
+
+        // Keyboard arrow scrolling (UP/DOWN arrow keys)
+        // SDL_SCANCODE_UP = 82, DOWN = 81
+        const int KEY_UP = 82;
+        const int KEY_DOWN = 81;
+        if (input->IsKeyDown(KEY_UP)) {
+            m_ScrollOffset.y += 5.0f; // Smooth scroll up
+        }
+        if (input->IsKeyDown(KEY_DOWN)) {
+            m_ScrollOffset.y -= 5.0f; // Smooth scroll down
+        }
+
+        // Touch drag scrolling (mobile)
+        const auto& touches = input->GetTouches();
+        if (!touches.empty()) {
+            const auto& touch = touches[0]; // Use first touch
+            m_ScrollOffset.y += touch.delta.y;
+        }
+
+        // Clamp scroll bounds (updated for new larger UI elements)
+        f32 maxScroll = 0.0f; // Can't scroll up past the top
+
+        // Calculate actual content height based on current UI layout
+        f32 stationHeight = 180.0f;  // Updated from 150px
+        f32 stationMargin = 25.0f;   // Updated from 20px
+        f32 stationsContentHeight = m_Stations.size() * (stationHeight + stationMargin);
+
+        // Add space for prestige button (60px) + auto-prestige controls (45px if unlocked)
+        // + collapse button (60px) + gaps (20 + 70 + 50 padding)
+        f32 bottomControlsHeight = 305.0f; // Generous padding for all bottom controls
+
+        f32 contentHeight = stationsContentHeight + bottomControlsHeight;
+
+        // Viewport = screen height - fixed top area (resources 100px + nav 80px)
+        f32 fixedTopArea = 180.0f;
+        f32 screenHeight = 720.0f; // Default screen height
+        f32 viewportHeight = screenHeight - fixedTopArea;
+
+        f32 minScroll = -(contentHeight - viewportHeight);
+        if (minScroll > 0) minScroll = 0; // If content fits on screen, don't allow scrolling
+
+        m_ScrollOffset.y = std::max(minScroll, std::min(maxScroll, m_ScrollOffset.y));
+    }
+
     // Keyboard shortcuts
-    // SDL_SCANCODE_A = 4, M = 13, R = 15, S = 16, ESCAPE = 41
+    // SDL_SCANCODE_A = 4, B = 5, C = 6, E = 8, F = 9, H = 11, M = 13, R = 15, S = 16, ESCAPE = 41
     const int KEY_A = 4;
+    const int KEY_B = 5;
+    const int KEY_C = 6;
+    const int KEY_E = 8;
+    const int KEY_F = 9;
+    const int KEY_H = 11;
     const int KEY_M = 13;
     const int KEY_R = 15;
     const int KEY_S = 16;
@@ -453,35 +830,594 @@ void GameState::UpdateUI(Input* input) {
     if (input->IsKeyPressed(KEY_M)) {
         m_ShowMilestones = !m_ShowMilestones;
     }
+    if (input->IsKeyPressed(KEY_B)) {
+        m_ShowBuyables = !m_ShowBuyables;
+    }
+    if (input->IsKeyPressed(KEY_C)) {
+        m_ShowChallenges = !m_ShowChallenges;
+    }
+    if (input->IsKeyPressed(KEY_E)) {
+        m_ShowEssenceShop = !m_ShowEssenceShop;
+    }
+    if (input->IsKeyPressed(KEY_H)) {
+        m_ShowSpaceship = !m_ShowSpaceship;
+    }
+    if (input->IsKeyPressed(KEY_F)) {
+        // Toggle number format between Suffix and Scientific
+        m_NumberFormat = (m_NumberFormat == GameUtils::NumberFormat::Suffix)
+            ? GameUtils::NumberFormat::Scientific
+            : GameUtils::NumberFormat::Suffix;
+        Log::Info("Number format toggled");
+    }
     if (input->IsKeyPressed(KEY_ESCAPE)) {
         m_ShowAchievements = false;
         m_ShowStats = false;
         m_ShowResearch = false;
         m_ShowMilestones = false;
+        m_ShowBuyables = false;
+        m_ShowChallenges = false;
+        m_ShowEssenceShop = false;
+        m_ShowSingularityShop = false;
+        m_ShowSpaceship = false;
+    }
+
+    // Handle popup close button clicks (X button in top-right of panels)
+    if (mousePressed) {
+        f32 closeBtnSize = 30.0f;
+        f32 screenWidth = 1280.0f;  // Default window width
+        f32 screenHeight = 720.0f;  // Default window height
+
+        // Helper function to check close button for a panel
+        auto checkCloseButton = [&](bool isShown, f32 panelWidth, f32 panelHeight, bool* showFlag) {
+            if (!isShown) return false;
+
+            f32 panelX = (screenWidth - panelWidth) / 2.0f;
+            f32 panelY = (screenHeight - panelHeight) / 2.0f;
+            f32 closeBtnX = panelX + panelWidth - closeBtnSize - 10.0f;
+            f32 closeBtnY = panelY + 10.0f;
+            Rect closeBtn(closeBtnX, closeBtnY, closeBtnSize, closeBtnSize);
+
+            if (closeBtn.Contains(mousePos)) {
+                *showFlag = false;
+                return true;  // Click was handled
+            }
+
+            // Click outside panel to close
+            Rect panel(panelX, panelY, panelWidth, panelHeight);
+            if (!panel.Contains(mousePos)) {
+                *showFlag = false;
+                return true;  // Click was handled
+            }
+
+            return false;
+        };
+
+        // Check close buttons for each popup (in reverse render order - check top-most first)
+        bool handled = false;
+        if (!handled) handled = checkCloseButton(m_ShowSingularityShop, 900.0f, 650.0f, &m_ShowSingularityShop);
+        if (!handled) handled = checkCloseButton(m_ShowEssenceShop, 900.0f, 650.0f, &m_ShowEssenceShop);
+        if (!handled) handled = checkCloseButton(m_ShowChallenges, 900.0f, 650.0f, &m_ShowChallenges);
+        if (!handled) handled = checkCloseButton(m_ShowBuyables, 900.0f, 600.0f, &m_ShowBuyables);
+        if (!handled) handled = checkCloseButton(m_ShowMilestones, 950.0f, 670.0f, &m_ShowMilestones);
+        if (!handled) handled = checkCloseButton(m_ShowResearch, 900.0f, 600.0f, &m_ShowResearch);
+        if (!handled) handled = checkCloseButton(m_ShowStats, 900.0f, 600.0f, &m_ShowStats);
+        if (!handled) handled = checkCloseButton(m_ShowAchievements, 900.0f, 600.0f, &m_ShowAchievements);
+
+        // Handle research node clicks (if research panel is open)
+        if (!handled && m_ShowResearch) {
+            f32 panelWidth = 900.0f;
+            f32 panelHeight = 600.0f;
+            f32 panelX = (screenWidth - panelWidth) / 2.0f;
+            f32 panelY = (screenHeight - panelHeight) / 2.0f;
+
+            f32 nodeStartY = panelY + 80.0f;
+            f32 nodeX = panelX + 20.0f;
+            f32 nodeWidth = panelWidth - 40.0f;
+            f32 nodeHeight = 100.0f;
+            f32 nodeSpacing = 10.0f;
+
+            auto availableNodes = m_ResearchTree.GetAvailableResearch(m_Timeline.completedResets);
+            i32 displayedCount = 0;
+            i32 maxDisplay = 5;
+
+            for (const ResearchNode* node : availableNodes) {
+                if (displayedCount >= maxDisplay) break;
+
+                f32 nodeY = nodeStartY + (nodeHeight + nodeSpacing) * displayedCount;
+
+                // Check AUTO toggle button first (top-right corner of node)
+                f32 autoToggleW = 60.0f;
+                f32 autoToggleH = 25.0f;
+                f32 autoToggleX = nodeX + nodeWidth - autoToggleW - 10.0f;
+                f32 autoToggleY = nodeY + 10.0f;
+                Rect autoToggleRect(autoToggleX, autoToggleY, autoToggleW, autoToggleH);
+
+                if (autoToggleRect.Contains(mousePos)) {
+                    // Toggle auto-research flag
+                    ResearchNode* mutableNode = m_ResearchTree.GetNode(node->id);
+                    if (mutableNode) {
+                        mutableNode->autoResearch = !mutableNode->autoResearch;
+                        Log::Infof(node->name, " auto-research: ", mutableNode->autoResearch ? "ON" : "OFF");
+                    }
+                    handled = true;
+                    break;
+                }
+
+                // Check node click for manual purchase
+                Rect nodeRect(nodeX, nodeY, nodeWidth, nodeHeight);
+                if (nodeRect.Contains(mousePos)) {
+                    // Try to research this node
+                    if (CanAffordResearch(node->id)) {
+                        PurchaseResearch(node->id);
+                        Log::Infof("Researched: ", node->name);
+                    } else {
+                        Log::Info("Cannot afford this research");
+                    }
+                    handled = true;
+                    break;
+                }
+
+                displayedCount++;
+            }
+        }
+
+        // Handle buyable purchase button clicks (if buyables panel is open)
+        if (!handled && m_ShowBuyables) {
+            f32 panelWidth = 900.0f;
+            f32 panelX = (1280.0f - panelWidth) / 2.0f;  // Default screen width
+            f32 panelY = (720.0f - 600.0f) / 2.0f;  // Default screen height
+
+            f32 buyableStartY = panelY + 70.0f;
+            f32 buyableX = panelX + 20.0f;
+            f32 buyableWidth = panelWidth - 40.0f;
+            f32 buyableHeight = 100.0f;
+            f32 buyableSpacing = 12.0f;
+
+            auto& buyables = m_BuyableManager.GetBuyables();
+
+            for (size_t i = 0; i < buyables.size(); i++) {
+                f32 buyableY = buyableStartY + (buyableHeight + buyableSpacing) * i;
+
+                // Purchase button rectangle
+                Rect buyBtn(buyableX + buyableWidth - 120.0f, buyableY + 55.0f, 110.0f, 35.0f);
+
+                if (buyBtn.Contains(mousePos)) {
+                    const auto& buyable = buyables[i];
+                    // Check if buyables are disabled by challenge
+                    if (m_ChallengeManager.HasModifier(ChallengeModifier::NoBuyables)) {
+                        Log::Info("Buyables are disabled during this challenge!");
+                    } else if (m_BuyableManager.Purchase(buyable.id, this)) {
+                        Log::Infof("Purchased: ", buyable.name);
+                        UpdateResearchBonuses(); // Recalculate production with new multipliers
+                    }
+                    handled = true;
+                    break;
+                }
+            }
+        }
+
+        // Handle challenge Enter/Exit button clicks (if challenges panel is open)
+        if (!handled && m_ShowChallenges) {
+            f32 panelWidth = 900.0f;
+            f32 panelHeight = 650.0f;
+            f32 panelX = (1280.0f - panelWidth) / 2.0f;
+            f32 panelY = (720.0f - panelHeight) / 2.0f;
+
+            const Challenge* currentChallenge = m_ChallengeManager.GetCurrentChallenge();
+            f32 challengeStartY = currentChallenge ? panelY + 100.0f : panelY + 70.0f;
+            f32 challengeX = panelX + 20.0f;
+            f32 challengeWidth = panelWidth - 40.0f;
+            f32 challengeHeight = 120.0f;
+            f32 challengeSpacing = 10.0f;
+
+            auto& challenges = m_ChallengeManager.GetChallenges();
+            i32 currentPrestige = m_Statistics.totalPrestigesPerformed;
+
+            for (size_t i = 0; i < challenges.size(); i++) {
+                const auto& challenge = challenges[i];
+                f32 challengeY = challengeStartY + (challengeHeight + challengeSpacing) * i;
+
+                // Skip if challenge is completed
+                if (challenge.completed) continue;
+
+                // Action button rectangle
+                Rect actionBtn(challengeX + challengeWidth - 120.0f, challengeY + 80.0f, 110.0f, 30.0f);
+
+                if (actionBtn.Contains(mousePos)) {
+                    if (challenge.active) {
+                        // Exit challenge
+                        m_ChallengeManager.ExitChallenge(this);
+                        Log::Infof("Exited challenge: ", challenge.name);
+                        PerformPrestige(); // Reset game state when exiting challenge
+                    } else {
+                        // Try to enter challenge
+                        bool canEnter = challenge.CanEnter(currentPrestige, currentChallenge != nullptr);
+                        if (canEnter) {
+                            if (m_ChallengeManager.EnterChallenge(challenge.id, this)) {
+                                Log::Infof("Entered challenge: ", challenge.name);
+                                PerformPrestige(); // Reset game state when entering challenge
+                            }
+                        } else {
+                            Log::Info("Cannot enter this challenge (check requirements or exit current challenge)");
+                        }
+                    }
+                    handled = true;
+                    break;
+                }
+            }
+        }
+
+        // Handle essence shop purchase button clicks (if essence shop panel is open)
+        if (!handled && m_ShowEssenceShop) {
+            f32 panelWidth = 900.0f;
+            f32 panelHeight = 650.0f;
+            f32 panelX = (1280.0f - panelWidth) / 2.0f;
+            f32 panelY = (720.0f - panelHeight) / 2.0f;
+
+            f32 upgradeStartY = panelY + 85.0f;
+            f32 upgradeX = panelX + 20.0f;
+            f32 upgradeWidth = panelWidth - 40.0f;
+            f32 upgradeHeight = 100.0f;
+            f32 upgradeSpacing = 10.0f;
+
+            auto& upgrades = m_EssenceShopManager.GetUpgrades();
+
+            for (size_t i = 0; i < upgrades.size(); i++) {
+                const auto& upgrade = upgrades[i];
+                f32 upgradeY = upgradeStartY + (upgradeHeight + upgradeSpacing) * i;
+
+                // Purchase button rectangle
+                Rect buyBtn(upgradeX + upgradeWidth - 120.0f, upgradeY + 55.0f, 110.0f, 35.0f);
+
+                if (buyBtn.Contains(mousePos) && !upgrade.IsMaxed()) {
+                    if (m_EssenceShopManager.Purchase(upgrade.id, this)) {
+                        Log::Infof("Purchased essence upgrade: ", upgrade.name);
+                        UpdateResearchBonuses(); // Recalculate production with new multipliers
+                    }
+                    handled = true;
+                    break;
+                }
+            }
+        }
+
+        // Handle singularity shop purchase button clicks (if singularity shop panel is open)
+        if (!handled && m_ShowSingularityShop) {
+            f32 panelWidth = 900.0f;
+            f32 panelHeight = 650.0f;
+            f32 panelX = (1280.0f - panelWidth) / 2.0f;
+            f32 panelY = (720.0f - panelHeight) / 2.0f;
+
+            f32 upgradeStartY = panelY + 85.0f;
+            f32 upgradeX = panelX + 20.0f;
+            f32 upgradeWidth = panelWidth - 40.0f;
+            f32 upgradeHeight = 100.0f;
+            f32 upgradeSpacing = 10.0f;
+
+            auto& upgrades = m_SingularityShopManager.GetUpgrades();
+
+            for (size_t i = 0; i < upgrades.size(); i++) {
+                const auto& upgrade = upgrades[i];
+                f32 upgradeY = upgradeStartY + (upgradeHeight + upgradeSpacing) * i;
+
+                // Purchase button rectangle
+                Rect buyBtn(upgradeX + upgradeWidth - 120.0f, upgradeY + 55.0f, 110.0f, 35.0f);
+
+                if (buyBtn.Contains(mousePos) && !upgrade.IsMaxed()) {
+                    if (m_SingularityShopManager.Purchase(upgrade.id, this)) {
+                        Log::Infof("Purchased singularity upgrade: ", upgrade.name);
+                        UpdateResearchBonuses(); // Recalculate production with new multipliers
+                    }
+                    handled = true;
+                    break;
+                }
+            }
+        }
+
+        // Handle Quantum Anomaly clicks (active gameplay - high priority)
+        if (!handled) {
+            ClickQuantumAnomaly(mousePos);
+            // Note: ClickQuantumAnomaly internally checks if a click was successful
+            // We don't set handled=true here because we want other UI elements to still work
+        }
+
+        // Handle navigation bar button clicks (only if no popup consumed the click)
+        if (!handled) {
+            f32 navY = 100.0f;
+            f32 navHeight = 80.0f; // Updated to match new nav height
+            f32 btnWidth = 180.0f; // Updated to match new button width
+            f32 btnHeight = 60.0f; // Updated to match new button height
+            f32 btnY = navY + (navHeight - btnHeight) * 0.5f;
+            f32 spacing = 10.0f; // Updated spacing
+            f32 startX = 15.0f; // Updated start position
+
+            // Check each navigation button (new order: BUYABLES, CHALLENGES, ESSENCE, RESEARCH, STATS, MILESTONES)
+            for (int i = 0; i < 6; i++) {
+                f32 x = startX + i * (btnWidth + spacing);
+
+                // Check if button would go off screen
+                if (x + btnWidth > 1280.0f - 200.0f) {
+                    break;
+                }
+
+                Rect btnRect(x, btnY, btnWidth, btnHeight);
+
+                if (btnRect.Contains(mousePos)) {
+                    // Toggle the corresponding panel (new order)
+                    if (i == 0) m_ShowBuyables = !m_ShowBuyables;
+                    else if (i == 1) m_ShowChallenges = !m_ShowChallenges;
+                    else if (i == 2) m_ShowEssenceShop = !m_ShowEssenceShop;
+                    else if (i == 3) m_ShowResearch = !m_ShowResearch;
+                    else if (i == 4) m_ShowStats = !m_ShowStats;
+                    else if (i == 5) m_ShowMilestones = !m_ShowMilestones;
+                    handled = true;
+                    break;  // Only handle one click per frame
+                }
+            }
+
+            // Check MORE menu button
+            if (!handled) {
+                f32 boostBtnWidth = 200.0f;
+                f32 moreBtnWidth = 80.0f;
+                f32 moreBtnX = 1280.0f - boostBtnWidth - moreBtnWidth - 35.0f;
+                Rect moreBtnRect(moreBtnX, btnY, moreBtnWidth, btnHeight);
+
+                if (moreBtnRect.Contains(mousePos)) {
+                    m_ShowMoreMenu = !m_ShowMoreMenu;
+                    handled = true;
+                }
+            }
+
+            // Handle MORE menu popup clicks
+            if (!handled && m_ShowMoreMenu) {
+                f32 menuWidth = 250.0f;
+                f32 menuHeight = 210.0f; // Increased from 140 to fit 3 items
+                f32 moreBtnWidth = 80.0f;
+                f32 boostBtnWidth = 200.0f;
+                f32 moreBtnX = 1280.0f - boostBtnWidth - moreBtnWidth - 35.0f;
+                f32 menuX = moreBtnX;
+                f32 menuY = navY + navHeight + 5.0f;
+
+                f32 itemHeight = 60.0f;
+                f32 itemY = menuY + 10.0f;
+
+                // Achievements button
+                Rect achievementsRect(menuX + 10.0f, itemY, menuWidth - 20.0f, itemHeight);
+                if (achievementsRect.Contains(mousePos)) {
+                    m_ShowAchievements = !m_ShowAchievements;
+                    m_ShowMoreMenu = false; // Close menu after selection
+                    handled = true;
+                }
+
+                // Singularity button
+                itemY += itemHeight + 10.0f;
+                Rect singularityRect(menuX + 10.0f, itemY, menuWidth - 20.0f, itemHeight);
+                if (singularityRect.Contains(mousePos)) {
+                    m_ShowSingularityShop = !m_ShowSingularityShop;
+                    m_ShowMoreMenu = false; // Close menu after selection
+                    handled = true;
+                }
+
+                // Ship button
+                itemY += itemHeight + 10.0f;
+                Rect shipRect(menuX + 10.0f, itemY, menuWidth - 20.0f, itemHeight);
+                if (shipRect.Contains(mousePos)) {
+                    m_ShowSpaceship = !m_ShowSpaceship;
+                    m_ShowMoreMenu = false; // Close menu after selection
+                    handled = true;
+                }
+
+                // Click outside menu closes it
+                Rect menuBg(menuX, menuY, menuWidth, menuHeight);
+                if (!handled && !menuBg.Contains(mousePos)) {
+                    m_ShowMoreMenu = false;
+                }
+            }
+        }
+    }
+
+    // Handle boost button click
+    if (mousePressed) {
+        // Boost button (from RenderUI) - Updated to match new sizes
+        f32 boostBtnWidth = 200.0f;  // Updated from 150px
+        f32 boostBtnHeight = 60.0f;  // Updated from 38px
+        f32 navY = 100.0f;
+        f32 navHeight = 80.0f;        // Updated from 50px
+        f32 boostBtnX = 1280.0f - boostBtnWidth - 25.0f;  // Default screen width
+        f32 boostBtnY = navY + (navHeight - boostBtnHeight) * 0.5f;
+        Rect boostBtnRect(boostBtnX, boostBtnY, boostBtnWidth, boostBtnHeight);
+
+        // Check if boost is allowed (not disabled by challenge)
+        bool canBoost = !m_ChallengeManager.HasModifier(ChallengeModifier::NoBoost);
+        if (boostBtnRect.Contains(mousePos) && !m_BoostActive && m_BoostCooldownRemaining <= 0 && canBoost) {
+            // Activate boost!
+            m_BoostActive = true;
+            m_BoostTimeRemaining = m_BoostDuration;
+            Log::Infof("Boost activated! 2x production for ", m_BoostDuration, " seconds!");
+        }
+    }
+
+    // Handle auto-upgrade toggle button clicks
+    if (mousePressed) {
+        f32 startY = 190.0f;          // Updated to match RenderStations
+        f32 stationHeight = 180.0f;   // Updated to match RenderStations
+        f32 margin = 25.0f;           // Updated to match RenderStations
+
+        for (size_t i = 0; i < m_Stations.size(); i++) {
+            auto& station = m_Stations[i];
+            if (!station.unlocked) continue; // Only unlocked stations have auto-upgrade toggle
+
+            f32 y = startY + i * (stationHeight + margin) + m_ScrollOffset.y;
+
+            // Skip if off-screen
+            if (y + stationHeight < 100.0f || y > 720.0f) continue;
+
+            // Auto toggle button position (must match render position)
+            f32 stationWidth = 1280.0f - 60.0f; // Default screen width minus margins
+            f32 autoToggleSize = 60.0f;
+            f32 autoToggleX = 30.0f + stationWidth - autoToggleSize - 10.0f;
+            f32 autoToggleY = y + 10.0f;
+            Rect autoToggleRect(autoToggleX, autoToggleY, autoToggleSize, 25.0f);
+
+            if (autoToggleRect.Contains(mousePos)) {
+                station.autoUpgrade = !station.autoUpgrade;
+                Log::Infof(station.name, " auto-upgrade: ", station.autoUpgrade ? "ON" : "OFF");
+                break; // Only handle one click per frame
+            }
+        }
     }
 
     // Update buttons
-    for (auto& button : m_Buttons) {
+    for (auto& button : m_StationButtons) {
         button.Update(mousePos);
 
         if (button.WasClicked(mousePos, mousePressed) && button.onClick) {
             button.onClick();
         }
     }
+
+    // Handle auto-prestige threshold adjustment button clicks
+    if (mousePressed && m_ResearchTree.IsResearched(ResearchID::AutoPrestige)) {
+        // Calculate button positions (must match RenderStations rendering)
+        f32 stationHeight = 180.0f;  // Updated to match RenderStations
+        f32 margin = 25.0f;           // Updated to match RenderStations
+        f32 startY = 190.0f;          // Updated to match RenderStations
+        f32 prestigeY = startY + m_Stations.size() * (stationHeight + margin) + 20.0f + m_ScrollOffset.y;
+        f32 autoPrestigeY = prestigeY + 70.0f;
+
+        f32 btnW = 50.0f;
+        f32 btnH = 30.0f;
+        f32 btnSpacing = 10.0f;
+        f32 startX = 500.0f;
+
+        Rect minusTenRect(startX, autoPrestigeY + 5.0f, btnW, btnH);
+        Rect minusOneRect(startX + btnW + btnSpacing, autoPrestigeY + 5.0f, btnW, btnH);
+        Rect plusOneRect(startX + (btnW + btnSpacing) * 2, autoPrestigeY + 5.0f, btnW, btnH);
+        Rect plusTenRect(startX + (btnW + btnSpacing) * 3, autoPrestigeY + 5.0f, btnW, btnH);
+
+        if (minusTenRect.Contains(mousePos)) {
+            m_AutoPrestigeThreshold = std::max(1.0, m_AutoPrestigeThreshold - 10.0);
+            Log::Infof("Auto-prestige threshold: ", m_AutoPrestigeThreshold);
+        } else if (minusOneRect.Contains(mousePos)) {
+            m_AutoPrestigeThreshold = std::max(1.0, m_AutoPrestigeThreshold - 1.0);
+            Log::Infof("Auto-prestige threshold: ", m_AutoPrestigeThreshold);
+        } else if (plusOneRect.Contains(mousePos)) {
+            m_AutoPrestigeThreshold += 1.0;
+            Log::Infof("Auto-prestige threshold: ", m_AutoPrestigeThreshold);
+        } else if (plusTenRect.Contains(mousePos)) {
+            m_AutoPrestigeThreshold += 10.0;
+            Log::Infof("Auto-prestige threshold: ", m_AutoPrestigeThreshold);
+        }
+    }
+
+    // Handle singularity collapse button clicks
+    if (mousePressed) {
+        // Calculate button position (must match RenderStations rendering)
+        f32 stationHeight = 180.0f;  // Updated to match RenderStations
+        f32 margin = 25.0f;           // Updated to match RenderStations
+        f32 startY = 190.0f;          // Updated to match RenderStations
+        f32 prestigeY = startY + m_Stations.size() * (stationHeight + margin) + 20.0f + m_ScrollOffset.y;
+
+        f32 collapseY = prestigeY + 115.0f;
+        if (!m_ResearchTree.IsResearched(ResearchID::AutoPrestige)) {
+            collapseY = prestigeY + 70.0f;
+        }
+
+        Rect collapseBtn(30.0f, collapseY, static_cast<f32>(1280.0f) - 60.0f, 60.0f);
+
+        if (collapseBtn.Contains(mousePos)) {
+            if (CalculateSingularitiesOnCollapse() > 0) {
+                PerformCollapse();
+            } else {
+                Log::Info("Not enough photons for collapse (need 10,000)");
+            }
+        }
+    }
 }
 
 void GameState::Render(Renderer* renderer) {
-    RenderResources(renderer);
-    RenderStations(renderer);
+    // PHASE D: Dynamic background theme based on game progress
+    Color bgTint(0.0f, 0.0f, 0.0f, 0.1f); // Default: subtle dark overlay
+
+    if (m_Timeline.singularities >= 50.0) {
+        // Cosmic Void theme (50+ singularities)
+        bgTint = Color(0.05f, 0.0f, 0.15f, 0.15f); // Deep purple tint
+    } else if (m_Timeline.singularities >= 10.0) {
+        // Cosmic Observatory theme (10+ singularities)
+        bgTint = Color(0.0f, 0.05f, 0.15f, 0.12f); // Deep blue tint
+    } else if (m_Timeline.photons >= 100.0) {
+        // Quantum Facility theme (100+ photons)
+        bgTint = Color(0.0f, 0.1f, 0.1f, 0.1f); // Cyan tint
+    }
+
+    // Apply background tint
+    if (bgTint.a > 0.0f) {
+        Rect fullScreen(0, 0, static_cast<f32>(renderer->GetWidth()), static_cast<f32>(renderer->GetHeight()));
+        renderer->DrawRect(fullScreen, bgTint, true);
+    }
+
+    RenderResources(renderer);  // Fixed at top (0-100px)
+    RenderUI(renderer);          // Navigation bar (100-150px) - BEFORE stations so it's on top
+    RenderStations(renderer);    // Scrollable area (starts at 150px)
+
+    // Render active gameplay elements (before popups)
+    RenderQuantumAnomalies(renderer); // Clickable orbs
+
+    // Render particles (visual feedback)
+    for (const auto& particle : m_Particles) {
+        f32 size = 3.0f + (1.0f - particle.lifetime / particle.maxLifetime) * 3.0f;
+        renderer->DrawCircle(particle.position, size, particle.color, true);
+    }
+
+    // Render combo counter (top-right, above everything)
+    if (m_ComboCount > 1) {
+        std::string comboText = std::to_string(m_ComboCount) + "x COMBO!";
+        Vec2 comboPos(static_cast<f32>(renderer->GetWidth()) - 150.0f, 180.0f);
+
+        // Pulsing effect for high combos
+        f32 pulseScale = 1.0f + 0.1f * sinf(m_ComboTimeRemaining * 10.0f);
+        f32 fontSize = 18.0f * pulseScale;
+
+        // Color based on combo level
+        Color comboColor = (m_ComboCount >= 5) ? Color(1.0f, 0.8f, 0.0f, 1.0f) : // Gold for 5+
+                          (m_ComboCount >= 3) ? Color(1.0f, 0.0f, 1.0f, 1.0f) : // Magenta for 3-4
+                          Color::NeonCyan(); // Cyan for 2
+
+        renderer->DrawText(comboText, comboPos, comboColor, fontSize);
+
+        // Time remaining bar
+        f32 barWidth = 100.0f;
+        f32 barHeight = 6.0f;
+        Vec2 barPos(static_cast<f32>(renderer->GetWidth()) - 140.0f, 200.0f);
+        Rect barBg(barPos.x, barPos.y, barWidth, barHeight);
+        renderer->DrawRect(barBg, Color(0.2f, 0.2f, 0.2f, 0.8f), true);
+
+        f32 timeRatio = static_cast<f32>(m_ComboTimeRemaining / m_ComboWindow);
+        Rect barFill(barPos.x, barPos.y, barWidth * timeRatio, barHeight);
+        renderer->DrawRect(barFill, comboColor, true);
+    }
+
+    // Render panels/popups (on top of gameplay)
     RenderActiveEvent(renderer);
-    RenderUI(renderer);
     RenderAchievements(renderer);
     RenderStatistics(renderer);
     RenderResearchTree(renderer);
     RenderMilestones(renderer);
+    RenderBuyables(renderer);
+    RenderChallenges(renderer);
+    RenderEssenceShop(renderer);
+    RenderSingularityShop(renderer);
+    RenderSpaceship(renderer);
     RenderParticleEffects(renderer, 1.0/60.0); // Assume 60 FPS for particles
     RenderAchievementNotifications(renderer);
     RenderMilestoneNotifications(renderer);
+
+    // Prestige flash effect (screen overlay, on top of everything)
+    if (m_PrestigeFlashActive) {
+        f32 alpha = static_cast<f32>(m_PrestigeFlashTimer / 0.5); // Fade over 0.5 seconds
+        Color flashColor(1.0f, 1.0f, 1.0f, alpha * 0.3f); // White flash, max 30% opacity
+        Rect fullScreen(0, 0, static_cast<f32>(renderer->GetWidth()), static_cast<f32>(renderer->GetHeight()));
+        renderer->DrawRect(fullScreen, flashColor, true);
+    }
 }
 
 void GameState::RenderResources(Renderer* renderer) {
@@ -503,18 +1439,32 @@ void GameState::RenderResources(Renderer* renderer) {
 
         renderer->DrawText(resourceNames[i], textPos, Color::White(), 16.0f);
 
-        // Draw value (formatted)
-        std::string formattedValue = GameUtils::FormatNumber(m_Resources[i]);
+        // Draw value (formatted with current format preference)
+        std::string formattedValue = GameUtils::FormatNumber(m_Resources[i], m_NumberFormat);
         Vec2 valuePos(xOffset, 50.0f);
         renderer->DrawText(formattedValue, valuePos, resourceColors[i], 24.0f);
 
         xOffset += 250.0f;
     }
 
+    // Draw Quantum Essence (permanent meta-currency) - top-right corner
+    Vec2 essencePos(static_cast<f32>(renderer->GetWidth()) - 500.0f, 10.0f);
+    renderer->DrawText("Quantum Essence", essencePos, Color::Magenta(), 14.0f);
+    Vec2 essenceValuePos(static_cast<f32>(renderer->GetWidth()) - 500.0f, 30.0f);
+    std::string essenceStr = GameUtils::FormatNumber(m_QuantumEssence, m_NumberFormat);
+    renderer->DrawText("💎 " + essenceStr, essenceValuePos, Color::Magenta() * 1.3f, 20.0f);
+
+    // Draw Singularities (second prestige layer) - top-right corner
+    Vec2 singularityPos(static_cast<f32>(renderer->GetWidth()) - 250.0f, 10.0f);
+    renderer->DrawText("Singularities", singularityPos, Color(0.5f, 0.0f, 1.0f, 1.0f), 14.0f);
+    Vec2 singularityValuePos(static_cast<f32>(renderer->GetWidth()) - 250.0f, 30.0f);
+    std::string singularityStr = GameUtils::FormatNumber(m_Timeline.singularities, m_NumberFormat);
+    renderer->DrawText("⭐ " + singularityStr, singularityValuePos, Color(0.8f, 0.0f, 1.0f, 1.0f), 20.0f);
+
     // Draw coherence bar
     f32 coherenceBarWidth = 200.0f;
     f32 coherenceBarHeight = 20.0f;
-    Vec2 coherenceBarPos(static_cast<f32>(renderer->GetWidth()) - coherenceBarWidth - 20.0f, 40.0f);
+    Vec2 coherenceBarPos(static_cast<f32>(renderer->GetWidth()) - coherenceBarWidth - 20.0f, 65.0f);
 
     renderer->DrawText("Coherence", Vec2(coherenceBarPos.x, coherenceBarPos.y - 20.0f), Color::White(), 14.0f);
 
@@ -529,171 +1479,516 @@ void GameState::RenderResources(Renderer* renderer) {
 }
 
 void GameState::RenderStations(Renderer* renderer) {
-    m_Buttons.clear(); // Rebuild buttons each frame for simplicity
+    // Stations start below the navigation bar (resources at 0-100, nav at 100-180)
+    f32 startY = 190.0f;  // Start below bigger nav bar (100+80+10 gap)
+    f32 stationHeight = 180.0f; // Increased from 150px to prevent overlap
+    f32 margin = 25.0f; // Increased spacing between stations
 
-    f32 startY = 120.0f;
-    f32 stationHeight = 130.0f;  // Increased height for better spacing
-    f32 margin = 15.0f;  // Increased margin
+    // Counter for accessing persistent buttons (4 buttons per station + 1 prestige button)
+    size_t buttonIdx = 0;
 
     for (size_t i = 0; i < m_Stations.size(); i++) {
         auto& station = m_Stations[i];
         f32 y = startY + i * (stationHeight + margin) + m_ScrollOffset.y;
 
-        // Station background with improved visuals
-        Rect stationRect(25.0f, y, static_cast<f32>(renderer->GetWidth()) - 50.0f, stationHeight);
-
-        // Draw shadow for depth
-        Rect shadowRect = stationRect;
-        shadowRect.x += 4.0f;
-        shadowRect.y += 4.0f;
-        renderer->DrawRect(shadowRect, Color(0.0f, 0.0f, 0.0f, 0.4f), true);
-
-        // Improved background colors with subtle gradients
-        Color bgColor, borderColor;
-        if (station.unlocked) {
-            // Unlocked stations: darker blue-tinted background
-            bgColor = Color(0.12f, 0.15f, 0.22f, 0.95f);
-            borderColor = Color::QuantumBlue() * 0.6f;
-        } else {
-            // Locked stations: very dark with red tint
-            bgColor = Color(0.15f, 0.1f, 0.1f, 0.7f);
-            borderColor = Color(0.4f, 0.2f, 0.2f, 0.8f);
-        }
-
-        renderer->DrawRect(stationRect, bgColor, true);
-
-        // Draw double border for emphasis
-        renderer->DrawRect(stationRect, borderColor, false);
-        Rect innerBorder(stationRect.x + 2.0f, stationRect.y + 2.0f,
-                        stationRect.width - 4.0f, stationRect.height - 4.0f);
-        renderer->DrawRect(innerBorder, borderColor * 0.5f, false);
-
-        if (!station.unlocked) {
-            // Draw unlock button with better text
-            Vec2 titlePos(45.0f, y + 25.0f);
-            renderer->DrawText(station.name + " (LOCKED)", titlePos, Color(0.7f, 0.4f, 0.4f, 1.0f), 22.0f);
-
-            UIButton unlockBtn;
-            unlockBtn.bounds = Rect(40.0f, y + 60.0f, 200.0f, 40.0f);
-            unlockBtn.text = "Unlock (" + std::to_string(static_cast<int>(station.unlockCost)) + " Qubits)";
-            unlockBtn.color = Color::QuantumBlue() * 0.7f;
-            unlockBtn.hoverColor = Color::QuantumBlue();
-            unlockBtn.enabled = m_Resources[0] >= station.unlockCost;
-            unlockBtn.onClick = [this, i]() {
-                if (SpendResource(QuantumResource::Qubits, m_Stations[i].unlockCost)) {
-                    m_Stations[i].unlocked = true;
-                    m_Stations[i].level = 0; // Not upgraded yet
-                    Log::Infof("Unlocked: ", m_Stations[i].name);
-                }
-            };
-
-            unlockBtn.Render(renderer);
-            m_Buttons.push_back(unlockBtn);
+        // Skip rendering if station is clipped by fixed headers at top
+        if (y + stationHeight < 150.0f) {
+            // Station is completely above the navigation bar - skip it
+            if (!station.unlocked) {
+                buttonIdx += 1; // Skip unlock button
+            } else {
+                buttonIdx += 4; // Skip all four buttons (observe, upgrade, buy max, and skip unlock)
+            }
             continue;
         }
 
-        // Draw station info with better spacing and hierarchy
-        Vec2 titlePos(45.0f, y + 15.0f);
-        renderer->DrawText(station.name + " Lv." + std::to_string(station.level), titlePos, Color::White(), 20.0f);
+        // Also skip if station would render over resource panel (top 100px)
+        if (y < 100.0f) {
+            // Part of station would be in resource area - skip it
+            if (!station.unlocked) {
+                buttonIdx += 1;
+            } else {
+                buttonIdx += 4;
+            }
+            continue;
+        }
 
-        Vec2 descPos(45.0f, y + 42.0f);
+        // Skip rendering if station is below the screen
+        if (y > static_cast<f32>(renderer->GetHeight())) {
+            if (!station.unlocked) {
+                buttonIdx += 1;
+            } else {
+                buttonIdx += 4;
+            }
+            continue;
+        }
+
+        // Define the main panel area
+        Rect stationRect(30.0f, y, static_cast<f32>(renderer->GetWidth()) - 60.0f, stationHeight);
+
+        // --- New Glass-Panel Background with Tier Colors ---
+        Color bgColor, borderColor;
+        if (station.unlocked) {
+            bgColor = Color(0.1f, 0.12f, 0.18f, 0.8f);
+
+            // Use tier-based color based on station level!
+            Color tierColor = GetStationTierColor(station.level);
+            borderColor = tierColor * 0.7f;
+            borderColor.a = 0.8f;
+        } else {
+            bgColor = Color(0.15f, 0.1f, 0.1f, 0.6f);
+            borderColor = Color(0.4f, 0.2f, 0.2f, 0.8f);
+        }
+
+        // Draw the background panel 
+        renderer->DrawRect(stationRect, bgColor, true);
+        renderer->DrawRect(stationRect, borderColor, false);
+        
+        // Draw a light internal separator line for the Information block
+        Rect separator(stationRect.x + 5.0f, stationRect.y + 70.0f, stationRect.width - 10.0f, 2.0f);
+        renderer->DrawRect(separator, borderColor * 0.5f, true);
+
+
+        // ----------------------------------------------------------------------
+        // --- LOCKED STATION UI ---
+        // ----------------------------------------------------------------------
+        if (!station.unlocked) {
+            // Title and description
+            Vec2 titlePos(stationRect.x + 20.0f, y + 25.0f);
+            renderer->DrawText(station.name + " // CLASSIFIED", titlePos, Color(0.7f, 0.4f, 0.4f, 1.0f), 22.0f);
+            
+            Vec2 descPos(stationRect.x + 20.0f, y + 50.0f);
+            renderer->DrawText(station.description, descPos, Color(0.5f, 0.5f, 0.55f, 1.0f), 13.0f);
+
+            // Update unlock button (below the separator line)
+            UIButton& unlockBtn = m_StationButtons[buttonIdx++];
+            unlockBtn.bounds = Rect(stationRect.x + 20.0f, y + 85.0f, 300.0f, 45.0f);
+            unlockBtn.text = "UNLOCK FIELD (" + std::to_string(static_cast<i64>(station.unlockCost)) + " Qubits)";
+            unlockBtn.enabled = m_Resources[0] >= station.unlockCost;
+            unlockBtn.affordability = std::min(1.0, m_Resources[0] / station.unlockCost);
+
+            unlockBtn.Render(renderer);
+
+            // Skip observe, upgrade, and buy max buttons
+            buttonIdx += 3;
+            continue;
+        }
+
+        // ----------------------------------------------------------------------
+        // --- UNLOCKED STATION UI (Information Block - Top Half) ---
+        // ----------------------------------------------------------------------
+        
+        // Station Title and Level (Main Header)
+        Vec2 titlePos(stationRect.x + 20.0f, y + 15.0f);
+        renderer->DrawText(station.name + " | Lv." + std::to_string(station.level), titlePos, Color::White(), 22.0f);
+
+        // Station Description (Sub-Header)
+        Vec2 descPos(stationRect.x + 20.0f, y + 40.0f);
         renderer->DrawText(station.description, descPos, Color(0.75f, 0.75f, 0.8f, 1.0f), 13.0f);
 
-        // Draw production with icon-like prefix
+        // Production Rate (Left Block)
         std::ostringstream prodOss;
         prodOss.precision(2);
-        prodOss << std::fixed << station.currentProduction << "/s";
-        Vec2 prodPos(45.0f, y + 65.0f);
-        renderer->DrawText(">> Production: " + prodOss.str(), prodPos, Color::CoherenceGreen() * 1.1f, 15.0f);
+        // *** FIX APPLIED HERE: m_Timeline.photonBonus instead of GetTimeline()->photonBonus ***
+        prodOss << std::fixed << (station.currentProduction * m_Timeline.photonBonus) << "/s"; 
+        Vec2 prodPos(stationRect.x + 20.0f, y + 58.0f);
+        renderer->DrawText("PROD: " + prodOss.str(), prodPos, Color::CoherenceGreen() * 1.1f, 15.0f);
 
-        // Draw superposition value with improved color
+        // Superposition Value (Center Block)
         std::ostringstream superOss;
         superOss.precision(1);
         superOss << std::fixed << station.superpositionValue;
-        Vec2 superPos(320.0f, y + 65.0f);
-        renderer->DrawText("Superposition: " + superOss.str(), superPos, Color::QuantumPurple() * 1.2f, 15.0f);
+        Vec2 superPos(stationRect.x + 250.0f, y + 58.0f);
+        renderer->DrawText("SUPERPOSITION: " + superOss.str(), superPos, Color::QuantumPurple() * 1.2f, 15.0f);
 
-        // Draw probability with better color
+        // Probability (Right Block)
         std::ostringstream probOss;
         probOss.precision(0);
         probOss << std::fixed << (station.superpositionProbability * 100.0f) << "%";
-        Vec2 probPos(590.0f, y + 65.0f);
+        Vec2 probPos(stationRect.x + 480.0f, y + 58.0f);
         Color probColor = station.superpositionProbability > 0.7f ? Color::CoherenceGreen() : Color::Yellow();
-        renderer->DrawText("Success: " + probOss.str(), probPos, probColor, 15.0f);
+        renderer->DrawText("COLLAPSE CHANCE: " + probOss.str(), probPos, probColor, 15.0f);
 
-        // Observe button - improved positioning
-        UIButton observeBtn;
-        observeBtn.bounds = Rect(45.0f, y + 88.0f, 160.0f, 36.0f);
-        observeBtn.text = "OBSERVE";
-        observeBtn.color = Color::QuantumPurple() * 0.7f;
-        observeBtn.hoverColor = Color::QuantumPurple();
-        observeBtn.enabled = station.superpositionValue > 0.1;
-        observeBtn.onClick = [this, i, renderer]() {
-            auto& st = m_Stations[i];
-            f64 value = st.superpositionValue;
-            st.Observe(this);
 
-            // Spawn particle effects
-            Rect stationRect(20.0f, 120.0f + i * 130.0f, 800.0f, 120.0f);
-            Vec2 center = stationRect.Center();
-            for (int p = 0; p < 20; p++) {
-                Renderer::Particle particle;
-                particle.position = center;
-                f32 angle = (rand() % 360) * 3.14159f / 180.0f;
-                f32 speed = 50.0f + (rand() % 100);
-                particle.velocity = Vec2(cosf(angle) * speed, sinf(angle) * speed);
-                particle.color = Color::QuantumPurple();
-                particle.life = 0.5f + (rand() % 100) / 200.0f;
-                particle.maxLife = particle.life;
-                particle.size = 3.0f + (rand() % 5);
-                renderer->AddParticle(particle);
-            }
+        // ----------------------------------------------------------------------
+        // --- UNLOCKED STATION UI (Action Block - Bottom Half) ---
+        // ----------------------------------------------------------------------
+        
+        // Skip unlock button 
+        buttonIdx++;
 
-            Log::Infof("Observed ", st.name, ", collapsed value: ", value);
-        };
+        // Calculate effective upgrade cost (with challenge modifiers)
+        f64 effectiveUpgradeCost = station.upgradeCost;
+        if (m_ChallengeManager.HasModifier(ChallengeModifier::ExpensiveUpgrades)) {
+            effectiveUpgradeCost *= 3.0; // Upgrades cost 3x more
+        }
 
+        // Get observe button (Left Button)
+        UIButton& observeBtn = m_StationButtons[buttonIdx++];
+        observeBtn.bounds = Rect(stationRect.x + 20.0f, y + 85.0f, 200.0f, 45.0f);
+        observeBtn.enabled = station.superpositionValue > 0.1 &&
+                            !m_ChallengeManager.HasModifier(ChallengeModifier::NoObserve);
         observeBtn.Render(renderer);
-        m_Buttons.push_back(observeBtn);
 
-        // Upgrade button - improved positioning and size
-        UIButton upgradeBtn;
-        upgradeBtn.bounds = Rect(215.0f, y + 88.0f, 210.0f, 36.0f);
-        upgradeBtn.text = "Upgrade (" + std::to_string(static_cast<int>(station.upgradeCost)) + ")";
-        upgradeBtn.color = Color::EntanglementOrange() * 0.7f;
-        upgradeBtn.hoverColor = Color::EntanglementOrange();
-        upgradeBtn.enabled = m_Resources[0] >= station.upgradeCost;
-        upgradeBtn.onClick = [this, i]() {
-            if (SpendResource(QuantumResource::Qubits, m_Stations[i].upgradeCost)) {
-                m_Stations[i].Upgrade();
-                Log::Infof("Upgraded ", m_Stations[i].name, " to level ", m_Stations[i].level);
-            }
-        };
-
+        // Get upgrade button (Middle Button)
+        UIButton& upgradeBtn = m_StationButtons[buttonIdx++];
+        upgradeBtn.bounds = Rect(stationRect.x + 240.0f, y + 85.0f, 180.0f, 45.0f);
+        upgradeBtn.text = "UPGRADE (" + GameUtils::FormatNumber(effectiveUpgradeCost, m_NumberFormat) + ")";
+        upgradeBtn.enabled = m_Resources[0] >= effectiveUpgradeCost &&
+                            !m_ChallengeManager.HasModifier(ChallengeModifier::NoUpgrades);
+        upgradeBtn.affordability = std::min(1.0, m_Resources[0] / effectiveUpgradeCost);
         upgradeBtn.Render(renderer);
-        m_Buttons.push_back(upgradeBtn);
+
+        // Get buy max button (Right Button)
+        UIButton& buyMaxBtn = m_StationButtons[buttonIdx++];
+        buyMaxBtn.bounds = Rect(stationRect.x + 440.0f, y + 85.0f, 140.0f, 45.0f);
+        buyMaxBtn.text = "BUY MAX";
+        buyMaxBtn.enabled = m_Resources[0] >= effectiveUpgradeCost &&
+                           !m_ChallengeManager.HasModifier(ChallengeModifier::NoUpgrades);
+        buyMaxBtn.affordability = std::min(1.0, m_Resources[0] / effectiveUpgradeCost);
+        buyMaxBtn.Render(renderer);
+
+        // Auto-upgrade toggle (small button in top-right corner of station panel)
+        f32 autoToggleSize = 60.0f;
+        f32 autoToggleX = stationRect.x + stationRect.width - autoToggleSize - 10.0f;
+        f32 autoToggleY = y + 10.0f;
+        Rect autoToggleRect(autoToggleX, autoToggleY, autoToggleSize, 25.0f);
+
+        Color autoToggleColor = station.autoUpgrade ? Color::CoherenceGreen() : Color(0.3f, 0.3f, 0.3f, 1.0f);
+        renderer->DrawRect(autoToggleRect, autoToggleColor * 0.4f, true);
+        renderer->DrawRect(autoToggleRect, autoToggleColor, false);
+
+        std::string autoText = station.autoUpgrade ? "AUTO" : "AUTO";
+        Vec2 autoTextPos(autoToggleX + 12.0f, autoToggleY + 6.0f);
+        renderer->DrawText(autoText, autoTextPos, Color::White(), 11.0f);
+
+        // Progress bar showing how close to affording next upgrade
+        f32 progressBarY = y + 135.0f;
+        f32 progressBarWidth = stationRect.width - 40.0f;
+        f32 progressBarHeight = 18.0f;
+        Vec2 progressBarPos(stationRect.x + 20.0f, progressBarY);
+
+        // Calculate progress (0-100% based on current resources vs upgrade cost)
+        f64 currentQubits = m_Resources[0];
+        f64 upgradeCost = effectiveUpgradeCost; // Use effective cost with challenge modifiers
+        f64 progress = std::min(1.0, currentQubits / upgradeCost);
+
+        // Color-code based on affordability
+        Color progressColor;
+        if (progress >= 1.0) {
+            progressColor = Color::CoherenceGreen();  // Can afford now
+        } else if (progress >= 0.75) {
+            progressColor = Color::Yellow();  // Almost there
+        } else if (progress >= 0.5) {
+            progressColor = Color::EntanglementOrange();  // Halfway
+        } else {
+            progressColor = Color::QuantumPurple();  // Still far away
+        }
+
+        renderer->DrawProgressBar(progressBarPos, progressBarWidth, progressBarHeight,
+                                 currentQubits, upgradeCost, progressColor,
+                                 Color(0.15f, 0.15f, 0.2f, 1.0f), true, 11.0f);
     }
 
-    // Prestige button
+    // ----------------------------------------------------------------------
+    // --- PRESTIGE BUTTON ---
+    // ----------------------------------------------------------------------
+
+    // Update prestige button from persistent list (last button)
+    UIButton& prestigeBtn = m_StationButtons.back();
+
     f32 prestigeY = startY + m_Stations.size() * (stationHeight + margin) + 20.0f + m_ScrollOffset.y;
     f64 photonsOnPrestige = CalculatePhotonsOnPrestige();
-
-    UIButton prestigeBtn;
-    prestigeBtn.bounds = Rect(20.0f, prestigeY, 400.0f, 60.0f);
-    prestigeBtn.text = "PRESTIGE (+" + std::to_string(static_cast<int>(photonsOnPrestige)) + " Photons)";
-    prestigeBtn.color = Color::Magenta() * 0.5f;
-    prestigeBtn.hoverColor = Color::Magenta();
+    
+    // Make the prestige button full width and more prominent
+    prestigeBtn.bounds = Rect(30.0f, prestigeY, static_cast<f32>(renderer->GetWidth()) - 60.0f, 60.0f);
+    prestigeBtn.text = "QUANTUM LEAP: INITIATE PRESTIGE (+" + std::to_string(static_cast<i64>(photonsOnPrestige)) + " PHOTONS)";
     prestigeBtn.enabled = photonsOnPrestige > 0;
-    prestigeBtn.onClick = [this]() {
-        PerformPrestige();
-    };
 
     prestigeBtn.Render(renderer);
-    m_Buttons.push_back(prestigeBtn);
+
+    // ----------------------------------------------------------------------
+    // --- AUTO-PRESTIGE CONTROLS ---
+    // ----------------------------------------------------------------------
+    if (m_ResearchTree.IsResearched(ResearchID::AutoPrestige)) {
+        f32 autoPrestigeY = prestigeY + 70.0f; // Below prestige button
+
+        // Label showing current threshold
+        std::string thresholdLabel = "Auto-Prestige Threshold: " + std::to_string(static_cast<i64>(m_AutoPrestigeThreshold)) + " photons";
+        Vec2 labelPos(40.0f, autoPrestigeY + 10.0f);
+        renderer->DrawText(thresholdLabel, labelPos, Color::QuantumPurple(), 14.0f);
+
+        // Adjustment buttons (right side)
+        f32 btnW = 50.0f;
+        f32 btnH = 30.0f;
+        f32 btnSpacing = 10.0f;
+        f32 startX = 500.0f;
+
+        // -10 button
+        Rect minusTenRect(startX, autoPrestigeY + 5.0f, btnW, btnH);
+        renderer->DrawRect(minusTenRect, Color(0.3f, 0.1f, 0.1f, 0.8f), true);
+        renderer->DrawRect(minusTenRect, Color::Red() * 0.6f, false);
+        Vec2 minusTenTextPos(startX + 14.0f, autoPrestigeY + 12.0f);
+        renderer->DrawText("-10", minusTenTextPos, Color::White(), 12.0f);
+
+        // -1 button
+        Rect minusOneRect(startX + btnW + btnSpacing, autoPrestigeY + 5.0f, btnW, btnH);
+        renderer->DrawRect(minusOneRect, Color(0.3f, 0.1f, 0.1f, 0.8f), true);
+        renderer->DrawRect(minusOneRect, Color::Red() * 0.6f, false);
+        Vec2 minusOneTextPos(startX + btnW + btnSpacing + 18.0f, autoPrestigeY + 12.0f);
+        renderer->DrawText("-1", minusOneTextPos, Color::White(), 12.0f);
+
+        // +1 button
+        Rect plusOneRect(startX + (btnW + btnSpacing) * 2, autoPrestigeY + 5.0f, btnW, btnH);
+        renderer->DrawRect(plusOneRect, Color(0.1f, 0.3f, 0.1f, 0.8f), true);
+        renderer->DrawRect(plusOneRect, Color::CoherenceGreen() * 0.6f, false);
+        Vec2 plusOneTextPos(startX + (btnW + btnSpacing) * 2 + 18.0f, autoPrestigeY + 12.0f);
+        renderer->DrawText("+1", plusOneTextPos, Color::White(), 12.0f);
+
+        // +10 button
+        Rect plusTenRect(startX + (btnW + btnSpacing) * 3, autoPrestigeY + 5.0f, btnW, btnH);
+        renderer->DrawRect(plusTenRect, Color(0.1f, 0.3f, 0.1f, 0.8f), true);
+        renderer->DrawRect(plusTenRect, Color::CoherenceGreen() * 0.6f, false);
+        Vec2 plusTenTextPos(startX + (btnW + btnSpacing) * 3 + 14.0f, autoPrestigeY + 12.0f);
+        renderer->DrawText("+10", plusTenTextPos, Color::White(), 12.0f);
+    }
+
+    // ----------------------------------------------------------------------
+    // --- SINGULARITY COLLAPSE BUTTON ---
+    // ----------------------------------------------------------------------
+    f32 collapseY = prestigeY + 115.0f; // Below auto-prestige controls (or below prestige if no auto-prestige)
+    if (!m_ResearchTree.IsResearched(ResearchID::AutoPrestige)) {
+        collapseY = prestigeY + 70.0f; // Directly below prestige button
+    }
+
+    f64 singularitiesOnCollapse = CalculateSingularitiesOnCollapse();
+    bool canCollapse = singularitiesOnCollapse > 0;
+
+    // Collapse button - full width, cosmic purple theme
+    Rect collapseBtn(30.0f, collapseY, static_cast<f32>(renderer->GetWidth()) - 60.0f, 60.0f);
+    Color collapseColor = canCollapse ? Color(0.5f, 0.0f, 1.0f, 1.0f) : Color(0.2f, 0.0f, 0.3f, 0.5f);
+    renderer->DrawRect(collapseBtn, collapseColor * 0.3f, true);
+    renderer->DrawRect(collapseBtn, collapseColor, false);
+
+    std::string collapseText = canCollapse ?
+        "⭐ SINGULARITY COLLAPSE: RESET EVERYTHING (+" + std::to_string(static_cast<i64>(singularitiesOnCollapse)) + " SINGULARITIES)" :
+        "⭐ SINGULARITY COLLAPSE (Requires 10,000 photons)";
+
+    f32 collapseTextWidth = static_cast<f32>(collapseText.length()) * 8.0f;
+    Vec2 collapseTextPos(30.0f + (collapseBtn.width - collapseTextWidth) / 2.0f, collapseY + 22.0f);
+    renderer->DrawText(collapseText, collapseTextPos, canCollapse ? Color::White() : Color(0.5f, 0.5f, 0.5f, 1.0f), 16.0f);
 }
 
 void GameState::RenderUI(Renderer* renderer) {
-    // Additional UI elements can go here
-    // Prestige info, achievements, etc.
+    // Top navigation bar with modern cyberpunk design (sits at 100-180px) - INCREASED FOR MOBILE
+    f32 navY = 100.0f;
+    f32 navHeight = 80.0f; // Increased from 50px for bigger touch targets
+    Rect navBar(0, navY, static_cast<f32>(renderer->GetWidth()), navHeight);
+
+    // Navigation bar background with dark panel
+    renderer->DrawRect(navBar, Color::DarkPanel(), true);
+
+    // Glowing cyan bottom border for cyberpunk feel
+    Rect navBorder(0, navY + navHeight - 2.0f, static_cast<f32>(renderer->GetWidth()), 2.0f);
+    renderer->DrawRect(navBorder, Color::NeonCyan() * 0.6f, true);
+
+    // Navigation buttons - BIGGER for mobile/touch
+    f32 btnWidth = 180.0f; // Increased from 130px
+    f32 btnHeight = 60.0f; // Increased from 32px
+    f32 btnY = navY + (navHeight - btnHeight) * 0.5f;
+    f32 spacing = 10.0f; // Tighter spacing since buttons are bigger
+    f32 startX = 15.0f; // Reduced to fit more buttons
+
+    struct NavButton {
+        const char* label;
+        bool* showFlag;
+        Color color;
+    };
+
+    // Simplified navigation - only most important pages (mobile-friendly)
+    NavButton navButtons[] = {
+        {"BUYABLES", &m_ShowBuyables, Color::ElectricBlue()},
+        {"CHALLENGES", &m_ShowChallenges, Color::Red()},
+        {"ESSENCE", &m_ShowEssenceShop, Color::Magenta()},
+        {"RESEARCH", &m_ShowResearch, Color::QuantumPurple()},
+        {"STATS", &m_ShowStats, Color::EntanglementOrange()},
+        {"MILESTONES", &m_ShowMilestones, Color::NeonPink()},
+    };
+
+    int numButtons = 6; // Show 6 main buttons
+    for (int i = 0; i < numButtons; i++) {
+        auto& btn = navButtons[i];
+        f32 x = startX + i * (btnWidth + spacing);
+
+        // Wrap to second row if needed (for smaller screens)
+        if (x + btnWidth > renderer->GetWidth() - 200.0f) {
+            break; // Don't draw if it goes off screen
+        }
+
+        Rect btnRect(x, btnY, btnWidth, btnHeight);
+
+        bool active = *btn.showFlag;
+        Color btnColor = active ? btn.color : btn.color * 0.5f;
+
+        // Button background
+        renderer->DrawRect(btnRect, btnColor * 0.25f, true);
+
+        // Glowing border (thicker for mobile)
+        if (active) {
+            // Active - bright glow
+            Rect glowRect(x - 2.0f, btnY - 2.0f, btnWidth + 4.0f, btnHeight + 4.0f);
+            renderer->DrawRect(glowRect, btn.color * 0.9f, false);
+        } else {
+            // Inactive - subtle border
+            renderer->DrawRect(btnRect, Color::DarkBorder(), false);
+        }
+
+        // Button text (centered, LARGER font for readability)
+        // Better text width calculation: ~7.5px per character for 16px font
+        f32 textWidth = strlen(btn.label) * 7.5f;
+        Vec2 textPos(x + (btnWidth - textWidth) * 0.5f, btnY + (btnHeight - 16.0f) * 0.5f + 2.0f);
+        renderer->DrawText(btn.label, textPos, Color::White(), 16.0f);
+    }
+
+    // MORE menu button (hamburger menu for overflow items) - far right before boost
+    f32 boostBtnWidth = 200.0f; // Declare early for positioning
+    f32 moreBtnWidth = 80.0f;
+    f32 moreBtnX = static_cast<f32>(renderer->GetWidth()) - boostBtnWidth - moreBtnWidth - 35.0f;
+    Rect moreBtnRect(moreBtnX, btnY, moreBtnWidth, btnHeight);
+
+    Color moreColor = m_ShowMoreMenu ? Color::NeonCyan() : Color(0.5f, 0.5f, 0.5f, 1.0f);
+    renderer->DrawRect(moreBtnRect, moreColor * 0.25f, true);
+
+    if (m_ShowMoreMenu) {
+        Rect glowRect(moreBtnX - 2.0f, btnY - 2.0f, moreBtnWidth + 4.0f, btnHeight + 4.0f);
+        renderer->DrawRect(glowRect, Color::NeonCyan() * 0.9f, false);
+    } else {
+        renderer->DrawRect(moreBtnRect, Color::DarkBorder(), false);
+    }
+
+    // Hamburger icon (three lines)
+    f32 lineWidth = 30.0f;
+    f32 lineHeight = 3.0f;
+    f32 lineSpacing = 8.0f;
+    f32 lineStartX = moreBtnX + (moreBtnWidth - lineWidth) * 0.5f;
+    f32 lineStartY = btnY + (btnHeight - (lineHeight * 3 + lineSpacing * 2)) * 0.5f;
+
+    for (int i = 0; i < 3; i++) {
+        Rect line(lineStartX, lineStartY + i * (lineHeight + lineSpacing), lineWidth, lineHeight);
+        renderer->DrawRect(line, Color::White(), true);
+    }
+
+    // Boost button (right side of nav bar) - BIGGER for touch
+    // boostBtnWidth already declared earlier for menu positioning
+    f32 boostBtnHeight = 60.0f; // Increased from 38px to match nav buttons
+    f32 boostBtnX = static_cast<f32>(renderer->GetWidth()) - boostBtnWidth - 25.0f;
+    f32 boostBtnY = navY + (navHeight - boostBtnHeight) * 0.5f;
+    Rect boostBtnRect(boostBtnX, boostBtnY, boostBtnWidth, boostBtnHeight);
+
+    // Determine boost button state and color
+    Color boostColor;
+    std::string boostText;
+    bool boostClickable = false;
+
+    // Check if boost is disabled by challenge
+    bool boostDisabledByChallenge = m_ChallengeManager.HasModifier(ChallengeModifier::NoBoost);
+
+    if (boostDisabledByChallenge) {
+        boostColor = Color(0.3f, 0.3f, 0.3f, 1.0f);
+        boostText = "BOOST DISABLED";
+    } else if (m_BoostActive) {
+        boostColor = Color::CoherenceGreen();
+        boostText = "BOOST ACTIVE! " + std::to_string(static_cast<i32>(m_BoostTimeRemaining)) + "s";
+    } else if (m_BoostCooldownRemaining > 0) {
+        boostColor = Color(0.4f, 0.4f, 0.4f, 1.0f);
+        boostText = "COOLDOWN " + std::to_string(static_cast<i32>(m_BoostCooldownRemaining)) + "s";
+    } else {
+        boostColor = Color::NeonCyan();
+        boostText = "BOOST (2x)";
+        boostClickable = true;
+    }
+
+    // Draw boost button
+    renderer->DrawRect(boostBtnRect, boostColor * 0.3f, true);
+
+    if (m_BoostActive) {
+        // Pulsing glow when active
+        Rect glowRect(boostBtnX - 2.0f, boostBtnY - 2.0f, boostBtnWidth + 4.0f, boostBtnHeight + 4.0f);
+        renderer->DrawRect(glowRect, boostColor * 0.9f, false);
+    } else if (boostClickable) {
+        renderer->DrawRect(boostBtnRect, boostColor * 0.7f, false);
+    } else {
+        renderer->DrawRect(boostBtnRect, Color(0.3f, 0.3f, 0.3f, 1.0f), false);
+    }
+
+    // Button text
+    f32 boostTextWidth = boostText.length() * 5.5f;
+    Vec2 boostTextPos(boostBtnX + (boostBtnWidth - boostTextWidth) * 0.5f, boostBtnY + (boostBtnHeight - 12.0f) * 0.5f);
+    renderer->DrawText(boostText, boostTextPos, Color::White(), 12.0f);
+
+    // Scroll indicator (bottom right corner - animated)
+    if (m_ScrollOffset.y > -50.0f && !m_ShowAchievements && !m_ShowStats && !m_ShowResearch && !m_ShowMilestones) {
+        f32 indicatorY = static_cast<f32>(renderer->GetHeight()) - 40.0f;
+        Vec2 arrowPos(static_cast<f32>(renderer->GetWidth()) - 90.0f, indicatorY);
+
+        // Animated pulsing glow
+        f32 pulse = 0.5f + 0.5f * static_cast<f32>(sin(m_TotalTimePlayed * 3.0));
+        Color glowColor = Color::NeonCyan() * pulse;
+
+        // Draw pulsing text
+        renderer->DrawText("SCROLL DOWN", arrowPos, glowColor, 13.0f);
+        Vec2 arrowPos2(static_cast<f32>(renderer->GetWidth()) - 60.0f, indicatorY + 15.0f);
+        renderer->DrawText("v v v", arrowPos2, glowColor, 14.0f);
+    }
+
+    // MORE Menu Popup (shows Achievements, Singularity Shop, and Spaceship)
+    if (m_ShowMoreMenu) {
+        f32 menuWidth = 250.0f;
+        f32 menuHeight = 210.0f; // Increased from 140 to fit 3 items
+        f32 menuX = moreBtnX;
+        f32 menuY = navY + navHeight + 5.0f;
+
+        // Background
+        Rect menuBg(menuX, menuY, menuWidth, menuHeight);
+        renderer->DrawRect(menuBg, Color::DarkPanel(), true);
+        renderer->DrawRect(menuBg, Color::NeonCyan() * 0.8f, false);
+
+        // Menu items
+        f32 itemHeight = 60.0f;
+        f32 itemY = menuY + 10.0f;
+
+        // Achievements button
+        Rect achievementsRect(menuX + 10.0f, itemY, menuWidth - 20.0f, itemHeight);
+        Color achievementsColor = m_ShowAchievements ? Color::ElectricBlue() : Color(0.3f, 0.3f, 0.3f, 1.0f);
+        renderer->DrawRect(achievementsRect, achievementsColor * 0.3f, true);
+        renderer->DrawRect(achievementsRect, achievementsColor, false);
+
+        f32 achievementsTextWidth = strlen("ACHIEVEMENTS") * 7.5f;
+        Vec2 achievementsTextPos(menuX + (menuWidth - achievementsTextWidth) * 0.5f, itemY + (itemHeight - 16.0f) * 0.5f + 2.0f);
+        renderer->DrawText("ACHIEVEMENTS", achievementsTextPos, Color::White(), 16.0f);
+
+        // Singularity Shop button
+        itemY += itemHeight + 10.0f;
+        Rect singularityRect(menuX + 10.0f, itemY, menuWidth - 20.0f, itemHeight);
+        Color singularityColor = m_ShowSingularityShop ? Color(0.5f, 0.0f, 1.0f, 1.0f) : Color(0.3f, 0.3f, 0.3f, 1.0f);
+        renderer->DrawRect(singularityRect, singularityColor * 0.3f, true);
+        renderer->DrawRect(singularityRect, singularityColor, false);
+
+        f32 singularityTextWidth = strlen("SINGULARITY") * 7.5f;
+        Vec2 singularityTextPos(menuX + (menuWidth - singularityTextWidth) * 0.5f, itemY + (itemHeight - 16.0f) * 0.5f + 2.0f);
+        renderer->DrawText("SINGULARITY", singularityTextPos, Color::White(), 16.0f);
+
+        // Spaceship button
+        itemY += itemHeight + 10.0f;
+        Rect shipRect(menuX + 10.0f, itemY, menuWidth - 20.0f, itemHeight);
+        Color shipColor = m_ShowSpaceship ? Color(1.0f, 0.7f, 0.0f, 1.0f) : Color(0.3f, 0.3f, 0.3f, 1.0f); // Gold color
+        renderer->DrawRect(shipRect, shipColor * 0.3f, true);
+        renderer->DrawRect(shipRect, shipColor, false);
+
+        f32 shipTextWidth = strlen("SPACESHIP") * 7.5f;
+        Vec2 shipTextPos(menuX + (menuWidth - shipTextWidth) * 0.5f, itemY + (itemHeight - 16.0f) * 0.5f + 2.0f);
+        renderer->DrawText("SPACESHIP", shipTextPos, Color::White(), 16.0f);
+    }
 }
 
 void GameState::AddResource(QuantumResource type, f64 amount) {
@@ -730,12 +2025,27 @@ f64 GameState::GetResource(QuantumResource type) const {
     return m_Resources[static_cast<int>(type)];
 }
 
+void GameState::AddEssence(f64 amount) {
+    m_QuantumEssence += amount;
+    Log::Infof("Gained ", static_cast<i32>(amount), " Quantum Essence! Total: ", static_cast<i32>(m_QuantumEssence));
+}
+
+bool GameState::SpendEssence(f64 amount) {
+    if (m_QuantumEssence >= amount) {
+        m_QuantumEssence -= amount;
+        return true;
+    }
+    return false;
+}
+
 f64 GameState::CalculatePhotonsOnPrestige() const {
     // Photons based on total qubits earned
+    // Formula adjusted for better progression balance
     f64 totalQubits = m_Resources[0];
-    if (totalQubits < 1000.0) return 0;
+    if (totalQubits < 5000.0) return 0; // Increased from 1000 to slow early game
 
-    return std::floor(std::sqrt(totalQubits / 100.0));
+    // Reduced photon gain for more gradual progression
+    return std::floor(std::sqrt(totalQubits / 500.0)); // Increased divisor from 100 to 500
 }
 
 void GameState::PerformPrestige() {
@@ -745,7 +2055,29 @@ void GameState::PerformPrestige() {
         return;
     }
 
+    // Apply photon doubling if purchased from essence shop
+    auto* photonDouble = m_EssenceShopManager.GetUpgrade("photon_double");
+    if (photonDouble && photonDouble->timesPurchased > 0) {
+        photons *= 2.0;
+    }
+
     Log::Infof("Performing prestige! Gained ", photons, " photons");
+
+    // TRACK FASTEST PRESTIGE: Update achievement tracking
+    if (m_TimeSinceLastPrestige < m_Statistics.fastestPrestige) {
+        m_Statistics.fastestPrestige = m_TimeSinceLastPrestige;
+        Log::Infof("New fastest prestige record: ", GameUtils::FormatTime(m_TimeSinceLastPrestige));
+    }
+    m_TimeSinceLastPrestige = 0.0; // Reset timer for next run
+
+    // VISUAL EFFECTS: Screen flash and particle explosion!
+    m_PrestigeFlashActive = true;
+    m_PrestigeFlashTimer = 0.5; // 0.5 second flash
+
+    // Particle explosion from center of screen
+    Vec2 centerPos(640.0f, 360.0f);
+    SpawnParticleBurst(centerPos, Color::Magenta(), 50);
+    SpawnParticleBurst(centerPos, Color(1.0f, 0.8f, 0.0f, 1.0f), 30); // Gold particles too
 
     m_Timeline.photons += photons;
     m_Timeline.completedResets++;
@@ -755,7 +2087,60 @@ void GameState::PerformPrestige() {
     for (int i = 0; i < 3; i++) {
         m_Resources[i] = 0;
     }
-    m_Resources[0] = 10.0; // Start with 10 qubits
+
+    // Start with base qubits plus essence shop bonus
+    f64 startingQubits = 10.0 + m_EssenceShopManager.GetStartingQubits();
+    m_Resources[0] = startingQubits;
+
+    // Reset stations
+    for (auto& station : m_Stations) {
+        if (station.name != "Qubit Generator") {
+            station.unlocked = false;
+        }
+        station.level = 0;
+        station.currentProduction = 0;
+        station.superpositionValue = 0;
+        station.upgradeCost = station.upgradeCostMultiplier; // Reset cost
+    }
+
+    m_Coherence = m_MaxCoherence;
+}
+
+f64 GameState::CalculateSingularitiesOnCollapse() const {
+    // Formula: singularities = sqrt(photons) / 100
+    // Minimum requirement: 10,000 photons
+    if (m_Timeline.photons < 10000.0) {
+        return 0.0;
+    }
+
+    return std::sqrt(m_Timeline.photons) / 100.0;
+}
+
+void GameState::PerformCollapse() {
+    f64 singularities = CalculateSingularitiesOnCollapse();
+    if (singularities <= 0) {
+        Log::Warning("Not enough photons for singularity collapse (need 10,000)");
+        return;
+    }
+
+    Log::Infof("Performing singularity collapse! Gained ", singularities, " singularities");
+
+    m_Timeline.singularities += singularities;
+    m_Timeline.completedCollapses++;
+
+    // Reset photon layer
+    m_Timeline.photons = 0;
+    m_Timeline.photonBonus = 1.0;
+    m_Timeline.completedResets = 0;
+
+    // Reset resources
+    for (int i = 0; i < 3; i++) {
+        m_Resources[i] = 0;
+    }
+
+    // Start with base qubits plus essence shop bonus
+    f64 startingQubits = 10.0 + m_EssenceShopManager.GetStartingQubits();
+    m_Resources[0] = startingQubits;
 
     // Reset stations
     for (auto& station : m_Stations) {
@@ -1014,6 +2399,22 @@ void GameState::CheckAchievements() {
                     if (s.unlocked) ach.progress++;
                 }
                 break;
+            // Spaceship achievements
+            case AchievementID::FirstShipPart:
+                ach.progress = m_Spaceship.GetTotalPartsCollected();
+                break;
+            case AchievementID::ShipOperational:
+                ach.progress = m_Spaceship.GetRepairProgress() >= 25.0 ? 1 : 0;
+                break;
+            case AchievementID::ShipFullyRepaired:
+                ach.progress = m_Spaceship.GetRepairProgress() >= 100.0 ? 1 : 0;
+                break;
+            case AchievementID::FirstLegendaryPart:
+                ach.progress = m_Spaceship.GetLegendaryPartsCollected();
+                break;
+            case AchievementID::PartCollector:
+                ach.progress = m_Spaceship.GetTotalPartsCollected();
+                break;
             default:
                 break;
         }
@@ -1040,6 +2441,16 @@ void GameState::UnlockAchievement(AchievementID id) {
         m_Timeline.photons += ach->rewardPhotons;
         m_Timeline.photonBonus = 1.0 + (m_Timeline.photons * 0.1);
     }
+
+    // Award Quantum Essence (based on achievement importance)
+    f64 essenceReward = 1.0; // Default: 1 essence
+    // Major achievements get more essence
+    if (id == AchievementID::QuantumMaster || id == AchievementID::Hoarder) {
+        essenceReward = 3.0; // Milestone achievements: 3 essence
+    } else if (id == AchievementID::FirstPrestige || id == AchievementID::Collector || id == AchievementID::WeekStreak) {
+        essenceReward = 2.0; // Important achievements: 2 essence
+    }
+    AddEssence(essenceReward);
 
     Log::Infof("Achievement Unlocked: ", ach->name);
 }
@@ -1161,6 +2572,10 @@ void GameState::CalculateOfflineProgress() {
 
     // Calculate offline production at reduced rate
     f64 offlineMultiplier = 0.5; // 50% efficiency while offline
+
+    // Apply essence shop offline progress boost
+    offlineMultiplier *= m_EssenceShopManager.GetOfflineProgressMultiplier();
+
     f64 offlineQubits = 0;
 
     for (const auto& station : m_Stations) {
@@ -1254,20 +2669,38 @@ void GameState::RenderParticleEffects(Renderer* renderer, f64 deltaTime) {
 void GameState::RenderAchievements(Renderer* renderer) {
     if (!m_ShowAchievements) return;
 
+    // Background overlay
+    Rect bg(0, 0, static_cast<f32>(renderer->GetWidth()), static_cast<f32>(renderer->GetHeight()));
+    renderer->DrawRect(bg, Color(0.0f, 0.0f, 0.0f, 0.8f), true);
+
     // Achievement panel
-    f32 panelWidth = 600.0f;
-    f32 panelHeight = 500.0f;
+    f32 panelWidth = 900.0f;
+    f32 panelHeight = 600.0f;
     f32 panelX = (renderer->GetWidth() - panelWidth) / 2.0f;
     f32 panelY = (renderer->GetHeight() - panelHeight) / 2.0f;
 
     // Background
     Rect panelBg(panelX, panelY, panelWidth, panelHeight);
-    renderer->DrawRect(panelBg, Color(0.05f, 0.05f, 0.1f, 0.95f), true);
-    renderer->DrawRect(panelBg, Color::QuantumBlue() * 0.5f, false);
+    renderer->DrawRect(panelBg, Color::DarkPanel(), true);
+    renderer->DrawRect(panelBg, Color::CoherenceGreen() * 0.8f, false);
 
     // Title
-    Vec2 titlePos(panelX + 20.0f, panelY + 10.0f);
-    renderer->DrawText("Achievements", titlePos, Color::QuantumBlue(), 24.0f);
+    Vec2 titlePos(panelX + 20.0f, panelY + 15.0f);
+    renderer->DrawText("ACHIEVEMENTS", titlePos, Color::CoherenceGreen(), 24.0f);
+
+    // Close button (X) in top right
+    f32 closeBtnSize = 30.0f;
+    f32 closeBtnX = panelX + panelWidth - closeBtnSize - 10.0f;
+    f32 closeBtnY = panelY + 10.0f;
+    Rect closeBtn(closeBtnX, closeBtnY, closeBtnSize, closeBtnSize);
+    renderer->DrawRect(closeBtn, Color(0.3f, 0.1f, 0.1f, 0.8f), true);
+    renderer->DrawRect(closeBtn, Color::Red() * 0.8f, false);
+    Vec2 xPos(closeBtnX + 10.0f, closeBtnY + 8.0f);
+    renderer->DrawText("X", xPos, Color::White(), 16.0f);
+
+    // Hint text
+    Vec2 hintPos(panelX + panelWidth - 200.0f, panelY + 45.0f);
+    renderer->DrawText("(Click X or press A/ESC)", hintPos, Color(0.6f, 0.6f, 0.6f, 1.0f), 11.0f);
 
     // List achievements
     f32 yOffset = panelY + 50.0f;
@@ -1298,7 +2731,7 @@ void GameState::RenderAchievements(Renderer* renderer) {
             renderer->DrawRect(barFill, Color::QuantumBlue(), true);
 
             // Progress text
-            std::string progressText = GameUtils::FormatNumber(ach.progress) + " / " + GameUtils::FormatNumber(ach.target);
+            std::string progressText = GameUtils::FormatNumber(ach.progress, m_NumberFormat) + " / " + GameUtils::FormatNumber(ach.target, m_NumberFormat);
             Vec2 progressPos(panelX + 260.0f, yOffset + 32.0f);
             renderer->DrawText(progressText, progressPos, Color::White(), 10.0f);
         }
@@ -1317,20 +2750,38 @@ void GameState::RenderAchievements(Renderer* renderer) {
 void GameState::RenderStatistics(Renderer* renderer) {
     if (!m_ShowStats) return;
 
+    // Background overlay
+    Rect bg(0, 0, static_cast<f32>(renderer->GetWidth()), static_cast<f32>(renderer->GetHeight()));
+    renderer->DrawRect(bg, Color(0.0f, 0.0f, 0.0f, 0.8f), true);
+
     // Stats panel
-    f32 panelWidth = 500.0f;
-    f32 panelHeight = 400.0f;
+    f32 panelWidth = 900.0f;
+    f32 panelHeight = 600.0f;
     f32 panelX = (renderer->GetWidth() - panelWidth) / 2.0f;
     f32 panelY = (renderer->GetHeight() - panelHeight) / 2.0f;
 
     // Background
     Rect panelBg(panelX, panelY, panelWidth, panelHeight);
-    renderer->DrawRect(panelBg, Color(0.05f, 0.05f, 0.1f, 0.95f), true);
-    renderer->DrawRect(panelBg, Color::EntanglementOrange() * 0.5f, false);
+    renderer->DrawRect(panelBg, Color::DarkPanel(), true);
+    renderer->DrawRect(panelBg, Color::EntanglementOrange() * 0.8f, false);
 
     // Title
-    Vec2 titlePos(panelX + 20.0f, panelY + 10.0f);
-    renderer->DrawText("Statistics", titlePos, Color::EntanglementOrange(), 24.0f);
+    Vec2 titlePos(panelX + 20.0f, panelY + 15.0f);
+    renderer->DrawText("STATISTICS", titlePos, Color::EntanglementOrange(), 24.0f);
+
+    // Close button (X) in top right
+    f32 closeBtnSize = 30.0f;
+    f32 closeBtnX = panelX + panelWidth - closeBtnSize - 10.0f;
+    f32 closeBtnY = panelY + 10.0f;
+    Rect closeBtn(closeBtnX, closeBtnY, closeBtnSize, closeBtnSize);
+    renderer->DrawRect(closeBtn, Color(0.3f, 0.1f, 0.1f, 0.8f), true);
+    renderer->DrawRect(closeBtn, Color::Red() * 0.8f, false);
+    Vec2 xPos(closeBtnX + 10.0f, closeBtnY + 8.0f);
+    renderer->DrawText("X", xPos, Color::White(), 16.0f);
+
+    // Hint text
+    Vec2 hintPos(panelX + panelWidth - 200.0f, panelY + 45.0f);
+    renderer->DrawText("(Click X or press S/ESC)", hintPos, Color(0.6f, 0.6f, 0.6f, 1.0f), 11.0f);
 
     // Display stats
     f32 yOffset = panelY + 50.0f;
@@ -1342,18 +2793,18 @@ void GameState::RenderStatistics(Renderer* renderer) {
         yOffset += 25.0f;
     };
 
-    renderStat("Total Qubits Earned:", GameUtils::FormatNumber(m_Statistics.totalQubitsEarned));
+    renderStat("Total Qubits Earned:", GameUtils::FormatNumber(m_Statistics.totalQubitsEarned, m_NumberFormat));
     renderStat("Total Observations:", std::to_string(m_Statistics.totalObservations));
     renderStat("Total Upgrades:", std::to_string(m_Statistics.totalUpgrades));
     renderStat("Total Prestiges:", std::to_string(m_Statistics.totalPrestigesPerformed));
 
     yOffset += 10.0f;
     renderStat("Session Time:", GameUtils::FormatTime(m_Statistics.sessionTime));
-    renderStat("Session Qubits:", GameUtils::FormatNumber(m_Statistics.sessionQubits));
+    renderStat("Session Qubits:", GameUtils::FormatNumber(m_Statistics.sessionQubits, m_NumberFormat));
     renderStat("Session Observations:", std::to_string(m_Statistics.sessionObservations));
 
     yOffset += 10.0f;
-    renderStat("Highest Qubits:", GameUtils::FormatNumber(m_Statistics.highestQubits));
+    renderStat("Highest Qubits:", GameUtils::FormatNumber(m_Statistics.highestQubits, m_NumberFormat));
     renderStat("Fastest Prestige:", GameUtils::FormatTime(m_Statistics.fastestPrestige));
     renderStat("Current Streak:", std::to_string(m_Statistics.currentStreak) + " days");
 }
@@ -1444,21 +2895,31 @@ void GameState::RenderResearchTree(Renderer* renderer) {
 
     // Research panel
     f32 panelWidth = 900.0f;
-    f32 panelHeight = 650.0f;
+    f32 panelHeight = 600.0f;
     f32 panelX = (renderer->GetWidth() - panelWidth) / 2.0f;
     f32 panelY = (renderer->GetHeight() - panelHeight) / 2.0f;
 
     Rect panel(panelX, panelY, panelWidth, panelHeight);
-    renderer->DrawRect(panel, Color(0.1f, 0.1f, 0.15f, 1.0f), true);
-    renderer->DrawRect(panel, Color::QuantumBlue(), false);
+    renderer->DrawRect(panel, Color::DarkPanel(), true);
+    renderer->DrawRect(panel, Color::QuantumPurple() * 0.8f, false);
 
     // Title
     Vec2 titlePos(panelX + 20.0f, panelY + 15.0f);
-    renderer->DrawText("🔬 Research Tree", titlePos, Color::QuantumBlue(), 24.0f);
+    renderer->DrawText("RESEARCH TREE", titlePos, Color::QuantumPurple(), 24.0f);
 
-    // Close button hint
-    Vec2 closeHintPos(panelX + panelWidth - 120.0f, panelY + 18.0f);
-    renderer->DrawText("[R to Close]", closeHintPos, Color(0.7f, 0.7f, 0.7f, 1.0f), 12.0f);
+    // Close button (X) in top right
+    f32 closeBtnSize = 30.0f;
+    f32 closeBtnX = panelX + panelWidth - closeBtnSize - 10.0f;
+    f32 closeBtnY = panelY + 10.0f;
+    Rect closeBtn(closeBtnX, closeBtnY, closeBtnSize, closeBtnSize);
+    renderer->DrawRect(closeBtn, Color(0.3f, 0.1f, 0.1f, 0.8f), true);
+    renderer->DrawRect(closeBtn, Color::Red() * 0.8f, false);
+    Vec2 xPos(closeBtnX + 10.0f, closeBtnY + 8.0f);
+    renderer->DrawText("X", xPos, Color::White(), 16.0f);
+
+    // Hint text
+    Vec2 hintPos(panelX + panelWidth - 200.0f, panelY + 45.0f);
+    renderer->DrawText("(Click X or press R/ESC)", hintPos, Color(0.6f, 0.6f, 0.6f, 1.0f), 11.0f);
 
     // Research count
     i32 researched = m_ResearchTree.GetResearchedCount();
@@ -1507,13 +2968,13 @@ void GameState::RenderResearchTree(Renderer* renderer) {
         f32 costY = nodeY + 55.0f;
         std::string costText = "Cost: ";
         if (node->qubitCost > 0) {
-            costText += GameUtils::FormatNumber(node->qubitCost) + " Qubits  ";
+            costText += GameUtils::FormatNumber(node->qubitCost, m_NumberFormat) + " Qubits  ";
         }
         if (node->coherenceCost > 0) {
-            costText += GameUtils::FormatNumber(node->coherenceCost) + " Coherence  ";
+            costText += GameUtils::FormatNumber(node->coherenceCost, m_NumberFormat) + " Coherence  ";
         }
         if (node->entanglementCost > 0) {
-            costText += GameUtils::FormatNumber(node->entanglementCost) + " Entanglement  ";
+            costText += GameUtils::FormatNumber(node->entanglementCost, m_NumberFormat) + " Entanglement  ";
         }
         if (node->photonCost > 0) {
             costText += std::to_string(node->photonCost) + " Photons";
@@ -1536,6 +2997,24 @@ void GameState::RenderResearchTree(Renderer* renderer) {
             Vec2 prereqPos(nodeX + 10.0f, costY + 18.0f);
             renderer->DrawText(prereqText, prereqPos, Color(0.7f, 0.7f, 0.7f, 1.0f), 10.0f);
         }
+
+        // Auto-research toggle button (top-right corner of node)
+        f32 autoToggleW = 60.0f;
+        f32 autoToggleH = 25.0f;
+        f32 autoToggleX = nodeX + nodeWidth - autoToggleW - 10.0f;
+        f32 autoToggleY = nodeY + 10.0f;
+        Rect autoToggleRect(autoToggleX, autoToggleY, autoToggleW, autoToggleH);
+
+        // Get mutable node pointer for checking autoResearch flag
+        ResearchNode* mutableNode = m_ResearchTree.GetNode(node->id);
+        bool autoEnabled = (mutableNode && mutableNode->autoResearch);
+
+        Color autoToggleColor = autoEnabled ? Color::CoherenceGreen() : Color(0.3f, 0.3f, 0.3f, 1.0f);
+        renderer->DrawRect(autoToggleRect, autoToggleColor * 0.4f, true);
+        renderer->DrawRect(autoToggleRect, autoToggleColor, false);
+
+        Vec2 autoTextPos(autoToggleX + 12.0f, autoToggleY + 6.0f);
+        renderer->DrawText("AUTO", autoTextPos, Color::White(), 11.0f);
 
         displayedCount++;
     }
@@ -1584,13 +3063,16 @@ bool GameState::CanAffordResearch(ResearchID id) const {
     const ResearchNode* node = m_ResearchTree.GetNode(id);
     if (!node) return false;
 
-    // Check resource costs
-    if (GetResource(QuantumResource::Qubits) < node->qubitCost) return false;
-    if (GetResource(QuantumResource::Coherence) < node->coherenceCost) return false;
-    if (GetResource(QuantumResource::Entanglement) < node->entanglementCost) return false;
+    // Apply singularity shop research cost discount
+    f64 costMultiplier = m_SingularityShopManager.GetResearchCostMultiplier();
+
+    // Check resource costs (with discount applied)
+    if (GetResource(QuantumResource::Qubits) < node->qubitCost * costMultiplier) return false;
+    if (GetResource(QuantumResource::Coherence) < node->coherenceCost * costMultiplier) return false;
+    if (GetResource(QuantumResource::Entanglement) < node->entanglementCost * costMultiplier) return false;
 
     // Check photon cost
-    if (m_Timeline.photons < node->photonCost) return false;
+    if (m_Timeline.photons < node->photonCost * costMultiplier) return false;
 
     // Check if can be researched
     if (!m_ResearchTree.CanResearch(id, m_Timeline.completedResets)) return false;
@@ -1604,11 +3086,14 @@ bool GameState::PurchaseResearch(ResearchID id) {
     ResearchNode* node = m_ResearchTree.GetNode(id);
     if (!node) return false;
 
-    // Spend resources
-    SpendResource(QuantumResource::Qubits, node->qubitCost);
-    SpendResource(QuantumResource::Coherence, node->coherenceCost);
-    SpendResource(QuantumResource::Entanglement, node->entanglementCost);
-    m_Timeline.photons -= node->photonCost;
+    // Apply singularity shop research cost discount
+    f64 costMultiplier = m_SingularityShopManager.GetResearchCostMultiplier();
+
+    // Spend resources (with discount applied)
+    SpendResource(QuantumResource::Qubits, node->qubitCost * costMultiplier);
+    SpendResource(QuantumResource::Coherence, node->coherenceCost * costMultiplier);
+    SpendResource(QuantumResource::Entanglement, node->entanglementCost * costMultiplier);
+    m_Timeline.photons -= node->photonCost * costMultiplier;
 
     // Research it
     m_ResearchTree.Research(id);
@@ -1635,9 +3120,36 @@ void GameState::UpdateResearchBonuses() {
     f64 milestoneBonus = 1.0 + m_MilestoneSystem.GetTotalProductionBonus();
     productionMult *= milestoneBonus;
 
+    // Apply challenge reward multipliers (permanent bonuses from completed challenges)
+    f64 challengeBonus = m_ChallengeManager.GetTotalRewardMultiplier();
+    productionMult *= challengeBonus;
+
+    // Apply essence shop production multiplier (permanent meta-upgrades)
+    f64 essenceBonus = m_EssenceShopManager.GetProductionMultiplier();
+    productionMult *= essenceBonus;
+
+    // Calculate buyable multipliers for each resource type
+    // Each purchase doubles production (2^timesPurchased)
+    auto* quantumAccelerator = m_BuyableManager.GetBuyable("quantum_accelerator");
+    auto* coherenceAmplifier = m_BuyableManager.GetBuyable("coherence_amplifier");
+    auto* entanglementBooster = m_BuyableManager.GetBuyable("entanglement_booster");
+
+    f64 qubitMultiplier = quantumAccelerator ? std::pow(2.0, quantumAccelerator->timesPurchased) : 1.0;
+    f64 coherenceMultiplier = coherenceAmplifier ? std::pow(2.0, coherenceAmplifier->timesPurchased) : 1.0;
+    f64 entanglementMultiplier = entanglementBooster ? std::pow(2.0, entanglementBooster->timesPurchased) : 1.0;
+
     for (auto& station : m_Stations) {
         if (station.unlocked && station.level > 0) {
             station.currentProduction = station.baseProduction * station.level * productionMult;
+
+            // Apply resource-specific buyable multipliers
+            if (station.resourceType == QuantumResource::Qubits) {
+                station.currentProduction *= qubitMultiplier;
+            } else if (station.resourceType == QuantumResource::Coherence) {
+                station.currentProduction *= coherenceMultiplier;
+            } else if (station.resourceType == QuantumResource::Entanglement) {
+                station.currentProduction *= entanglementMultiplier;
+            }
         }
     }
 
@@ -1661,10 +3173,24 @@ void GameState::UpdateResearchBonuses() {
 void GameState::AddPhotons(f64 amount) {
     m_Timeline.photons += amount;
     m_Timeline.photonBonus = 1.0 + (m_Timeline.photons * 0.1);
-    
+
     // Apply PhotonMultiplier research bonus
     if (m_ResearchTree.IsResearched(ResearchID::PhotonMultiplier)) {
         m_Timeline.photonBonus *= 1.5;
+    }
+
+    // PHASE D: Check for theme unlocks
+    if (m_Timeline.photons >= 100.0 && m_LastThemeUnlocked < 1) {
+        m_LastThemeUnlocked = 1;
+        Log::Info("🎨 NEW THEME UNLOCKED: Quantum Facility! Your lab has a cyan glow.");
+    }
+    if (m_Timeline.singularities >= 10.0 && m_LastThemeUnlocked < 2) {
+        m_LastThemeUnlocked = 2;
+        Log::Info("🌌 NEW THEME UNLOCKED: Cosmic Observatory! Deep space blue surrounds you.");
+    }
+    if (m_Timeline.singularities >= 50.0 && m_LastThemeUnlocked < 3) {
+        m_LastThemeUnlocked = 3;
+        Log::Info("⚫ NEW THEME UNLOCKED: Cosmic Void! You've entered the purple abyss.");
     }
 }
 
@@ -1786,16 +3312,30 @@ void GameState::RenderMilestones(Renderer* renderer) {
     f32 panelY = (renderer->GetHeight() - panelHeight) / 2.0f;
 
     Rect panel(panelX, panelY, panelWidth, panelHeight);
-    renderer->DrawRect(panel, Color(0.1f, 0.1f, 0.15f, 1.0f), true);
-    renderer->DrawRect(panel, Color::QuantumBlue(), false);
+    renderer->DrawRect(panel, Color::DarkPanel(), true);
+    renderer->DrawRect(panel, Color::NeonPink() * 0.8f, false);
 
     // Title
     Vec2 titlePos(panelX + 20.0f, panelY + 15.0f);
-    renderer->DrawText("🎯 Milestones", titlePos, Color::QuantumBlue(), 24.0f);
+    renderer->DrawText("MILESTONES", titlePos, Color::NeonPink(), 24.0f);
 
-    // Close button hint
-    Vec2 closeHintPos(panelX + panelWidth - 120.0f, panelY + 18.0f);
-    renderer->DrawText("[M to Close]", closeHintPos, Color(0.7f, 0.7f, 0.7f, 1.0f), 12.0f);
+    // Close button (X) in top right
+    f32 closeBtnSize = 30.0f;
+    f32 closeBtnX = panelX + panelWidth - closeBtnSize - 10.0f;
+    f32 closeBtnY = panelY + 10.0f;
+    Rect closeBtn(closeBtnX, closeBtnY, closeBtnSize, closeBtnSize);
+
+    // Draw close button background
+    renderer->DrawRect(closeBtn, Color(0.3f, 0.1f, 0.1f, 0.8f), true);
+    renderer->DrawRect(closeBtn, Color::Red() * 0.8f, false);
+
+    // Draw X symbol
+    Vec2 xPos(closeBtnX + 10.0f, closeBtnY + 8.0f);
+    renderer->DrawText("X", xPos, Color::White(), 16.0f);
+
+    // Hint text
+    Vec2 hintPos(panelX + panelWidth - 200.0f, panelY + 45.0f);
+    renderer->DrawText("(Click X or press M/ESC)", hintPos, Color(0.6f, 0.6f, 0.6f, 1.0f), 11.0f);
 
     // Completion stats
     auto completedMilestones = m_MilestoneSystem.GetCompletedMilestones();
@@ -1858,7 +3398,7 @@ void GameState::RenderMilestones(Renderer* renderer) {
         renderer->DrawRect(progressFill, barColor, true);
 
         // Progress text
-        std::string progressText = GameUtils::FormatNumber(milestone->progress) + " / " + GameUtils::FormatNumber(milestone->target);
+        std::string progressText = GameUtils::FormatNumber(milestone->progress, m_NumberFormat) + " / " + GameUtils::FormatNumber(milestone->target, m_NumberFormat);
         if (milestone->id == MilestoneID::HalfAchievements || milestone->id == MilestoneID::AllAchievements) {
             progressText = std::to_string(static_cast<i32>(progressPercent * 100.0)) + "%";
         }
@@ -1890,6 +3430,105 @@ void GameState::RenderMilestones(Renderer* renderer) {
             renderer->DrawText(completedText, completedPos, Color::CoherenceGreen(), 12.0f);
 
             completedCount++;
+        }
+    }
+}
+
+void GameState::RenderBuyables(Renderer* renderer) {
+    if (!m_ShowBuyables) return;
+
+    // Background overlay
+    Rect bg(0, 0, static_cast<f32>(renderer->GetWidth()), static_cast<f32>(renderer->GetHeight()));
+    renderer->DrawRect(bg, Color(0.0f, 0.0f, 0.0f, 0.8f), true);
+
+    // Buyables panel
+    f32 panelWidth = 900.0f;
+    f32 panelHeight = 600.0f;
+    f32 panelX = (renderer->GetWidth() - panelWidth) / 2.0f;
+    f32 panelY = (renderer->GetHeight() - panelHeight) / 2.0f;
+
+    Rect panel(panelX, panelY, panelWidth, panelHeight);
+    renderer->DrawRect(panel, Color::DarkPanel(), true);
+    renderer->DrawRect(panel, Color::ElectricBlue() * 0.8f, false);
+
+    // Title
+    Vec2 titlePos(panelX + 20.0f, panelY + 15.0f);
+    renderer->DrawText("BUYABLE UPGRADES", titlePos, Color::ElectricBlue(), 24.0f);
+
+    // Close button (X) in top right
+    f32 closeBtnSize = 30.0f;
+    f32 closeBtnX = panelX + panelWidth - closeBtnSize - 10.0f;
+    f32 closeBtnY = panelY + 10.0f;
+    Rect closeBtn(closeBtnX, closeBtnY, closeBtnSize, closeBtnSize);
+
+    renderer->DrawRect(closeBtn, Color(0.3f, 0.1f, 0.1f, 0.8f), true);
+    renderer->DrawRect(closeBtn, Color::Red() * 0.8f, false);
+
+    Vec2 xPos(closeBtnX + 10.0f, closeBtnY + 8.0f);
+    renderer->DrawText("X", xPos, Color::White(), 16.0f);
+
+    // Hint text
+    Vec2 hintPos(panelX + panelWidth - 200.0f, panelY + 45.0f);
+    renderer->DrawText("(Click X or press B/ESC)", hintPos, Color(0.6f, 0.6f, 0.6f, 1.0f), 11.0f);
+
+    // Buyables list
+    f32 buyableStartY = panelY + 70.0f;
+    f32 buyableX = panelX + 20.0f;
+    f32 buyableWidth = panelWidth - 40.0f;
+    f32 buyableHeight = 100.0f;
+    f32 buyableSpacing = 12.0f;
+
+    auto& buyables = m_BuyableManager.GetBuyables();
+
+    for (size_t i = 0; i < buyables.size(); i++) {
+        const auto& buyable = buyables[i];
+        f32 buyableY = buyableStartY + (buyableHeight + buyableSpacing) * i;
+
+        // Buyable background
+        bool maxed = buyable.IsMaxed();
+        Color buyableBg = maxed ? Color(0.1f, 0.2f, 0.15f, 1.0f) : Color(0.15f, 0.15f, 0.2f, 1.0f);
+        Color buyableBorder = maxed ? Color::CoherenceGreen() * 0.6f : Color::ElectricBlue() * 0.6f;
+
+        Rect buyableRect(buyableX, buyableY, buyableWidth, buyableHeight);
+        renderer->DrawRect(buyableRect, buyableBg, true);
+        renderer->DrawRect(buyableRect, buyableBorder, false);
+
+        // Buyable name
+        Vec2 namePos(buyableX + 10.0f, buyableY + 10.0f);
+        renderer->DrawText(buyable.name, namePos, Color::White(), 18.0f);
+
+        // Purchase count
+        std::string progressStr = buyable.GetProgressString();
+        Vec2 progressPos(buyableX + 400.0f, buyableY + 10.0f);
+        renderer->DrawText("Owned: " + progressStr, progressPos, Color::QuantumPurple(), 14.0f);
+
+        // Description
+        Vec2 descPos(buyableX + 10.0f, buyableY + 35.0f);
+        renderer->DrawText(buyable.description, descPos, Color(0.8f, 0.8f, 0.9f, 1.0f), 13.0f);
+
+        // Cost and Buy button
+        f64 cost = buyable.GetCurrentCost();
+        bool canAfford = buyable.CanAfford(m_Resources[0]);
+        bool disabledByChallenge = m_ChallengeManager.HasModifier(ChallengeModifier::NoBuyables);
+
+        if (!maxed) {
+            std::string costStr = GameUtils::FormatNumber(cost, m_NumberFormat) + " Qubits";
+            Vec2 costPos(buyableX + 10.0f, buyableY + 60.0f);
+            Color costColor = (canAfford && !disabledByChallenge) ? Color::CoherenceGreen() : Color(0.7f, 0.5f, 0.5f, 1.0f);
+            renderer->DrawText("Cost: " + costStr, costPos, costColor, 14.0f);
+
+            // Buy button
+            Rect buyBtn(buyableX + buyableWidth - 120.0f, buyableY + 55.0f, 110.0f, 35.0f);
+            Color btnColor = (canAfford && !disabledByChallenge) ? Color::CoherenceGreen() : Color(0.3f, 0.3f, 0.3f, 1.0f);
+            renderer->DrawRect(buyBtn, btnColor * 0.3f, true);
+            renderer->DrawRect(buyBtn, (canAfford && !disabledByChallenge) ? Color::CoherenceGreen() : Color(0.4f, 0.4f, 0.4f, 1.0f), false);
+
+            Vec2 btnTextPos(buyBtn.x + 28.0f, buyBtn.y + 10.0f);
+            std::string btnText = disabledByChallenge ? "DISABLED" : "PURCHASE";
+            renderer->DrawText(btnText, btnTextPos, Color::White(), 14.0f);
+        } else {
+            Vec2 maxedPos(buyableX + 10.0f, buyableY + 60.0f);
+            renderer->DrawText("MAXED OUT", maxedPos, Color::CoherenceGreen(), 16.0f);
         }
     }
 }
@@ -1939,3 +3578,635 @@ void GameState::RenderMilestoneNotifications(Renderer* renderer) {
         }
     }
 }
+
+void GameState::RenderChallenges(Renderer* renderer) {
+    if (!m_ShowChallenges) return;
+
+    // Background overlay
+    Rect bg(0, 0, static_cast<f32>(renderer->GetWidth()), static_cast<f32>(renderer->GetHeight()));
+    renderer->DrawRect(bg, Color(0.0f, 0.0f, 0.0f, 0.8f), true);
+
+    // Challenges panel
+    f32 panelWidth = 900.0f;
+    f32 panelHeight = 650.0f;
+    f32 panelX = (renderer->GetWidth() - panelWidth) / 2.0f;
+    f32 panelY = (renderer->GetHeight() - panelHeight) / 2.0f;
+
+    Rect panel(panelX, panelY, panelWidth, panelHeight);
+    renderer->DrawRect(panel, Color::DarkPanel(), true);
+    renderer->DrawRect(panel, Color::Red() * 0.8f, false);
+
+    // Title
+    Vec2 titlePos(panelX + 20.0f, panelY + 15.0f);
+    renderer->DrawText("QUANTUM CHALLENGES", titlePos, Color::Red(), 24.0f);
+
+    // Close button (X) in top right
+    f32 closeBtnSize = 30.0f;
+    f32 closeBtnX = panelX + panelWidth - closeBtnSize - 10.0f;
+    f32 closeBtnY = panelY + 10.0f;
+    Rect closeBtn(closeBtnX, closeBtnY, closeBtnSize, closeBtnSize);
+
+    renderer->DrawRect(closeBtn, Color(0.3f, 0.1f, 0.1f, 0.8f), true);
+    renderer->DrawRect(closeBtn, Color::Red() * 0.8f, false);
+
+    Vec2 xPos(closeBtnX + 10.0f, closeBtnY + 8.0f);
+    renderer->DrawText("X", xPos, Color::White(), 16.0f);
+
+    // Hint text
+    Vec2 hintPos(panelX + panelWidth - 200.0f, panelY + 45.0f);
+    renderer->DrawText("(Click X or press C/ESC)", hintPos, Color(0.6f, 0.6f, 0.6f, 1.0f), 11.0f);
+
+    // Current challenge info (if in challenge)
+    const Challenge* currentChallenge = m_ChallengeManager.GetCurrentChallenge();
+    if (currentChallenge) {
+        Vec2 currentPos(panelX + 20.0f, panelY + 50.0f);
+        renderer->DrawText("⚠ ACTIVE CHALLENGE: " + currentChallenge->name, currentPos, Color::Red(), 16.0f);
+
+        Vec2 goalPos(panelX + 20.0f, panelY + 70.0f);
+        f64 currentQubits = GetResource(QuantumResource::Qubits);
+        std::string goalText = "Goal: " + GameUtils::FormatNumber(currentQubits, m_NumberFormat) +
+                               " / " + GameUtils::FormatNumber(currentChallenge->goalQubits, m_NumberFormat) + " Qubits";
+        renderer->DrawText(goalText, goalPos, Color::Yellow(), 13.0f);
+    }
+
+    // Challenges list
+    f32 challengeStartY = currentChallenge ? panelY + 100.0f : panelY + 70.0f;
+    f32 challengeX = panelX + 20.0f;
+    f32 challengeWidth = panelWidth - 40.0f;
+    f32 challengeHeight = 120.0f;
+    f32 challengeSpacing = 10.0f;
+
+    auto& challenges = m_ChallengeManager.GetChallenges();
+    i32 currentPrestige = m_Statistics.totalPrestigesPerformed;
+
+    for (size_t i = 0; i < challenges.size(); i++) {
+        const auto& challenge = challenges[i];
+        f32 challengeY = challengeStartY + (challengeHeight + challengeSpacing) * i;
+
+        // Challenge background
+        bool completed = challenge.completed;
+        bool active = challenge.active;
+        bool canEnter = challenge.CanEnter(currentPrestige, currentChallenge != nullptr);
+
+        Color challengeBg;
+        Color challengeBorder;
+        if (active) {
+            challengeBg = Color(0.2f, 0.1f, 0.1f, 1.0f);
+            challengeBorder = Color::Red();
+        } else if (completed) {
+            challengeBg = Color(0.1f, 0.2f, 0.15f, 1.0f);
+            challengeBorder = Color::CoherenceGreen() * 0.6f;
+        } else {
+            challengeBg = Color(0.15f, 0.15f, 0.2f, 1.0f);
+            challengeBorder = Color::Red() * 0.6f;
+        }
+
+        Rect challengeRect(challengeX, challengeY, challengeWidth, challengeHeight);
+        renderer->DrawRect(challengeRect, challengeBg, true);
+        renderer->DrawRect(challengeRect, challengeBorder, false);
+
+        // Challenge name
+        Vec2 namePos(challengeX + 10.0f, challengeY + 10.0f);
+        std::string nameStr = challenge.name;
+        if (active) nameStr += " [ACTIVE]";
+        if (completed) nameStr += " [COMPLETED]";
+        Color nameColor = completed ? Color::CoherenceGreen() : (active ? Color::Red() : Color::White());
+        renderer->DrawText(nameStr, namePos, nameColor, 18.0f);
+
+        // Description
+        Vec2 descPos(challengeX + 10.0f, challengeY + 35.0f);
+        renderer->DrawText(challenge.description, descPos, Color(0.8f, 0.8f, 0.9f, 1.0f), 13.0f);
+
+        // Requirements
+        Vec2 reqPos(challengeX + 10.0f, challengeY + 55.0f);
+        std::string reqText = "Requires: " + std::to_string(challenge.minPrestigeLevel) + " prestiges";
+        Color reqColor = currentPrestige >= challenge.minPrestigeLevel ? Color::CoherenceGreen() : Color(0.7f, 0.5f, 0.5f, 1.0f);
+        renderer->DrawText(reqText, reqPos, reqColor, 12.0f);
+
+        // Goal
+        Vec2 goalPos(challengeX + 10.0f, challengeY + 75.0f);
+        std::string goalText = "Goal: " + GameUtils::FormatNumber(challenge.goalQubits, m_NumberFormat) + " Qubits";
+        renderer->DrawText(goalText, goalPos, Color::Yellow(), 12.0f);
+
+        // Reward
+        Vec2 rewardPos(challengeX + 10.0f, challengeY + 95.0f);
+        renderer->DrawText("Reward: " + challenge.rewardDescription, rewardPos, Color::QuantumPurple(), 12.0f);
+
+        // Enter/Exit button
+        if (!completed) {
+            Rect actionBtn(challengeX + challengeWidth - 120.0f, challengeY + 80.0f, 110.0f, 30.0f);
+
+            if (active) {
+                // Exit button
+                renderer->DrawRect(actionBtn, Color::Red() * 0.3f, true);
+                renderer->DrawRect(actionBtn, Color::Red(), false);
+                Vec2 btnTextPos(actionBtn.x + 35.0f, actionBtn.y + 8.0f);
+                renderer->DrawText("EXIT", btnTextPos, Color::White(), 14.0f);
+            } else {
+                // Enter button
+                Color btnColor = canEnter ? Color::CoherenceGreen() : Color(0.3f, 0.3f, 0.3f, 1.0f);
+                renderer->DrawRect(actionBtn, btnColor * 0.3f, true);
+                renderer->DrawRect(actionBtn, canEnter ? Color::CoherenceGreen() : Color(0.4f, 0.4f, 0.4f, 1.0f), false);
+                Vec2 btnTextPos(actionBtn.x + 30.0f, actionBtn.y + 8.0f);
+                renderer->DrawText("ENTER", btnTextPos, Color::White(), 14.0f);
+            }
+        }
+    }
+}
+void GameState::RenderEssenceShop(Renderer* renderer) {
+    if (!m_ShowEssenceShop) return;
+
+    // Background overlay
+    Rect bg(0, 0, static_cast<f32>(renderer->GetWidth()), static_cast<f32>(renderer->GetHeight()));
+    renderer->DrawRect(bg, Color(0.0f, 0.0f, 0.0f, 0.8f), true);
+
+    // Essence shop panel
+    f32 panelWidth = 900.0f;
+    f32 panelHeight = 650.0f;
+    f32 panelX = (renderer->GetWidth() - panelWidth) / 2.0f;
+    f32 panelY = (renderer->GetHeight() - panelHeight) / 2.0f;
+
+    Rect panel(panelX, panelY, panelWidth, panelHeight);
+    renderer->DrawRect(panel, Color::DarkPanel(), true);
+    renderer->DrawRect(panel, Color::Magenta() * 0.8f, false);
+
+    // Title
+    Vec2 titlePos(panelX + 20.0f, panelY + 15.0f);
+    renderer->DrawText("💎 ESSENCE SHOP - PERMANENT UPGRADES", titlePos, Color::Magenta(), 22.0f);
+
+    // Close button (X) in top right
+    f32 closeBtnSize = 30.0f;
+    f32 closeBtnX = panelX + panelWidth - closeBtnSize - 10.0f;
+    f32 closeBtnY = panelY + 10.0f;
+    Rect closeBtn(closeBtnX, closeBtnY, closeBtnSize, closeBtnSize);
+
+    renderer->DrawRect(closeBtn, Color(0.3f, 0.1f, 0.1f, 0.8f), true);
+    renderer->DrawRect(closeBtn, Color::Magenta() * 0.8f, false);
+
+    Vec2 xPos(closeBtnX + 10.0f, closeBtnY + 8.0f);
+    renderer->DrawText("X", xPos, Color::White(), 16.0f);
+
+    // Hint text
+    Vec2 hintPos(panelX + panelWidth - 200.0f, panelY + 45.0f);
+    renderer->DrawText("(Click X or press E/ESC)", hintPos, Color(0.6f, 0.6f, 0.6f, 1.0f), 11.0f);
+
+    // Current essence display
+    Vec2 essencePos(panelX + 20.0f, panelY + 50.0f);
+    std::string essenceText = "Your Quantum Essence: " + GameUtils::FormatNumber(m_QuantumEssence, m_NumberFormat);
+    renderer->DrawText(essenceText, essencePos, Color::Magenta() * 1.3f, 16.0f);
+
+    // Upgrades list
+    f32 upgradeStartY = panelY + 85.0f;
+    f32 upgradeX = panelX + 20.0f;
+    f32 upgradeWidth = panelWidth - 40.0f;
+    f32 upgradeHeight = 100.0f;
+    f32 upgradeSpacing = 10.0f;
+
+    auto& upgrades = m_EssenceShopManager.GetUpgrades();
+
+    for (size_t i = 0; i < upgrades.size(); i++) {
+        const auto& upgrade = upgrades[i];
+        f32 upgradeY = upgradeStartY + (upgradeHeight + upgradeSpacing) * i;
+
+        // Upgrade background
+        bool maxed = upgrade.IsMaxed();
+        Color upgradeBg = maxed ? Color(0.1f, 0.2f, 0.15f, 1.0f) : Color(0.15f, 0.15f, 0.2f, 1.0f);
+        Color upgradeBorder = maxed ? Color::CoherenceGreen() * 0.6f : Color::Magenta() * 0.6f;
+
+        Rect upgradeRect(upgradeX, upgradeY, upgradeWidth, upgradeHeight);
+        renderer->DrawRect(upgradeRect, upgradeBg, true);
+        renderer->DrawRect(upgradeRect, upgradeBorder, false);
+
+        // Upgrade name
+        Vec2 namePos(upgradeX + 10.0f, upgradeY + 10.0f);
+        renderer->DrawText(upgrade.name, namePos, Color::White(), 18.0f);
+
+        // Purchase count
+        std::string progressStr = upgrade.GetProgressString();
+        Vec2 progressPos(upgradeX + 400.0f, upgradeY + 10.0f);
+        renderer->DrawText("Owned: " + progressStr, progressPos, Color::Magenta(), 14.0f);
+
+        // Description
+        Vec2 descPos(upgradeX + 10.0f, upgradeY + 35.0f);
+        renderer->DrawText(upgrade.description, descPos, Color(0.8f, 0.8f, 0.9f, 1.0f), 13.0f);
+
+        // Cost and Buy button
+        f64 cost = upgrade.GetCurrentCost();
+        bool canAfford = upgrade.CanAfford(m_QuantumEssence);
+
+        if (!maxed) {
+            std::string costStr = GameUtils::FormatNumber(cost, m_NumberFormat) + " Essence";
+            Vec2 costPos(upgradeX + 10.0f, upgradeY + 60.0f);
+            Color costColor = canAfford ? Color::Magenta() * 1.3f : Color(0.7f, 0.5f, 0.5f, 1.0f);
+            renderer->DrawText("Cost: " + costStr, costPos, costColor, 14.0f);
+
+            // Buy button
+            Rect buyBtn(upgradeX + upgradeWidth - 120.0f, upgradeY + 55.0f, 110.0f, 35.0f);
+            Color btnColor = canAfford ? Color::Magenta() : Color(0.3f, 0.3f, 0.3f, 1.0f);
+            renderer->DrawRect(buyBtn, btnColor * 0.3f, true);
+            renderer->DrawRect(buyBtn, canAfford ? Color::Magenta() : Color(0.4f, 0.4f, 0.4f, 1.0f), false);
+
+            Vec2 btnTextPos(buyBtn.x + 28.0f, buyBtn.y + 10.0f);
+            renderer->DrawText("PURCHASE", btnTextPos, Color::White(), 14.0f);
+        } else {
+            Vec2 maxedPos(upgradeX + 10.0f, upgradeY + 60.0f);
+            renderer->DrawText("MAXED OUT", maxedPos, Color::CoherenceGreen(), 16.0f);
+        }
+    }
+}
+
+void GameState::RenderSingularityShop(Renderer* renderer) {
+    if (!m_ShowSingularityShop) return;
+
+    // Background overlay
+    Rect bg(0, 0, static_cast<f32>(renderer->GetWidth()), static_cast<f32>(renderer->GetHeight()));
+    renderer->DrawRect(bg, Color(0.0f, 0.0f, 0.0f, 0.8f), true);
+
+    // Singularity shop panel
+    f32 panelWidth = 900.0f;
+    f32 panelHeight = 650.0f;
+    f32 panelX = (renderer->GetWidth() - panelWidth) / 2.0f;
+    f32 panelY = (renderer->GetHeight() - panelHeight) / 2.0f;
+
+    Rect panel(panelX, panelY, panelWidth, panelHeight);
+    renderer->DrawRect(panel, Color::DarkPanel(), true);
+    renderer->DrawRect(panel, Color(0.5f, 0.0f, 1.0f, 1.0f) * 0.8f, false);
+
+    // Title
+    Vec2 titlePos(panelX + 20.0f, panelY + 15.0f);
+    renderer->DrawText("⭐ SINGULARITY SHOP - COSMIC UPGRADES", titlePos, Color(0.8f, 0.0f, 1.0f, 1.0f), 22.0f);
+
+    // Close button (X) in top right
+    f32 closeBtnSize = 30.0f;
+    f32 closeBtnX = panelX + panelWidth - closeBtnSize - 10.0f;
+    f32 closeBtnY = panelY + 10.0f;
+    Rect closeBtn(closeBtnX, closeBtnY, closeBtnSize, closeBtnSize);
+
+    renderer->DrawRect(closeBtn, Color(0.3f, 0.1f, 0.1f, 0.8f), true);
+    renderer->DrawRect(closeBtn, Color(0.5f, 0.0f, 1.0f, 1.0f) * 0.8f, false);
+
+    Vec2 xPos(closeBtnX + 10.0f, closeBtnY + 8.0f);
+    renderer->DrawText("X", xPos, Color::White(), 16.0f);
+
+    // Hint text
+    Vec2 hintPos(panelX + panelWidth - 200.0f, panelY + 45.0f);
+    renderer->DrawText("(Click X or press ESC)", hintPos, Color(0.6f, 0.6f, 0.6f, 1.0f), 11.0f);
+
+    // Current singularities display
+    Vec2 singularityPos(panelX + 20.0f, panelY + 50.0f);
+    std::string singularityText = "Your Singularities: " + GameUtils::FormatNumber(m_Timeline.singularities, m_NumberFormat);
+    renderer->DrawText(singularityText, singularityPos, Color(0.8f, 0.0f, 1.0f, 1.0f) * 1.3f, 16.0f);
+
+    // Upgrades list
+    f32 upgradeStartY = panelY + 85.0f;
+    f32 upgradeX = panelX + 20.0f;
+    f32 upgradeWidth = panelWidth - 40.0f;
+    f32 upgradeHeight = 100.0f;
+    f32 upgradeSpacing = 10.0f;
+
+    auto& upgrades = m_SingularityShopManager.GetUpgrades();
+
+    for (size_t i = 0; i < upgrades.size(); i++) {
+        const auto& upgrade = upgrades[i];
+        f32 upgradeY = upgradeStartY + (upgradeHeight + upgradeSpacing) * i;
+
+        // Upgrade background
+        bool maxed = upgrade.IsMaxed();
+        Color upgradeBg = maxed ? Color(0.1f, 0.15f, 0.2f, 1.0f) : Color(0.1f, 0.1f, 0.15f, 1.0f);
+        Color upgradeBorder = maxed ? Color::CoherenceGreen() * 0.6f : Color(0.5f, 0.0f, 1.0f, 1.0f) * 0.6f;
+
+        Rect upgradeRect(upgradeX, upgradeY, upgradeWidth, upgradeHeight);
+        renderer->DrawRect(upgradeRect, upgradeBg, true);
+        renderer->DrawRect(upgradeRect, upgradeBorder, false);
+
+        // Upgrade name
+        Vec2 namePos(upgradeX + 10.0f, upgradeY + 10.0f);
+        renderer->DrawText(upgrade.name, namePos, Color::White(), 18.0f);
+
+        // Purchase count
+        std::string progressStr = upgrade.GetProgressString();
+        Vec2 progressPos(upgradeX + 400.0f, upgradeY + 10.0f);
+        renderer->DrawText("Owned: " + progressStr, progressPos, Color(0.8f, 0.0f, 1.0f, 1.0f), 14.0f);
+
+        // Description
+        Vec2 descPos(upgradeX + 10.0f, upgradeY + 35.0f);
+        renderer->DrawText(upgrade.description, descPos, Color(0.7f, 0.7f, 0.9f, 1.0f), 13.0f);
+
+        // Cost and Buy button
+        f64 cost = upgrade.GetCurrentCost();
+        bool canAfford = upgrade.CanAfford(m_Timeline.singularities);
+
+        if (!maxed) {
+            std::string costStr = GameUtils::FormatNumber(cost, m_NumberFormat) + " Singularities";
+            Vec2 costPos(upgradeX + 10.0f, upgradeY + 60.0f);
+            Color costColor = canAfford ? Color(0.8f, 0.0f, 1.0f, 1.0f) * 1.3f : Color(0.7f, 0.5f, 0.5f, 1.0f);
+            renderer->DrawText("Cost: " + costStr, costPos, costColor, 14.0f);
+
+            // Buy button
+            Rect buyBtn(upgradeX + upgradeWidth - 120.0f, upgradeY + 55.0f, 110.0f, 35.0f);
+            Color btnColor = canAfford ? Color(0.5f, 0.0f, 1.0f, 1.0f) : Color(0.3f, 0.3f, 0.3f, 1.0f);
+            renderer->DrawRect(buyBtn, btnColor * 0.3f, true);
+            renderer->DrawRect(buyBtn, canAfford ? Color(0.8f, 0.0f, 1.0f, 1.0f) : Color(0.4f, 0.4f, 0.4f, 1.0f), false);
+
+            Vec2 btnTextPos(buyBtn.x + 28.0f, buyBtn.y + 10.0f);
+            renderer->DrawText("PURCHASE", btnTextPos, Color::White(), 14.0f);
+        } else {
+            Vec2 maxedPos(upgradeX + 10.0f, upgradeY + 60.0f);
+            renderer->DrawText("MAXED OUT", maxedPos, Color::CoherenceGreen(), 16.0f);
+        }
+    }
+}
+
+void GameState::RenderSpaceship(Renderer* renderer) {
+    if (!m_ShowSpaceship) return;
+
+    // Background overlay
+    Rect bg(0, 0, static_cast<f32>(renderer->GetWidth()), static_cast<f32>(renderer->GetHeight()));
+    renderer->DrawRect(bg, Color(0.0f, 0.0f, 0.0f, 0.8f), true);
+
+    // Main spaceship panel
+    f32 panelWidth = 1100.0f;
+    f32 panelHeight = 700.0f;
+    f32 panelX = (renderer->GetWidth() - panelWidth) / 2.0f;
+    f32 panelY = (renderer->GetHeight() - panelHeight) / 2.0f;
+
+    Rect panel(panelX, panelY, panelWidth, panelHeight);
+    renderer->DrawRect(panel, Color::DarkPanel(), true);
+    renderer->DrawRect(panel, Color(1.0f, 0.7f, 0.0f, 1.0f) * 0.8f, false); // Gold border
+
+    // Title
+    Vec2 titlePos(panelX + 20.0f, panelY + 15.0f);
+    renderer->DrawText("SPACESHIP - REPAIR AND UPGRADE", titlePos, Color(1.0f, 0.7f, 0.0f, 1.0f), 22.0f);
+
+    // Close button (X) in top right
+    f32 closeBtnSize = 30.0f;
+    f32 closeBtnX = panelX + panelWidth - closeBtnSize - 10.0f;
+    f32 closeBtnY = panelY + 10.0f;
+    Rect closeBtn(closeBtnX, closeBtnY, closeBtnSize, closeBtnSize);
+
+    renderer->DrawRect(closeBtn, Color(0.3f, 0.1f, 0.1f, 0.8f), true);
+    renderer->DrawRect(closeBtn, Color(1.0f, 0.7f, 0.0f, 1.0f) * 0.8f, false);
+
+    Vec2 xPos(closeBtnX + 10.0f, closeBtnY + 8.0f);
+    renderer->DrawText("X", xPos, Color::White(), 16.0f);
+
+    // Hint text
+    Vec2 hintPos(panelX + panelWidth - 250.0f, panelY + 45.0f);
+    renderer->DrawText("(Press H or ESC to close)", hintPos, Color(0.6f, 0.6f, 0.6f, 1.0f), 11.0f);
+
+    // Split panel into left (ship status) and right (inventory)
+    f32 leftPanelWidth = panelWidth * 0.5f - 15.0f;
+    f32 rightPanelWidth = panelWidth * 0.5f - 15.0f;
+    f32 contentY = panelY + 70.0f;
+    f32 contentHeight = panelHeight - 90.0f;
+
+    // Left panel: Ship status and installed parts
+    f32 leftPanelX = panelX + 10.0f;
+    m_Spaceship.RenderShipPanel(renderer, leftPanelX, contentY, leftPanelWidth, contentHeight);
+
+    // Right panel: Part inventory
+    f32 rightPanelX = panelX + leftPanelWidth + 20.0f;
+    m_Spaceship.RenderInventoryPanel(renderer, rightPanelX, contentY, rightPanelWidth, contentHeight);
+
+    // Instructions at bottom
+    Vec2 instructionPos(panelX + 20.0f, panelY + panelHeight - 25.0f);
+    renderer->DrawText("Ship parts drop from Research Station observations. Install parts to increase production & unlock travel!",
+                     instructionPos, Color(0.7f, 0.7f, 0.7f, 1.0f), 12.0f);
+}
+
+// ============================================================================
+// VISUAL EFFECTS & ACTIVE GAMEPLAY SYSTEMS
+// ============================================================================
+
+// Quantum Anomaly System - Clickable orbs for active rewards
+void GameState::SpawnQuantumAnomaly() {
+    QuantumAnomaly anomaly;
+
+    // Random position (avoid edges and fixed UI areas)
+    f32 marginX = 100.0f;
+    f32 marginY = 250.0f; // Avoid top resource/nav area
+    anomaly.position.x = marginX + (rand() % (1280 - static_cast<i32>(marginX * 2)));
+    anomaly.position.y = marginY + (rand() % (720 - static_cast<i32>(marginY * 2)));
+
+    // Size and lifetime
+    anomaly.radius = 20.0f + (rand() % 15); // 20-35px radius
+    anomaly.lifetime = 0.0f;
+    anomaly.maxLifetime = 10.0f; // 10 seconds to click it
+
+    // Reward multiplier (higher = better reward)
+    i32 rarity = rand() % 100;
+    if (rarity < 60) {
+        // Common: 10-30x production
+        anomaly.rewardMultiplier = 10.0 + (rand() % 21);
+        anomaly.color = Color(0.0f, 0.8f, 1.0f, 1.0f); // Cyan
+    } else if (rarity < 85) {
+        // Uncommon: 30-60x production
+        anomaly.rewardMultiplier = 30.0 + (rand() % 31);
+        anomaly.color = Color(0.2f, 1.0f, 0.2f, 1.0f); // Green
+    } else if (rarity < 95) {
+        // Rare: 60-100x production
+        anomaly.rewardMultiplier = 60.0 + (rand() % 41);
+        anomaly.color = Color(1.0f, 0.0f, 1.0f, 1.0f); // Magenta
+    } else {
+        // Legendary: 100-200x production
+        anomaly.rewardMultiplier = 100.0 + (rand() % 101);
+        anomaly.color = Color(1.0f, 0.8f, 0.0f, 1.0f); // Gold
+    }
+
+    anomaly.clicked = false;
+    m_Anomalies.push_back(anomaly);
+
+    Log::Infof("Quantum Anomaly spawned! Reward: ", anomaly.rewardMultiplier, "x");
+}
+
+void GameState::UpdateQuantumAnomalies(f64 deltaTime) {
+    // Update existing anomalies
+    for (auto it = m_Anomalies.begin(); it != m_Anomalies.end();) {
+        it->lifetime += deltaTime;
+
+        // Remove if expired or clicked
+        if (it->lifetime >= it->maxLifetime || it->clicked) {
+            if (it->lifetime >= it->maxLifetime && !it->clicked) {
+                Log::Info("Quantum Anomaly expired...");
+            }
+            it = m_Anomalies.erase(it);
+        } else {
+            ++it;
+        }
+    }
+
+    // Spawn new anomalies periodically
+    m_TimeSinceLastAnomaly += deltaTime;
+    if (m_TimeSinceLastAnomaly >= m_AnomalySpawnInterval) {
+        SpawnQuantumAnomaly();
+        m_TimeSinceLastAnomaly = 0.0;
+        // Randomize next spawn time (30-60 seconds)
+        m_AnomalySpawnInterval = 30.0 + (rand() % 31);
+    }
+}
+
+void GameState::RenderQuantumAnomalies(Renderer* renderer) {
+    for (const auto& anomaly : m_Anomalies) {
+        f32 lifeRatio = 1.0f - (anomaly.lifetime / anomaly.maxLifetime);
+
+        // Pulsing effect (makes it more noticeable)
+        f32 pulseScale = 1.0f + 0.2f * sinf(anomaly.lifetime * 5.0f);
+        f32 currentRadius = anomaly.radius * pulseScale;
+
+        // Outer glow (larger, transparent)
+        Color glowColor = anomaly.color;
+        glowColor.a = 0.3f * lifeRatio;
+        renderer->DrawCircle(anomaly.position, currentRadius * 1.5f, glowColor, true);
+
+        // Inner core (bright, opaque)
+        Color coreColor = anomaly.color;
+        coreColor.a = 0.9f * lifeRatio;
+        renderer->DrawCircle(anomaly.position, currentRadius, coreColor, true);
+
+        // White center dot
+        renderer->DrawCircle(anomaly.position, currentRadius * 0.3f, Color::White(), true);
+
+        // Show reward multiplier above it
+        std::string rewardText = std::to_string(static_cast<i32>(anomaly.rewardMultiplier)) + "x";
+        Vec2 textPos(anomaly.position.x - 15.0f, anomaly.position.y - currentRadius - 20.0f);
+        renderer->DrawText(rewardText, textPos, Color::White(), 14.0f);
+
+        // Lifetime bar below it
+        f32 barWidth = anomaly.radius * 2.0f;
+        f32 barHeight = 4.0f;
+        Vec2 barPos(anomaly.position.x - barWidth / 2.0f, anomaly.position.y + currentRadius + 10.0f);
+
+        // Background
+        Rect barBg(barPos.x, barPos.y, barWidth, barHeight);
+        renderer->DrawRect(barBg, Color(0.2f, 0.2f, 0.2f, 0.8f), true);
+
+        // Fill
+        Rect barFill(barPos.x, barPos.y, barWidth * lifeRatio, barHeight);
+        renderer->DrawRect(barFill, anomaly.color, true);
+    }
+}
+
+void GameState::ClickQuantumAnomaly(const Vec2& clickPos) {
+    for (auto& anomaly : m_Anomalies) {
+        if (anomaly.clicked) continue;
+
+        // Check if click is within anomaly circle
+        f32 dx = clickPos.x - anomaly.position.x;
+        f32 dy = clickPos.y - anomaly.position.y;
+        f32 distSq = dx * dx + dy * dy;
+        f32 radiusSq = anomaly.radius * anomaly.radius;
+
+        if (distSq <= radiusSq) {
+            // Clicked! Award bonus resources
+            anomaly.clicked = true;
+
+            // Calculate reward based on current total production
+            f64 totalProduction = 0.0;
+            for (const auto& station : m_Stations) {
+                if (station.unlocked) {
+                    totalProduction += station.currentProduction;
+                }
+            }
+
+            // Give reward equal to N seconds of production
+            f64 secondsWorth = anomaly.rewardMultiplier;
+            f64 qubitReward = totalProduction * secondsWorth * m_Timeline.photonBonus;
+
+            AddResource(QuantumResource::Qubits, qubitReward);
+
+            // Visual feedback: particle burst
+            SpawnParticleBurst(anomaly.position, anomaly.color, 30);
+
+            // Add combo point
+            AddComboPoint();
+
+            Log::Infof("Anomaly claimed! Gained ", qubitReward, " qubits (", anomaly.rewardMultiplier, "x)");
+
+            return; // Only click one anomaly per click
+        }
+    }
+}
+
+// Combo System - Reward multiple interactions
+void GameState::AddComboPoint() {
+    m_ComboCount++;
+    m_ComboTimeRemaining = m_ComboWindow; // Reset timer (5 seconds)
+
+    if (m_ComboCount >= 3) {
+        Log::Infof("COMBO x", m_ComboCount, "!");
+    }
+}
+
+void GameState::ResetCombo() {
+    if (m_ComboCount > 0) {
+        Log::Info("Combo broken!");
+    }
+    m_ComboCount = 0;
+    m_ComboTimeRemaining = 0.0;
+}
+
+f64 GameState::GetComboMultiplier() const {
+    if (m_ComboCount <= 1) return 1.0;
+
+    // 2 combo = 1.2x, 3 combo = 1.5x, 4 combo = 2.0x, 5+ combo = 2.5x
+    if (m_ComboCount == 2) return 1.2;
+    if (m_ComboCount == 3) return 1.5;
+    if (m_ComboCount == 4) return 2.0;
+    return 2.5;
+}
+
+// Station Visual Tiers - Color changes based on level
+Color GameState::GetStationTierColor(i32 level) const {
+    if (level < 10) {
+        // Tier 1: Quantum Blue (default)
+        return Color::QuantumBlue();
+    } else if (level < 25) {
+        // Tier 2: Neon Cyan
+        return Color::NeonCyan();
+    } else if (level < 50) {
+        // Tier 3: Electric Purple
+        return Color(0.5f, 0.0f, 1.0f, 1.0f);
+    } else if (level < 100) {
+        // Tier 4: Magenta/Pink
+        return Color::Magenta();
+    } else {
+        // Tier 5: Cosmic Gold
+        return Color(1.0f, 0.8f, 0.0f, 1.0f);
+    }
+}
+
+// Flying Resource Particles - Visual feedback for production
+void GameState::SpawnResourceParticles(const Vec2& start, const Vec2& end, const Color& color, i32 count) {
+    for (i32 i = 0; i < count; i++) {
+        Particle p;
+        p.position = start;
+
+        // Calculate velocity to reach end point
+        Vec2 direction(end.x - start.x, end.y - start.y);
+        f32 distance = sqrtf(direction.x * direction.x + direction.y * direction.y);
+
+        if (distance > 0.1f) {
+            direction.x /= distance;
+            direction.y /= distance;
+
+            // Speed varies slightly for visual variety
+            f32 speed = 300.0f + (rand() % 100);
+            p.velocity.x = direction.x * speed;
+            p.velocity.y = direction.y * speed;
+        }
+
+        p.color = color;
+        p.maxLifetime = 0.8f + (rand() % 40) / 100.0f; // 0.8-1.2 seconds
+        p.lifetime = 0.0f;
+
+        m_Particles.push_back(p);
+    }
+}
+
+// Update particles (fade out over time)
+
+// ============================================================================
+// PHASE C & D: COLLECTION SYSTEM & BIOME/THEMES
+// ============================================================================
+
+// These will be implemented at the end of the file to keep code organized

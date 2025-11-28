@@ -50,7 +50,11 @@ void Input::ProcessEvent(const SDL_Event& event) {
             // Handle touch for mobile
             Touch touch;
             touch.id = static_cast<i32>(event.tfinger.fingerId);
-            touch.position = Vec2(event.tfinger.x, event.tfinger.y);
+            // FIX: Scale normalized touch coordinates (0.0 to 1.0) to window pixels
+            touch.position = Vec2(
+                event.tfinger.x * m_WindowWidth,
+                event.tfinger.y * m_WindowHeight
+            );
 
             // Find or add touch
             bool found = false;

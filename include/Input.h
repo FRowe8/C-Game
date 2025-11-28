@@ -44,6 +44,12 @@ public:
 
     const std::vector<Touch>& GetTouches() const { return m_Touches; }
 
+    // Window size (needed for touch coordinate scaling)
+    void SetWindowSize(f32 width, f32 height) {
+        m_WindowWidth = width;
+        m_WindowHeight = height;
+    }
+
 private:
     // Keyboard state
     std::unordered_map<int, bool> m_KeysDown;
@@ -62,4 +68,8 @@ private:
 
     // Touch state
     std::vector<Touch> m_Touches;
+
+    // Window size (needed for touch coordinate scaling)
+    f32 m_WindowWidth = 0.0f;
+    f32 m_WindowHeight = 0.0f;
 };

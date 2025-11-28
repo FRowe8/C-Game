@@ -3,6 +3,12 @@
 #include "Types.h"
 #include "Research.h"
 #include "Milestones.h"
+#include "Buyables.h"
+#include "Challenges.h"
+#include "EssenceShop.h"
+#include "SingularityShop.h"
+#include "GameUtils.h"
+#include "Spaceship.h"
 #include <vector>
 #include <string>
 #include <functional>
@@ -38,6 +44,9 @@ struct ResearchStation {
     bool unlocked;
     f64 unlockCost;
 
+    // Automation
+    bool autoUpgrade; // Automatically upgrade when can afford 10x the cost
+
     ResearchStation();
     void Upgrade();
     void Observe(class GameState* state); // Collapse superposition
@@ -69,6 +78,12 @@ enum class AchievementID {
     Collector,            // Unlock all station types
     EventHunter,          // Experience 50 quantum events
     WeekStreak,           // Play 7 days in a row
+    // Spaceship achievements
+    FirstShipPart,        // Acquire your first ship part
+    ShipOperational,      // Repair ship to 25% (travel unlocked)
+    ShipFullyRepaired,    // Repair ship to 100%
+    FirstLegendaryPart,   // Find a legendary ship part
+    PartCollector,        // Collect 50 ship parts
     TotalCount            // Keep this last
 };
 
@@ -144,6 +159,10 @@ struct QuantumTimeline {
     f64 photons; // Prestige currency
     f64 photonBonus; // Global multiplier from photons
 
+    // Second prestige layer
+    i32 completedCollapses; // Number of singularity collapses performed
+    f64 singularities; // Second-layer currency (gained by collapsing photons)
+
     std::vector<bool> permanentUpgrades;
 
     QuantumTimeline();
@@ -158,6 +177,7 @@ struct UIButton {
     std::function<void()> onClick;
     bool enabled = true;
     bool hovered = false;
+    f64 affordability = 1.0; // 0.0-1.0: How close to affording (for visual feedback)
 
     void Update(const Vec2& mousePos);
     void Render(Renderer* renderer);
@@ -178,6 +198,11 @@ public:
     bool SpendResource(QuantumResource type, f64 amount);
     f64 GetResource(QuantumResource type) const;
 
+    // Quantum Essence management (permanent meta-currency)
+    void AddEssence(f64 amount);
+    bool SpendEssence(f64 amount);
+    f64 GetEssence() const { return m_QuantumEssence; }
+
     // Save/Load
     bool Save(const std::string& filepath);
     bool Load(const std::string& filepath);
@@ -185,6 +210,10 @@ public:
     // Prestige
     void PerformPrestige();
     f64 CalculatePhotonsOnPrestige() const;
+
+    // Singularity Collapse (Second prestige layer)
+    void PerformCollapse();
+    f64 CalculateSingularitiesOnCollapse() const;
 
     // Achievements
     void CheckAchievements();
@@ -213,6 +242,26 @@ public:
     void CheckMilestones();
     void AddPhotons(f64 amount);
 
+    // Buyables System
+    BuyableManager& GetBuyableManager() { return m_BuyableManager; }
+
+    // Challenge System
+    ChallengeManager& GetChallengeManager() { return m_ChallengeManager; }
+
+    // Essence Shop System
+    EssenceShopManager& GetEssenceShopManager() { return m_EssenceShopManager; }
+
+    // Singularity Shop System
+    SingularityShopManager& GetSingularityShopManager() { return m_SingularityShopManager; }
+    QuantumTimeline& GetTimeline() { return m_Timeline; }
+
+    // Spaceship System
+    Spaceship& GetSpaceship() { return m_Spaceship; }
+
+    // Combo System (public so ResearchStation::Observe can use it)
+    void AddComboPoint();
+    f64 GetComboMultiplier() const;
+
 private:
     void InitializeStations();
     void InitializeUI();
@@ -230,6 +279,11 @@ private:
     void RenderResearchTree(Renderer* renderer);
     void RenderMilestones(Renderer* renderer);
     void RenderMilestoneNotifications(Renderer* renderer);
+    void RenderBuyables(Renderer* renderer);
+    void RenderChallenges(Renderer* renderer);
+    void RenderEssenceShop(Renderer* renderer);
+    void RenderSingularityShop(Renderer* renderer);
+    void RenderSpaceship(Renderer* renderer);
 
     // Particle system helpers
     void SpawnParticle(const Vec2& position, const Color& color, f64 lifetime = 1.0);
@@ -263,25 +317,62 @@ private:
     // Milestone System
     MilestoneSystem m_MilestoneSystem;
 
+    // Buyables System
+    BuyableManager m_BuyableManager;
+
+    // Challenge System
+    ChallengeManager m_ChallengeManager;
+
+    // Quantum Essence (permanent meta-currency)
+    f64 m_QuantumEssence; // Never lost on prestige
+
+    // Essence Shop System
+    EssenceShopManager m_EssenceShopManager;
+
+    // Singularity Shop System
+    SingularityShopManager m_SingularityShopManager;
+
+    // Spaceship System
+    Spaceship m_Spaceship;
+
     // Offline progress
     i64 m_LastSaveTimestamp;
 
     // UI
-    std::vector<UIButton> m_Buttons;
+    std::vector<UIButton> m_StationButtons; // Persistent buttons (unlock, observe, upgrade per station + prestige)
     Vec2 m_ScrollOffset;
     bool m_ShowAchievements;
     bool m_ShowStats;
     bool m_ShowResearch;
     bool m_ShowMilestones;
+    bool m_ShowBuyables;
+    bool m_ShowChallenges;
+    bool m_ShowEssenceShop;
+    bool m_ShowSingularityShop;
+    bool m_ShowSpaceship;
+    bool m_ShowMoreMenu; // Overflow menu for less frequent pages
+    GameUtils::NumberFormat m_NumberFormat; // Toggle between suffix (1.23M) and scientific (1.23e6)
 
     // Game time
     f64 m_TotalTimePlayed;
     f64 m_TimeSinceLastSave;
+    f64 m_TimeSinceLastPrestige; // Track time for fastest prestige achievement
 
     // Coherence decay
     f64 m_Coherence;
     f64 m_MaxCoherence;
     f64 m_CoherenceDecayRate;
+
+    // Boost system (temporary production multiplier)
+    bool m_BoostActive;
+    f64 m_BoostTimeRemaining;
+    f64 m_BoostCooldownRemaining;
+    f64 m_BoostDuration;          // How long boost lasts (30 seconds)
+    f64 m_BoostCooldown;          // How long until can boost again (120 seconds)
+    f64 m_BoostMultiplier;        // Production multiplier during boost (2.0x)
+
+    // Auto-Prestige system (automatically prestige at photon threshold)
+    f64 m_AutoPrestigeThreshold;  // Minimum photons before auto-prestige (default: 10)
 
     // Particle effects for visual feedback
     struct Particle {
@@ -292,4 +383,41 @@ private:
         f32 maxLifetime;
     };
     std::vector<Particle> m_Particles;
+
+    // Quantum Anomaly System (clickable orbs for active gameplay)
+    struct QuantumAnomaly {
+        Vec2 position;
+        f32 radius;
+        f32 lifetime;
+        f32 maxLifetime;
+        f64 rewardMultiplier;  // How much bonus (10-100x production)
+        Color color;
+        bool clicked;
+    };
+    std::vector<QuantumAnomaly> m_Anomalies;
+    f64 m_TimeSinceLastAnomaly;
+    f64 m_AnomalySpawnInterval;  // How often anomalies spawn (30-60 seconds)
+
+    // Combo System (reward multiple clicks in sequence)
+    i32 m_ComboCount;
+    f64 m_ComboTimeRemaining;
+    f64 m_ComboWindow;  // 5 seconds to maintain combo
+
+    // Visual Effects State
+    f64 m_PrestigeFlashTimer;  // For screen flash effect
+    bool m_PrestigeFlashActive;
+
+    // Theme System (Phase D)
+    i32 m_LastThemeUnlocked; // Track which theme was last unlocked (0=none, 1=facility, 2=observatory, 3=void)
+
+    // Helper methods for new systems (private)
+    void SpawnQuantumAnomaly();
+    void UpdateQuantumAnomalies(f64 deltaTime);
+    void RenderQuantumAnomalies(Renderer* renderer);
+    void ClickQuantumAnomaly(const Vec2& clickPos);
+
+    void ResetCombo();
+
+    Color GetStationTierColor(i32 level) const;
+    void SpawnResourceParticles(const Vec2& start, const Vec2& end, const Color& color, i32 count);
 };

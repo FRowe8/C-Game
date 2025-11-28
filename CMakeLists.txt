@@ -266,7 +266,11 @@ elseif(PLATFORM_WEB)
     set(EMSCRIPTEN_LINK_FLAGS
         "-sUSE_SDL=2"
         "-sUSE_SDL_TTF=2"
-        "-sLEGACY_GL_EMULATION=1"  # Emulate legacy OpenGL (glBegin/glEnd/etc) - requires WebGL1
+        "-lidbfs.js"  # Include IndexedDB filesystem for persistent saves
+        "-sLEGACY_GL_EMULATION=1"  # Emulate legacy OpenGL (glBegin/glEnd/etc)
+        "-sGL_UNSAFE_OPTS=0"  # Disable unsafe GL optimizations to prevent warnings
+        "-sMIN_WEBGL_VERSION=1"  # Require at least WebGL 1
+        "-sMAX_WEBGL_VERSION=1"  # Use WebGL 1 (OpenGL ES 2.0 compatible)
         "-sALLOW_MEMORY_GROWTH=1"
         "-sINITIAL_MEMORY=67108864"  # 64MB
         "-sMAXIMUM_MEMORY=268435456"  # 256MB max

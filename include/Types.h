@@ -98,6 +98,17 @@ struct Color {
     static Color QuantumPurple() { return Color(0.6f, 0.2f, 0.9f, 1.0f); }
     static Color CoherenceGreen() { return Color(0.2f, 0.9f, 0.5f, 1.0f); }
     static Color EntanglementOrange() { return Color(1.0f, 0.5f, 0.1f, 1.0f); }
+
+    // Cyberpunk neon colors for modern UI
+    static Color NeonCyan() { return Color(0.0f, 0.9f, 0.9f, 1.0f); }
+    static Color NeonPink() { return Color(1.0f, 0.0f, 0.6f, 1.0f); }
+    static Color NeonPurple() { return Color(0.7f, 0.0f, 1.0f, 1.0f); }
+    static Color ElectricBlue() { return Color(0.3f, 0.7f, 1.0f, 1.0f); }
+
+    // Dark UI colors
+    static Color DarkBackground() { return Color(0.08f, 0.08f, 0.12f, 1.0f); }
+    static Color DarkPanel() { return Color(0.12f, 0.12f, 0.18f, 0.95f); }
+    static Color DarkBorder() { return Color(0.2f, 0.2f, 0.3f, 1.0f); }
 };
 
 struct Rect {

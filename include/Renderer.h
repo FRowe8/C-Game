@@ -26,6 +26,13 @@ public:
     // Text rendering (uses bitmap font)
     void DrawText(const std::string& text, const Vec2& position, const Color& color, f32 size = 16.0f);
 
+    // Progress bar helper (reusable for all progress displays)
+    // Shows a progress bar with background, fill, border, and optional percentage text
+    void DrawProgressBar(const Vec2& position, f32 width, f32 height,
+                        f64 current, f64 max,
+                        const Color& fillColor, const Color& bgColor = Color(0.2f, 0.2f, 0.2f, 1.0f),
+                        bool showPercentage = true, f32 textSize = 12.0f);
+
     // Particle system
     struct Particle {
         Vec2 position;

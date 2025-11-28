@@ -10,31 +10,107 @@
 
 namespace GameUtils {
 
-// Number formatting
-inline std::string FormatNumber(f64 num) {
-    if (num < 1000.0) {
-        return std::to_string(static_cast<i32>(num));
-    } else if (num < 1000000.0) {
-        f64 thousands = num / 1000.0;
+// Number format options
+enum class NumberFormat {
+    Suffix,      // 1.23M, 4.56B, 7.89T (default)
+    Scientific   // 1.23e6, 4.56e9, 7.89e12
+};
+
+// Number formatting with extended suffix support
+inline std::string FormatNumber(f64 num, NumberFormat format = NumberFormat::Suffix) {
+    // Handle special cases
+    if (num < 0.0) {
+        return "-" + FormatNumber(-num, format);
+    }
+    if (num == 0.0) {
+        return "0";
+    }
+
+    // Scientific notation mode
+    if (format == NumberFormat::Scientific) {
+        if (num < 1000.0) {
+            // Small numbers don't need scientific notation
+            if (num < 10.0) {
+                std::ostringstream ss;
+                ss << std::fixed << std::setprecision(1) << num;
+                return ss.str();
+            }
+            return std::to_string(static_cast<i32>(num));
+        }
+
+        // Calculate exponent
+        i32 exponent = static_cast<i32>(std::floor(std::log10(num)));
+        f64 mantissa = num / std::pow(10.0, exponent);
+
         std::ostringstream ss;
-        ss << std::fixed << std::setprecision(1) << thousands << "K";
-        return ss.str();
-    } else if (num < 1000000000.0) {
-        f64 millions = num / 1000000.0;
-        std::ostringstream ss;
-        ss << std::fixed << std::setprecision(1) << millions << "M";
-        return ss.str();
-    } else if (num < 1000000000000.0) {
-        f64 billions = num / 1000000000.0;
-        std::ostringstream ss;
-        ss << std::fixed << std::setprecision(1) << billions << "B";
-        return ss.str();
-    } else {
-        f64 trillions = num / 1000000000000.0;
-        std::ostringstream ss;
-        ss << std::fixed << std::setprecision(1) << trillions << "T";
+        ss << std::fixed << std::setprecision(2) << mantissa << "e" << exponent;
         return ss.str();
     }
+
+    // Suffix notation mode (default)
+    // Extended suffix support - following Shark Incremental style
+    struct Suffix {
+        f64 value;
+        const char* name;
+    };
+
+    static const Suffix suffixes[] = {
+        {1e303, "Cg"},  // Centillion
+        {1e153, "Uvg"}, // Unvigintillion
+        {1e120, "Uvg"}, // Unvigintillion
+        {1e102, "Tg"},  // Trigintillion
+        {1e99,  "Vg"},  // Vigintillion
+        {1e96,  "UDc"}, // Untrigintillion
+        {1e93,  "DTg"}, // Duotrigintillion
+        {1e90,  "TVg"}, // Trevigintillion
+        {1e87,  "UVg"}, // Unvigintillion
+        {1e84,  "DVg"}, // Duovigintillion
+        {1e81,  "TVg"}, // Trevigintillion
+        {1e78,  "QVg"}, // Quattuorvigintillion
+        {1e75,  "QiVg"},// Quinvigintillion
+        {1e72,  "SxVg"},// Sexvigintillion
+        {1e69,  "SpVg"},// Septvigintillion
+        {1e66,  "OcVg"},// Octovigintillion
+        {1e63,  "NoVg"},// Novevig intillion
+        {1e60,  "Vg"},  // Vigintillion
+        {1e57,  "UDc"}, // Undevigintillion
+        {1e54,  "DDc"}, // Duodevigintillion
+        {1e51,  "TDc"}, // Tredevigintillion
+        {1e48,  "QDc"}, // Quattuordevigintillion
+        {1e45,  "QiDc"},// Quindevigintillion
+        {1e42,  "SxDc"},// Sexdevigintillion
+        {1e39,  "SpDc"},// Septdevigintillion
+        {1e36,  "UDc"}, // Undecillion
+        {1e33,  "Dc"},  // Decillion
+        {1e30,  "No"},  // Nonillion
+        {1e27,  "Oc"},  // Octillion
+        {1e24,  "Sp"},  // Septillion
+        {1e21,  "Sx"},  // Sextillion
+        {1e18,  "Qi"},  // Quintillion
+        {1e15,  "Qa"},  // Quadrillion
+        {1e12,  "T"},   // Trillion
+        {1e9,   "B"},   // Billion
+        {1e6,   "M"},   // Million
+        {1e3,   "K"}    // Thousand
+    };
+
+    // Find appropriate suffix
+    for (const auto& suffix : suffixes) {
+        if (num >= suffix.value) {
+            f64 scaled = num / suffix.value;
+            std::ostringstream ss;
+            ss << std::fixed << std::setprecision(2) << scaled << suffix.name;
+            return ss.str();
+        }
+    }
+
+    // Small numbers (< 1000)
+    if (num < 10.0) {
+        std::ostringstream ss;
+        ss << std::fixed << std::setprecision(1) << num;
+        return ss.str();
+    }
+    return std::to_string(static_cast<i32>(num));
 }
 
 // Format time (seconds to readable format)

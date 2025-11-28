@@ -86,12 +86,10 @@
 
         /* Responsive canvas */
         canvas.emscripten {
-            width: 100% !important;
-            height: 100% !important;
-            object-fit: contain;
             display: block;
             image-rendering: pixelated;
             image-rendering: crisp-edges;
+            margin: 0 auto;
         }
 
         /* Loading Screen */
@@ -303,6 +301,17 @@
                 }, false);
                 return canvas;
             })(),
+            // WebGL context attributes for better performance
+            webglContextAttributes: {
+                alpha: false,              // Disable alpha channel (no transparency) for better performance
+                antialias: false,          // Disable antialiasing for pixel-perfect rendering
+                depth: true,               // Enable depth buffer
+                stencil: false,            // Disable stencil buffer (not needed)
+                preserveDrawingBuffer: false,  // Don't preserve buffer between frames
+                powerPreference: "high-performance",  // Request high-performance GPU
+                premultipliedAlpha: true,  // Standard WebGL setting
+                failIfMajorPerformanceCaveat: false  // Allow software rendering if needed
+            },
             setStatus: function(text) {
                 console.log("=== MODULE STATUS: " + (text || "(empty - loaded)") + " ===");
                 var loading = document.getElementById('loading');
@@ -382,9 +391,42 @@
         }
 
         // Handle window resize
-        window.addEventListener('resize', function() {
+        function resizeCanvas() {
             var canvas = document.getElementById('canvas');
-            // Emscripten will handle canvas resizing
+            var container = document.getElementById('canvas-container');
+
+            // Get container size
+            var containerWidth = container.clientWidth;
+            var containerHeight = container.clientHeight;
+
+            // Calculate aspect ratio (16:9 for 1280x720)
+            var targetAspect = 1280 / 720;
+            var containerAspect = containerWidth / containerHeight;
+
+            var newWidth, newHeight;
+
+            if (containerAspect > targetAspect) {
+                // Container is wider - fit to height
+                newHeight = containerHeight;
+                newWidth = containerHeight * targetAspect;
+            } else {
+                // Container is taller - fit to width
+                newWidth = containerWidth;
+                newHeight = containerWidth / targetAspect;
+            }
+
+            // Set canvas display size
+            canvas.style.width = newWidth + 'px';
+            canvas.style.height = newHeight + 'px';
+
+            console.log("Canvas resized to: " + newWidth + "x" + newHeight);
+        }
+
+        window.addEventListener('resize', resizeCanvas);
+
+        // Initial resize when page loads
+        window.addEventListener('load', function() {
+            setTimeout(resizeCanvas, 100);
         });
 
         // Prevent zoom on mobile

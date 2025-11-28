@@ -34,6 +34,7 @@ enum class ResearchID {
     // Automation
     AutoObserver,             // Auto-observe every 10 seconds
     AutoUpgrade,              // Auto-buy cheapest upgrade
+    AutoPrestige,             // Auto-prestige at photon threshold
     SmartInvestor,            // AI decides best purchases
 
     // Special
@@ -78,6 +79,7 @@ struct ResearchNode {
     // State
     bool unlocked;
     bool researched;
+    bool autoResearch; // Automatically purchase when affordable
 
     ResearchNode();
     ResearchNode(ResearchID _id, const std::string& _name, const std::string& _desc,

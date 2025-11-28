@@ -37,6 +37,24 @@ bool Application::Initialize() {
 
 #ifdef __EMSCRIPTEN__
     printf("=== EMSCRIPTEN BUILD - Starting initialization ===\n");
+
+    // Mount IndexedDB filesystem for persistent saves
+    printf("=== Mounting IndexedDB filesystem ===\n");
+    EM_ASM(
+        // Create the /idbfs directory
+        FS.mkdir('/idbfs');
+        // Mount IndexedDB filesystem
+        FS.mount(IDBFS, {}, '/idbfs');
+        // Sync from IndexedDB to memory (load existing saves)
+        FS.syncfs(true, function(err) {
+            if (err) {
+                console.error('Error loading saves from IndexedDB:', err);
+            } else {
+                console.log('Successfully loaded saves from IndexedDB');
+            }
+        });
+    );
+    printf("=== IndexedDB filesystem mounted ===\n");
 #endif
 
     // Initialize SDL
@@ -46,10 +64,22 @@ bool Application::Initialize() {
     }
 
     // Set OpenGL attributes
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 1);
     SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
     SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
+
+#ifdef __EMSCRIPTEN__
+    // For web: Request OpenGL ES 2.0 (WebGL 1) to avoid legacy emulation
+    // This prevents Emscripten from needing to emulate desktop OpenGL
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
+    Log::Info("Requesting OpenGL ES 2.0 context for WebGL");
+#else
+    // For desktop: Use OpenGL 2.1 compatibility profile
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 1);
+    Log::Info("Requesting OpenGL 2.1 context for desktop");
+#endif
 
     // Create window
     u32 windowFlags = SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN;
@@ -95,6 +125,8 @@ bool Application::Initialize() {
 #endif
 
     m_Input = CreateScope<Input>();
+    // Set window size for touch coordinate scaling
+    m_Input->SetWindowSize(static_cast<f32>(m_Config.windowWidth), static_cast<f32>(m_Config.windowHeight));
 
     m_GameState = CreateScope<GameState>();
     m_GameState->Initialize();
@@ -170,6 +202,9 @@ void Application::RunFrame() {
 }
 
 void Application::ProcessEvents() {
+    // Update input state first (clears previous frame's input)
+    m_Input->Update();
+
     SDL_Event event;
     while (SDL_PollEvent(&event)) {
         if (event.type == SDL_QUIT) {
@@ -179,9 +214,6 @@ void Application::ProcessEvents() {
         // Let input system process the event
         m_Input->ProcessEvent(event);
     }
-
-    // Update input state
-    m_Input->Update();
 }
 
 void Application::Update(f64 deltaTime) {
@@ -194,7 +226,7 @@ void Application::Update(f64 deltaTime) {
 
 void Application::Render() {
     m_Renderer->BeginFrame();
-    m_Renderer->Clear(Color(0.05f, 0.05f, 0.1f, 1.0f)); // Dark blue background
+    m_Renderer->Clear(Color::DarkBackground()); // Modern dark cyberpunk background
 
     // Render game
     m_GameState->Render(m_Renderer.get());
@@ -212,6 +244,30 @@ void Application::Shutdown() {
     if (!m_Initialized) return;
 
     Log::Info("Shutting down application...");
+
+    // CRITICAL: Save game state before shutdown
+    if (m_GameState) {
+        std::string savePath = Platform::GetSaveDirectory() + "quantum_save.json";
+        if (m_GameState->Save(savePath)) {
+            Log::Info("Final save completed successfully");
+        } else {
+            Log::Error("Failed to save game state on shutdown");
+        }
+    }
+
+#ifdef __EMSCRIPTEN__
+    // Sync filesystem to IndexedDB before shutdown (save to browser storage)
+    printf("=== Syncing saves to IndexedDB ===\n");
+    EM_ASM(
+        FS.syncfs(false, function(err) {
+            if (err) {
+                console.error('Error saving to IndexedDB:', err);
+            } else {
+                console.log('Successfully saved to IndexedDB');
+            }
+        });
+    );
+#endif
 
     m_GameState.reset();
     m_Input.reset();
