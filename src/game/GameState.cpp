@@ -665,9 +665,6 @@ void GameState::Update(f64 deltaTime, Input* input, Renderer* renderer) {
     // Update gatcha system
     m_GatchaSystem.Update(deltaTime);
 
-    // Update skill tree system
-    m_SkillTree.Update(deltaTime);
-
     // Update combo timer
     if (m_ComboTimeRemaining > 0) {
         m_ComboTimeRemaining -= deltaTime;
