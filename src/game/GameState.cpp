@@ -678,10 +678,24 @@ void GameState::UpdateUI(Input* input) {
             m_ScrollOffset.y += touch.delta.y;
         }
 
-        // Clamp scroll bounds
+        // Clamp scroll bounds (updated for new larger UI elements)
         f32 maxScroll = 0.0f; // Can't scroll up past the top
-        f32 contentHeight = (m_Stations.size() * 145.0f) + 200.0f; // Total content height
-        f32 viewportHeight = 600.0f; // Visible area height
+
+        // Calculate actual content height based on current UI layout
+        f32 stationHeight = 180.0f;  // Updated from 150px
+        f32 stationMargin = 25.0f;   // Updated from 20px
+        f32 stationsContentHeight = m_Stations.size() * (stationHeight + stationMargin);
+
+        // Add space for prestige button (60px) + auto-prestige controls (45px if unlocked)
+        // + collapse button (60px) + gaps (20 + 70 + 50 padding)
+        f32 bottomControlsHeight = 305.0f; // Generous padding for all bottom controls
+
+        f32 contentHeight = stationsContentHeight + bottomControlsHeight;
+
+        // Viewport = screen height - fixed top area (resources 100px + nav 80px)
+        f32 fixedTopArea = 180.0f;
+        f32 viewportHeight = static_cast<f32>(renderer->GetHeight()) - fixedTopArea;
+
         f32 minScroll = -(contentHeight - viewportHeight);
         if (minScroll > 0) minScroll = 0; // If content fits on screen, don't allow scrolling
 
@@ -994,27 +1008,32 @@ void GameState::UpdateUI(Input* input) {
         // Handle navigation bar button clicks (only if no popup consumed the click)
         if (!handled) {
             f32 navY = 100.0f;
-            f32 navHeight = 50.0f;
-            f32 btnWidth = 130.0f;
-            f32 btnHeight = 32.0f;
+            f32 navHeight = 80.0f; // Updated to match new nav height
+            f32 btnWidth = 180.0f; // Updated to match new button width
+            f32 btnHeight = 60.0f; // Updated to match new button height
             f32 btnY = navY + (navHeight - btnHeight) * 0.5f;
-            f32 spacing = 12.0f;
-            f32 startX = 25.0f;
+            f32 spacing = 10.0f; // Updated spacing
+            f32 startX = 15.0f; // Updated start position
 
-            // Check each navigation button
-            for (int i = 0; i < 7; i++) {  // 7 buttons (RESEARCH, ACHIEVEMENTS, STATS, MILESTONES, BUYABLES, CHALLENGES, ESSENCE)
+            // Check each navigation button (new order: BUYABLES, CHALLENGES, ESSENCE, RESEARCH, STATS, MILESTONES)
+            for (int i = 0; i < 6; i++) {
                 f32 x = startX + i * (btnWidth + spacing);
+
+                // Check if button would go off screen
+                if (x + btnWidth > 1280.0f - 200.0f) {
+                    break;
+                }
+
                 Rect btnRect(x, btnY, btnWidth, btnHeight);
 
                 if (btnRect.Contains(mousePos)) {
-                    // Toggle the corresponding panel
-                    if (i == 0) m_ShowResearch = !m_ShowResearch;
-                    else if (i == 1) m_ShowAchievements = !m_ShowAchievements;
-                    else if (i == 2) m_ShowStats = !m_ShowStats;
-                    else if (i == 3) m_ShowMilestones = !m_ShowMilestones;
-                    else if (i == 4) m_ShowBuyables = !m_ShowBuyables;
-                    else if (i == 5) m_ShowChallenges = !m_ShowChallenges;
-                    else if (i == 6) m_ShowEssenceShop = !m_ShowEssenceShop;
+                    // Toggle the corresponding panel (new order)
+                    if (i == 0) m_ShowBuyables = !m_ShowBuyables;
+                    else if (i == 1) m_ShowChallenges = !m_ShowChallenges;
+                    else if (i == 2) m_ShowEssenceShop = !m_ShowEssenceShop;
+                    else if (i == 3) m_ShowResearch = !m_ShowResearch;
+                    else if (i == 4) m_ShowStats = !m_ShowStats;
+                    else if (i == 5) m_ShowMilestones = !m_ShowMilestones;
                     handled = true;
                     break;  // Only handle one click per frame
                 }
@@ -1024,11 +1043,11 @@ void GameState::UpdateUI(Input* input) {
 
     // Handle boost button click
     if (mousePressed) {
-        // Boost button (from RenderUI)
-        f32 boostBtnWidth = 150.0f;
-        f32 boostBtnHeight = 38.0f;
+        // Boost button (from RenderUI) - Updated to match new sizes
+        f32 boostBtnWidth = 200.0f;  // Updated from 150px
+        f32 boostBtnHeight = 60.0f;  // Updated from 38px
         f32 navY = 100.0f;
-        f32 navHeight = 50.0f;
+        f32 navHeight = 80.0f;        // Updated from 50px
         f32 boostBtnX = 1280.0f - boostBtnWidth - 25.0f;  // Default screen width
         f32 boostBtnY = navY + (navHeight - boostBtnHeight) * 0.5f;
         Rect boostBtnRect(boostBtnX, boostBtnY, boostBtnWidth, boostBtnHeight);
@@ -1045,9 +1064,9 @@ void GameState::UpdateUI(Input* input) {
 
     // Handle auto-upgrade toggle button clicks
     if (mousePressed) {
-        f32 startY = 160.0f;
-        f32 stationHeight = 150.0f;
-        f32 margin = 20.0f;
+        f32 startY = 190.0f;          // Updated to match RenderStations
+        f32 stationHeight = 180.0f;   // Updated to match RenderStations
+        f32 margin = 25.0f;           // Updated to match RenderStations
 
         for (size_t i = 0; i < m_Stations.size(); i++) {
             auto& station = m_Stations[i];
@@ -1085,9 +1104,9 @@ void GameState::UpdateUI(Input* input) {
     // Handle auto-prestige threshold adjustment button clicks
     if (mousePressed && m_ResearchTree.IsResearched(ResearchID::AutoPrestige)) {
         // Calculate button positions (must match RenderStations rendering)
-        f32 stationHeight = 150.0f;
-        f32 margin = 20.0f;
-        f32 startY = 160.0f;
+        f32 stationHeight = 180.0f;  // Updated to match RenderStations
+        f32 margin = 25.0f;           // Updated to match RenderStations
+        f32 startY = 190.0f;          // Updated to match RenderStations
         f32 prestigeY = startY + m_Stations.size() * (stationHeight + margin) + 20.0f + m_ScrollOffset.y;
         f32 autoPrestigeY = prestigeY + 70.0f;
 
@@ -1119,9 +1138,9 @@ void GameState::UpdateUI(Input* input) {
     // Handle singularity collapse button clicks
     if (mousePressed) {
         // Calculate button position (must match RenderStations rendering)
-        f32 stationHeight = 150.0f;
-        f32 margin = 20.0f;
-        f32 startY = 160.0f;
+        f32 stationHeight = 180.0f;  // Updated to match RenderStations
+        f32 margin = 25.0f;           // Updated to match RenderStations
+        f32 startY = 190.0f;          // Updated to match RenderStations
         f32 prestigeY = startY + m_Stations.size() * (stationHeight + margin) + 20.0f + m_ScrollOffset.y;
 
         f32 collapseY = prestigeY + 115.0f;
@@ -1218,10 +1237,10 @@ void GameState::RenderResources(Renderer* renderer) {
 }
 
 void GameState::RenderStations(Renderer* renderer) {
-    // Stations start below the navigation bar (resources at 0-100, nav at 100-150)
-    f32 startY = 160.0f;  // Start below nav bar with small gap
-    f32 stationHeight = 150.0f;
-    f32 margin = 20.0f;
+    // Stations start below the navigation bar (resources at 0-100, nav at 100-180)
+    f32 startY = 190.0f;  // Start below bigger nav bar (100+80+10 gap)
+    f32 stationHeight = 180.0f; // Increased from 150px to prevent overlap
+    f32 margin = 25.0f; // Increased spacing between stations
 
     // Counter for accessing persistent buttons (4 buttons per station + 1 prestige button)
     size_t buttonIdx = 0;
@@ -1516,9 +1535,9 @@ void GameState::RenderStations(Renderer* renderer) {
 }
 
 void GameState::RenderUI(Renderer* renderer) {
-    // Top navigation bar with modern cyberpunk design (sits at 100-150px)
+    // Top navigation bar with modern cyberpunk design (sits at 100-180px) - INCREASED FOR MOBILE
     f32 navY = 100.0f;
-    f32 navHeight = 50.0f;
+    f32 navHeight = 80.0f; // Increased from 50px for bigger touch targets
     Rect navBar(0, navY, static_cast<f32>(renderer->GetWidth()), navHeight);
 
     // Navigation bar background with dark panel
@@ -1528,12 +1547,12 @@ void GameState::RenderUI(Renderer* renderer) {
     Rect navBorder(0, navY + navHeight - 2.0f, static_cast<f32>(renderer->GetWidth()), 2.0f);
     renderer->DrawRect(navBorder, Color::NeonCyan() * 0.6f, true);
 
-    // Navigation buttons
-    f32 btnWidth = 130.0f;
-    f32 btnHeight = 32.0f;
+    // Navigation buttons - BIGGER for mobile/touch
+    f32 btnWidth = 180.0f; // Increased from 130px
+    f32 btnHeight = 60.0f; // Increased from 32px
     f32 btnY = navY + (navHeight - btnHeight) * 0.5f;
-    f32 spacing = 12.0f;
-    f32 startX = 25.0f;
+    f32 spacing = 10.0f; // Tighter spacing since buttons are bigger
+    f32 startX = 15.0f; // Reduced to fit more buttons
 
     struct NavButton {
         const char* label;
@@ -1541,19 +1560,26 @@ void GameState::RenderUI(Renderer* renderer) {
         Color color;
     };
 
+    // Simplified navigation - only most important pages (mobile-friendly)
     NavButton navButtons[] = {
-        {"RESEARCH (R)", &m_ShowResearch, Color::QuantumPurple()},
-        {"ACHIEVEMENTS (A)", &m_ShowAchievements, Color::CoherenceGreen()},
-        {"STATS (S)", &m_ShowStats, Color::EntanglementOrange()},
-        {"MILESTONES (M)", &m_ShowMilestones, Color::NeonPink()},
-        {"BUYABLES (B)", &m_ShowBuyables, Color::ElectricBlue()},
-        {"CHALLENGES (C)", &m_ShowChallenges, Color::Red()},
-        {"ESSENCE (E)", &m_ShowEssenceShop, Color::Magenta()}
+        {"BUYABLES", &m_ShowBuyables, Color::ElectricBlue()},
+        {"CHALLENGES", &m_ShowChallenges, Color::Red()},
+        {"ESSENCE", &m_ShowEssenceShop, Color::Magenta()},
+        {"RESEARCH", &m_ShowResearch, Color::QuantumPurple()},
+        {"STATS", &m_ShowStats, Color::EntanglementOrange()},
+        {"MILESTONES", &m_ShowMilestones, Color::NeonPink()},
     };
 
-    for (int i = 0; i < 7; i++) {
+    int numButtons = 6; // Show 6 main buttons
+    for (int i = 0; i < numButtons; i++) {
         auto& btn = navButtons[i];
         f32 x = startX + i * (btnWidth + spacing);
+
+        // Wrap to second row if needed (for smaller screens)
+        if (x + btnWidth > renderer->GetWidth() - 200.0f) {
+            break; // Don't draw if it goes off screen
+        }
+
         Rect btnRect(x, btnY, btnWidth, btnHeight);
 
         bool active = *btn.showFlag;
@@ -1562,25 +1588,25 @@ void GameState::RenderUI(Renderer* renderer) {
         // Button background
         renderer->DrawRect(btnRect, btnColor * 0.25f, true);
 
-        // Glowing border
+        // Glowing border (thicker for mobile)
         if (active) {
             // Active - bright glow
-            Rect glowRect(x - 1.0f, btnY - 1.0f, btnWidth + 2.0f, btnHeight + 2.0f);
+            Rect glowRect(x - 2.0f, btnY - 2.0f, btnWidth + 4.0f, btnHeight + 4.0f);
             renderer->DrawRect(glowRect, btn.color * 0.9f, false);
         } else {
             // Inactive - subtle border
             renderer->DrawRect(btnRect, Color::DarkBorder(), false);
         }
 
-        // Button text (centered)
-        f32 textWidth = strlen(btn.label) * 5.0f;  // Approximate width
-        Vec2 textPos(x + (btnWidth - textWidth) * 0.5f, btnY + (btnHeight - 12.0f) * 0.5f);
-        renderer->DrawText(btn.label, textPos, Color::White(), 11.0f);
+        // Button text (centered, LARGER font for readability)
+        f32 textWidth = strlen(btn.label) * 9.0f;  // Approximate width (larger)
+        Vec2 textPos(x + (btnWidth - textWidth) * 0.5f, btnY + (btnHeight - 16.0f) * 0.5f);
+        renderer->DrawText(btn.label, textPos, Color::White(), 16.0f); // Increased from 11px
     }
 
-    // Boost button (right side of nav bar)
-    f32 boostBtnWidth = 150.0f;
-    f32 boostBtnHeight = 38.0f;
+    // Boost button (right side of nav bar) - BIGGER for touch
+    f32 boostBtnWidth = 200.0f; // Increased from 150px
+    f32 boostBtnHeight = 60.0f; // Increased from 38px to match nav buttons
     f32 boostBtnX = static_cast<f32>(renderer->GetWidth()) - boostBtnWidth - 25.0f;
     f32 boostBtnY = navY + (navHeight - boostBtnHeight) * 0.5f;
     Rect boostBtnRect(boostBtnX, boostBtnY, boostBtnWidth, boostBtnHeight);
