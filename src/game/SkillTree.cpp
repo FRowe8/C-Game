@@ -506,7 +506,7 @@ void SkillTreeSystem::RenderSkillNodes(Renderer* renderer, GameState* state, f32
     }
 }
 
-void SkillTreeSystem::RenderSkillInfo(Renderer* renderer, f32 panelX, f32 panelY, f32 panelWidth) {
+void SkillTreeSystem::RenderSkillInfo(Renderer* renderer, f32 panelX, f32 panelY, f32 panelWidth, f32 panelHeight) {
     f32 infoY = panelY + panelHeight - 120.0f;
 
     renderer->DrawText("SKILL POINTS:", Vec2(panelX + 20.0f, infoY), Color::NeonCyan(), 16.0f);
@@ -547,7 +547,7 @@ void SkillTreeSystem::RenderSkillTree(Renderer* renderer, GameState* state) {
     // Render components
     RenderBranchTabs(renderer, panelX, panelY, panelWidth);
     RenderSkillNodes(renderer, state, panelX, panelY, panelWidth);
-    RenderSkillInfo(renderer, panelX, panelY, panelWidth);
+    RenderSkillInfo(renderer, panelX, panelY, panelWidth, panelHeight);
 
     // Close hint
     renderer->DrawText("Press ESC to close", Vec2(panelX + panelWidth - 150.0f, panelY + panelHeight - 30.0f),
