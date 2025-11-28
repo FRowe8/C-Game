@@ -13,6 +13,7 @@
 #include "Enemy.h"
 #include "GatchaSystem.h"
 #include "SkillTree.h"
+#include "EnhancementSystem.h"
 #include <vector>
 #include <string>
 #include <functional>
@@ -277,6 +278,9 @@ public:
     // Skill Tree System
     SkillTreeSystem& GetSkillTree() { return m_SkillTree; }
 
+    // Enhancement System
+    EnhancementSystem& GetEnhancementSystem() { return m_EnhancementSystem; }
+
     // Combo System (public so ResearchStation::Observe can use it)
     void AddComboPoint();
     f64 GetComboMultiplier() const;
@@ -368,6 +372,9 @@ private:
 
     // Skill Tree System
     SkillTreeSystem m_SkillTree;
+
+    // Enhancement System
+    EnhancementSystem m_EnhancementSystem;
 
     // Offline progress
     i64 m_LastSaveTimestamp;

@@ -372,6 +372,9 @@ void GameState::Initialize() {
     // Initialize skill tree system
     m_SkillTree.Initialize();
 
+    // Initialize enhancement system
+    m_EnhancementSystem.Initialize();
+
     Log::Info("Game state initialized");
 }
 
@@ -4350,7 +4353,16 @@ void GameState::EndCombat() {
         
         // Award XP
         AddXP(static_cast<f64>(m_CombatSystem.GetXPEarned()));
-        
+
+        // Award enhancement materials based on enemy level
+        i32 techScraps = 2 + (m_PlayerLevel / 5); // 2-22 scraps
+        i32 nanoAlloy = (m_PlayerLevel >= 10) ? (1 + m_PlayerLevel / 10) : 0; // 0-11 alloy
+        i32 quantumCore = (m_PlayerLevel >= 30) ? (m_PlayerLevel / 30) : 0; // 0-3 cores
+
+        m_EnhancementSystem.AddMaterial(MaterialType::TechScraps, techScraps);
+        if (nanoAlloy > 0) m_EnhancementSystem.AddMaterial(MaterialType::NanoAlloy, nanoAlloy);
+        if (quantumCore > 0) m_EnhancementSystem.AddMaterial(MaterialType::QuantumCore, quantumCore);
+
         // Award ship part if dropped
         if (m_CombatSystem.GetPartDropped()) {
             // Generate part based on enemy's min rarity
