@@ -248,8 +248,9 @@ bool UIButton::WasClicked(const Vec2& mousePos, bool mousePressed) {
 GameState::GameState()
     : m_CurrentEvent(nullptr), m_TimeSinceLastEvent(0), m_EventCooldown(120.0),
       m_QuantumEssence(0),
+      m_PlayerLevel(1), m_PlayerXP(0.0),
       m_LastSaveTimestamp(0),
-      m_ShowAchievements(false), m_ShowStats(false), m_ShowResearch(false), m_ShowMilestones(false), m_ShowBuyables(false), m_ShowChallenges(false), m_ShowEssenceShop(false), m_ShowSingularityShop(false), m_ShowSpaceship(false), m_ShowMoreMenu(false),
+      m_ShowAchievements(false), m_ShowStats(false), m_ShowResearch(false), m_ShowMilestones(false), m_ShowBuyables(false), m_ShowChallenges(false), m_ShowEssenceShop(false), m_ShowSingularityShop(false), m_ShowSpaceship(false), m_ShowCombat(false), m_ShowGatcha(false), m_ShowSkills(false), m_ShowEnhancement(false), m_ShowMoreMenu(false),
       m_NumberFormat(GameUtils::NumberFormat::Suffix),
       m_TotalTimePlayed(0), m_TimeSinceLastSave(0), m_TimeSinceLastPrestige(0),
       m_Coherence(100), m_MaxCoherence(100), m_CoherenceDecayRate(1.0),
@@ -363,6 +364,20 @@ void GameState::Initialize() {
             CalculateOfflineProgress(); // Calculate what happened while away
         }
     }
+
+    // Give starting currency for gatcha system (for testing)
+    m_GatchaSystem.AddStellarShards(50); // Start with 50 shards for testing
+    m_GatchaSystem.AddSummonTickets(5);  // Start with 5 tickets
+
+    // Initialize skill tree system
+    m_SkillTree.Initialize();
+
+    // Initialize enhancement system
+    m_EnhancementSystem.Initialize();
+
+    // Initialize feature unlock manager
+    m_UnlockManager.Initialize();
+    m_UnlockManager.CheckUnlocks(m_PlayerLevel);
 
     Log::Info("Game state initialized");
 }
@@ -553,6 +568,9 @@ void GameState::Update(f64 deltaTime, Input* input, Renderer* renderer) {
     m_TimeSinceLastSave += deltaTime;
     m_TimeSinceLastEvent += deltaTime;
 
+    // Update feature unlock manager (handles notifications)
+    m_UnlockManager.Update(deltaTime);
+
     // Update boost timers
     if (m_BoostActive) {
         m_BoostTimeRemaining -= deltaTime;
@@ -637,6 +655,26 @@ void GameState::Update(f64 deltaTime, Input* input, Renderer* renderer) {
     UpdateQuantumAnomalies(deltaTime);
     UpdateParticles(deltaTime);
 
+    // Update combat system
+    if (m_CombatSystem.IsInCombat()) {
+        m_CombatSystem.Update(deltaTime);
+
+        // Check if combat ended (victory or defeat)
+        if (m_CombatSystem.GetState() == CombatState::Victory ||
+            m_CombatSystem.GetState() == CombatState::Defeat) {
+            // Give time to see the result before ending
+            static f64 combatEndTimer = 0.0;
+            combatEndTimer += deltaTime;
+            if (combatEndTimer >= 2.0) {
+                EndCombat();
+                combatEndTimer = 0.0;
+            }
+        }
+    }
+
+    // Update gatcha system
+    m_GatchaSystem.Update(deltaTime);
+
     // Update combo timer
     if (m_ComboTimeRemaining > 0) {
         m_ComboTimeRemaining -= deltaTime;
@@ -693,6 +731,9 @@ void GameState::UpdateStations(f64 deltaTime) {
     if (m_ChallengeManager.HasModifier(ChallengeModifier::SlowTime)) {
         globalMultiplier *= 0.5; // Time runs at half speed (same effect)
     }
+
+    // Apply skill tree production bonus
+    globalMultiplier *= m_SkillTree.GetProductionMultiplier();
 
     // Check if Auto-Observer research is unlocked
     bool hasAutoObserver = m_ResearchTree.IsResearched(ResearchID::AutoObserver);
@@ -753,6 +794,41 @@ void GameState::UpdateCoherence(f64 deltaTime) {
 void GameState::UpdateUI(Input* input) {
     Vec2 mousePos = input->GetMousePosition();
     bool mousePressed = input->IsMouseButtonPressed(MouseButton::Left);
+
+    // ESC key to close overlays (highest priority)
+    const int KEY_ESC = 41; // SDL_SCANCODE_ESCAPE
+    if (input->IsKeyPressed(KEY_ESC)) {
+        // Close overlays in priority order (most recently opened first)
+        if (m_ShowEnhancement) { m_ShowEnhancement = false; }
+        else if (m_ShowSkills) { m_ShowSkills = false; }
+        else if (m_ShowGatcha) { m_ShowGatcha = false; }
+        else if (m_ShowCombat) { m_ShowCombat = false; }
+        else if (m_ShowSpaceship) { m_ShowSpaceship = false; }
+        else if (m_ShowChallenges) { m_ShowChallenges = false; }
+        else if (m_ShowBuyables) { m_ShowBuyables = false; }
+        else if (m_ShowMilestones) { m_ShowMilestones = false; }
+        else if (m_ShowResearch) { m_ShowResearch = false; }
+        else if (m_ShowEssenceShop) { m_ShowEssenceShop = false; }
+        else if (m_ShowSingularityShop) { m_ShowSingularityShop = false; }
+        else if (m_ShowAchievements) { m_ShowAchievements = false; }
+        else if (m_ShowStats) { m_ShowStats = false; }
+        else if (m_ShowMoreMenu) { m_ShowMoreMenu = false; } // Close hamburger menu last
+    }
+
+    // Handle unlock notification clicks (click to dismiss)
+    if (mousePressed && m_UnlockManager.HasActiveNotification()) {
+        f32 screenWidth = static_cast<f32>(input->GetWindowWidth());
+        f32 notifWidth = 400.0f;
+        f32 notifHeight = 100.0f;
+        f32 notifX = (screenWidth - notifWidth) * 0.5f;
+        f32 notifY = 100.0f;
+
+        Rect notifRect(notifX, notifY, notifWidth, notifHeight);
+        if (notifRect.Contains(Vec2(mousePos.x, mousePos.y))) {
+            m_UnlockManager.DismissNotification(0); // Dismiss the first (topmost) notification
+            return; // Don't process other clicks this frame
+        }
+    }
 
     // Scrolling support
     if (!m_ShowAchievements && !m_ShowStats && !m_ShowResearch && !m_ShowMilestones) {
@@ -1170,7 +1246,7 @@ void GameState::UpdateUI(Input* input) {
             // Handle MORE menu popup clicks
             if (!handled && m_ShowMoreMenu) {
                 f32 menuWidth = 250.0f;
-                f32 menuHeight = 210.0f; // Increased from 140 to fit 3 items
+                f32 menuHeight = 490.0f; // Increased from 420 to fit 7 items
                 f32 moreBtnWidth = 80.0f;
                 f32 boostBtnWidth = 200.0f;
                 f32 moreBtnX = 1280.0f - boostBtnWidth - moreBtnWidth - 35.0f;
@@ -1202,6 +1278,44 @@ void GameState::UpdateUI(Input* input) {
                 Rect shipRect(menuX + 10.0f, itemY, menuWidth - 20.0f, itemHeight);
                 if (shipRect.Contains(mousePos)) {
                     m_ShowSpaceship = !m_ShowSpaceship;
+                    m_ShowMoreMenu = false; // Close menu after selection
+                    handled = true;
+                }
+
+                // Battle button
+                itemY += itemHeight + 10.0f;
+                Rect battleRect(menuX + 10.0f, itemY, menuWidth - 20.0f, itemHeight);
+                if (battleRect.Contains(mousePos)) {
+                    // Start combat and show combat screen
+                    StartRandomCombat();
+                    m_ShowCombat = true;
+                    m_ShowMoreMenu = false; // Close menu after selection
+                    handled = true;
+                }
+
+                // Summon button
+                itemY += itemHeight + 10.0f;
+                Rect summonRect(menuX + 10.0f, itemY, menuWidth - 20.0f, itemHeight);
+                if (summonRect.Contains(mousePos)) {
+                    m_ShowGatcha = !m_ShowGatcha;
+                    m_ShowMoreMenu = false; // Close menu after selection
+                    handled = true;
+                }
+
+                // Skills button
+                itemY += itemHeight + 10.0f;
+                Rect skillsRect(menuX + 10.0f, itemY, menuWidth - 20.0f, itemHeight);
+                if (skillsRect.Contains(mousePos)) {
+                    m_ShowSkills = !m_ShowSkills;
+                    m_ShowMoreMenu = false; // Close menu after selection
+                    handled = true;
+                }
+
+                // Enhancement button
+                itemY += itemHeight + 10.0f;
+                Rect enhanceRect(menuX + 10.0f, itemY, menuWidth - 20.0f, itemHeight);
+                if (enhanceRect.Contains(mousePos)) {
+                    m_ShowEnhancement = !m_ShowEnhancement;
                     m_ShowMoreMenu = false; // Close menu after selection
                     handled = true;
                 }
@@ -1332,6 +1446,98 @@ void GameState::UpdateUI(Input* input) {
             }
         }
     }
+
+    // Handle combat UI clicks
+    if (m_ShowCombat && m_CombatSystem.IsInCombat()) {
+        // Check close button first (44px button in top-right, mobile-first design)
+        if (mousePressed) {
+            f32 panelWidth = 900.0f;
+            f32 panelHeight = 600.0f;
+            f32 panelX = (static_cast<f32>(input->GetWindowWidth()) - panelWidth) * 0.5f;
+            f32 panelY = (static_cast<f32>(input->GetWindowHeight()) - panelHeight) * 0.5f;
+
+            f32 closeBtnSize = 44.0f;
+            f32 closeBtnX = panelX + panelWidth - closeBtnSize - 10.0f;
+            f32 closeBtnY = panelY + 10.0f;
+
+            Rect closeBtn(closeBtnX, closeBtnY, closeBtnSize, closeBtnSize);
+            if (closeBtn.Contains(Vec2(mousePos.x, mousePos.y))) {
+                m_ShowCombat = false;
+                return;
+            }
+        }
+
+        m_CombatSystem.HandleClick(mousePos.x, mousePos.y, mousePressed);
+    }
+
+    // Handle gatcha UI clicks
+    if (m_ShowGatcha) {
+        // Check close button first (44px button in top-right, mobile-first design)
+        if (mousePressed) {
+            f32 panelWidth = 950.0f;
+            f32 panelHeight = 700.0f;
+            f32 panelX = (static_cast<f32>(input->GetWindowWidth()) - panelWidth) * 0.5f;
+            f32 panelY = (static_cast<f32>(input->GetWindowHeight()) - panelHeight) * 0.5f;
+
+            f32 closeBtnSize = 44.0f;
+            f32 closeBtnX = panelX + panelWidth - closeBtnSize - 10.0f;
+            f32 closeBtnY = panelY + 10.0f;
+
+            Rect closeBtn(closeBtnX, closeBtnY, closeBtnSize, closeBtnSize);
+            if (closeBtn.Contains(Vec2(mousePos.x, mousePos.y))) {
+                m_ShowGatcha = false;
+                return;
+            }
+        }
+
+        m_GatchaSystem.HandleClick(mousePos.x, mousePos.y, mousePressed, this);
+    }
+
+    // Handle skill tree UI clicks
+    if (m_ShowSkills) {
+        // Check close button first (44px button in top-right, mobile-first design)
+        if (mousePressed) {
+            f32 panelWidth = 1000.0f;
+            f32 panelHeight = 700.0f;
+            f32 panelX = (static_cast<f32>(input->GetWindowWidth()) - panelWidth) * 0.5f;
+            f32 panelY = (static_cast<f32>(input->GetWindowHeight()) - panelHeight) * 0.5f;
+
+            f32 closeBtnSize = 44.0f;
+            f32 closeBtnX = panelX + panelWidth - closeBtnSize - 10.0f;
+            f32 closeBtnY = panelY + 10.0f;
+
+            Rect closeBtn(closeBtnX, closeBtnY, closeBtnSize, closeBtnSize);
+            if (closeBtn.Contains(Vec2(mousePos.x, mousePos.y))) {
+                m_ShowSkills = false;
+                return;
+            }
+        }
+
+        m_SkillTree.HandleClick(mousePos.x, mousePos.y, mousePressed, this);
+    }
+
+    // Handle enhancement UI clicks
+    if (m_ShowEnhancement) {
+        // Check close button first (44px button in top-right, mobile-first design)
+        if (mousePressed) {
+            f32 panelWidth = 900.0f;
+            f32 panelHeight = 700.0f;
+            f32 panelX = (static_cast<f32>(input->GetWindowWidth()) - panelWidth) * 0.5f;
+            f32 panelY = (static_cast<f32>(input->GetWindowHeight()) - panelHeight) * 0.5f;
+
+            f32 closeBtnSize = 44.0f;
+            f32 closeBtnX = panelX + panelWidth - closeBtnSize - 10.0f;
+            f32 closeBtnY = panelY + 10.0f;
+
+            Rect closeBtn(closeBtnX, closeBtnY, closeBtnSize, closeBtnSize);
+            if (closeBtn.Contains(Vec2(mousePos.x, mousePos.y))) {
+                m_ShowEnhancement = false;
+                return;
+            }
+        }
+
+        m_EnhancementSystem.HandleClick(mousePos.x, mousePos.y, mousePressed, this);
+    }
 }
 
 void GameState::Render(Renderer* renderer) {
@@ -1407,9 +1613,21 @@ void GameState::Render(Renderer* renderer) {
     RenderEssenceShop(renderer);
     RenderSingularityShop(renderer);
     RenderSpaceship(renderer);
+    RenderCombat(renderer); // Combat overlay renders on top
+    RenderGatcha(renderer); // Gatcha overlay renders on top
+    RenderSkillTree(renderer); // Skill tree overlay renders on top
+
+    // Render enhancement UI
+    if (m_ShowEnhancement) {
+        m_EnhancementSystem.RenderEnhancementUI(renderer, this);
+    }
+
     RenderParticleEffects(renderer, 1.0/60.0); // Assume 60 FPS for particles
     RenderAchievementNotifications(renderer);
     RenderMilestoneNotifications(renderer);
+
+    // Feature unlock notifications (render on top)
+    m_UnlockManager.RenderNotifications(renderer);
 
     // Prestige flash effect (screen overlay, on top of everything)
     if (m_PrestigeFlashActive) {
@@ -1856,26 +2074,30 @@ void GameState::RenderUI(Renderer* renderer) {
     f32 moreBtnX = static_cast<f32>(renderer->GetWidth()) - boostBtnWidth - moreBtnWidth - 35.0f;
     Rect moreBtnRect(moreBtnX, btnY, moreBtnWidth, btnHeight);
 
-    Color moreColor = m_ShowMoreMenu ? Color::NeonCyan() : Color(0.5f, 0.5f, 0.5f, 1.0f);
-    renderer->DrawRect(moreBtnRect, moreColor * 0.25f, true);
+    // More visible colors for hamburger menu
+    Color moreColor = m_ShowMoreMenu ? Color::NeonCyan() : Color(0.3f, 0.4f, 0.5f, 1.0f); // Subtle blue-gray tint
+    Color moreBgColor = m_ShowMoreMenu ? (moreColor * 0.4f) : (moreColor * 0.35f); // Brighter background
+    renderer->DrawRect(moreBtnRect, moreBgColor, true);
 
     if (m_ShowMoreMenu) {
         Rect glowRect(moreBtnX - 2.0f, btnY - 2.0f, moreBtnWidth + 4.0f, btnHeight + 4.0f);
         renderer->DrawRect(glowRect, Color::NeonCyan() * 0.9f, false);
     } else {
-        renderer->DrawRect(moreBtnRect, Color::DarkBorder(), false);
+        // More visible border when inactive
+        renderer->DrawRect(moreBtnRect, Color(0.4f, 0.5f, 0.6f, 0.8f), false);
     }
 
-    // Hamburger icon (three lines)
+    // Hamburger icon (three lines) - brighter and more visible
     f32 lineWidth = 30.0f;
     f32 lineHeight = 3.0f;
     f32 lineSpacing = 8.0f;
     f32 lineStartX = moreBtnX + (moreBtnWidth - lineWidth) * 0.5f;
     f32 lineStartY = btnY + (btnHeight - (lineHeight * 3 + lineSpacing * 2)) * 0.5f;
 
+    Color lineColor = m_ShowMoreMenu ? Color::NeonCyan() : Color(0.8f, 0.9f, 1.0f, 1.0f); // Bright cyan-white
     for (int i = 0; i < 3; i++) {
         Rect line(lineStartX, lineStartY + i * (lineHeight + lineSpacing), lineWidth, lineHeight);
-        renderer->DrawRect(line, Color::White(), true);
+        renderer->DrawRect(line, lineColor, true);
     }
 
     // Boost button (right side of nav bar) - BIGGER for touch
@@ -1941,10 +2163,10 @@ void GameState::RenderUI(Renderer* renderer) {
         renderer->DrawText("v v v", arrowPos2, glowColor, 14.0f);
     }
 
-    // MORE Menu Popup (shows Achievements, Singularity Shop, and Spaceship)
+    // MORE Menu Popup (shows Achievements, Singularity Shop, Spaceship, Combat, Summon, Skills, and Enhancement)
     if (m_ShowMoreMenu) {
         f32 menuWidth = 250.0f;
-        f32 menuHeight = 210.0f; // Increased from 140 to fit 3 items
+        f32 menuHeight = 490.0f; // Increased from 420 to fit 7 items
         f32 menuX = moreBtnX;
         f32 menuY = navY + navHeight + 5.0f;
 
@@ -1988,6 +2210,50 @@ void GameState::RenderUI(Renderer* renderer) {
         f32 shipTextWidth = strlen("SPACESHIP") * 7.5f;
         Vec2 shipTextPos(menuX + (menuWidth - shipTextWidth) * 0.5f, itemY + (itemHeight - 16.0f) * 0.5f + 2.0f);
         renderer->DrawText("SPACESHIP", shipTextPos, Color::White(), 16.0f);
+
+        // Combat/Battle button
+        itemY += itemHeight + 10.0f;
+        Rect battleRect(menuX + 10.0f, itemY, menuWidth - 20.0f, itemHeight);
+        Color battleColor = m_ShowCombat ? Color(1.0f, 0.3f, 0.3f, 1.0f) : Color(0.3f, 0.3f, 0.3f, 1.0f); // Red color
+        renderer->DrawRect(battleRect, battleColor * 0.3f, true);
+        renderer->DrawRect(battleRect, battleColor, false);
+
+        f32 battleTextWidth = strlen("BATTLE") * 7.5f;
+        Vec2 battleTextPos(menuX + (menuWidth - battleTextWidth) * 0.5f, itemY + (itemHeight - 16.0f) * 0.5f + 2.0f);
+        renderer->DrawText("BATTLE", battleTextPos, Color::White(), 16.0f);
+
+        // Summon/Gatcha button
+        itemY += itemHeight + 10.0f;
+        Rect summonRect(menuX + 10.0f, itemY, menuWidth - 20.0f, itemHeight);
+        Color summonColor = m_ShowGatcha ? Color(1.0f, 0.3f, 1.0f, 1.0f) : Color(0.3f, 0.3f, 0.3f, 1.0f); // Magenta color
+        renderer->DrawRect(summonRect, summonColor * 0.3f, true);
+        renderer->DrawRect(summonRect, summonColor, false);
+
+        f32 summonTextWidth = strlen("SUMMON") * 7.5f;
+        Vec2 summonTextPos(menuX + (menuWidth - summonTextWidth) * 0.5f, itemY + (itemHeight - 16.0f) * 0.5f + 2.0f);
+        renderer->DrawText("SUMMON", summonTextPos, Color::White(), 16.0f);
+
+        // Skills button
+        itemY += itemHeight + 10.0f;
+        Rect skillsRect(menuX + 10.0f, itemY, menuWidth - 20.0f, itemHeight);
+        Color skillsColor = m_ShowSkills ? Color(0.0f, 1.0f, 0.5f, 1.0f) : Color(0.3f, 0.3f, 0.3f, 1.0f); // Green color
+        renderer->DrawRect(skillsRect, skillsColor * 0.3f, true);
+        renderer->DrawRect(skillsRect, skillsColor, false);
+
+        f32 skillsTextWidth = strlen("SKILLS") * 7.5f;
+        Vec2 skillsTextPos(menuX + (menuWidth - skillsTextWidth) * 0.5f, itemY + (itemHeight - 16.0f) * 0.5f + 2.0f);
+        renderer->DrawText("SKILLS", skillsTextPos, Color::White(), 16.0f);
+
+        // Enhancement button
+        itemY += itemHeight + 10.0f;
+        Rect enhanceRect(menuX + 10.0f, itemY, menuWidth - 20.0f, itemHeight);
+        Color enhanceColor = m_ShowEnhancement ? Color(0.8f, 0.6f, 0.2f, 1.0f) : Color(0.3f, 0.3f, 0.3f, 1.0f); // Gold color
+        renderer->DrawRect(enhanceRect, enhanceColor * 0.3f, true);
+        renderer->DrawRect(enhanceRect, enhanceColor, false);
+
+        f32 enhanceTextWidth = strlen("ENHANCE") * 7.5f;
+        Vec2 enhanceTextPos(menuX + (menuWidth - enhanceTextWidth) * 0.5f, itemY + (itemHeight - 16.0f) * 0.5f + 2.0f);
+        renderer->DrawText("ENHANCE", enhanceTextPos, Color::White(), 16.0f);
     }
 }
 
@@ -4210,3 +4476,144 @@ void GameState::SpawnResourceParticles(const Vec2& start, const Vec2& end, const
 // ============================================================================
 
 // These will be implemented at the end of the file to keep code organized
+
+// ============================================================================
+// COMBAT SYSTEM INTEGRATION
+// ============================================================================
+
+void GameState::StartRandomCombat() {
+    // Generate random enemy based on player level
+    m_CurrentEnemy = EnemyGenerator::GenerateEnemy(m_PlayerLevel);
+
+    // Start combat with current enemy (pass this to apply skill bonuses)
+    m_CombatSystem.StartCombat(&m_CurrentEnemy, m_PlayerLevel, &m_Spaceship, this);
+    
+    Log::Infof("Starting combat with ", m_CurrentEnemy.GetName());
+}
+
+void GameState::EndCombat() {
+    if (!m_CombatSystem.IsInCombat()) return;
+    
+    // Check if we won and award rewards
+    if (m_CombatSystem.GetState() == CombatState::Victory) {
+        // Award credits (as Qubits)
+        AddResource(QuantumResource::Qubits, static_cast<f64>(m_CombatSystem.GetCreditsEarned()));
+        
+        // Award XP
+        AddXP(static_cast<f64>(m_CombatSystem.GetXPEarned()));
+
+        // Award enhancement materials based on enemy level
+        i32 techScraps = 2 + (m_PlayerLevel / 5); // 2-22 scraps
+        i32 nanoAlloy = (m_PlayerLevel >= 10) ? (1 + m_PlayerLevel / 10) : 0; // 0-11 alloy
+        i32 quantumCore = (m_PlayerLevel >= 30) ? (m_PlayerLevel / 30) : 0; // 0-3 cores
+
+        m_EnhancementSystem.AddMaterial(MaterialType::TechScraps, techScraps);
+        if (nanoAlloy > 0) m_EnhancementSystem.AddMaterial(MaterialType::NanoAlloy, nanoAlloy);
+        if (quantumCore > 0) m_EnhancementSystem.AddMaterial(MaterialType::QuantumCore, quantumCore);
+
+        // Award ship part if dropped
+        if (m_CombatSystem.GetPartDropped()) {
+            // Generate part based on enemy's min rarity
+            i32 minRarity = m_CurrentEnemy.GetMinPartRarity();
+            PartRarity rarity = static_cast<PartRarity>(minRarity);
+            
+            // Random chance for higher rarity
+            i32 roll = rand() % 100;
+            if (roll < 20 && minRarity < 4) { // 20% chance for +1 rarity
+                rarity = static_cast<PartRarity>(minRarity + 1);
+            }
+            
+            ShipPart droppedPart = ShipPartGenerator::GeneratePart(rarity);
+            m_Spaceship.AddPart(droppedPart);
+            
+            Log::Infof("Combat reward: ", droppedPart.GetRarityName(), " ", droppedPart.name);
+        }
+    }
+    
+    // End the combat
+    m_CombatSystem.EndCombat();
+    m_ShowCombat = false;
+    
+    Log::Info("Combat ended");
+}
+
+f64 GameState::GetXPForNextLevel() const {
+    // XP required scales exponentially: 100 * (level ^ 1.5)
+    return 100.0 * pow(static_cast<f64>(m_PlayerLevel), 1.5);
+}
+
+void GameState::AddXP(f64 amount) {
+    m_PlayerXP += amount;
+
+    // Check for level up
+    f64 xpRequired = GetXPForNextLevel();
+    while (m_PlayerXP >= xpRequired && m_PlayerLevel < 100) {
+        m_PlayerXP -= xpRequired;
+        m_PlayerLevel++;
+
+        Log::Infof("LEVEL UP! You are now level ", m_PlayerLevel);
+
+        // Check for unlocked features
+        m_UnlockManager.OnLevelUp(m_PlayerLevel);
+
+        // Award Stellar Shards on level up!
+        i32 shardsEarned = 1 + (m_PlayerLevel / 10); // 1 shard + bonus every 10 levels
+        m_GatchaSystem.AddStellarShards(shardsEarned);
+        Log::Infof("Earned ", shardsEarned, " Stellar Shards!");
+
+        // Award Summon Tickets at milestone levels
+        if (m_PlayerLevel % 10 == 0) {
+            m_GatchaSystem.AddSummonTickets(1);
+            Log::Info("Earned 1 Summon Ticket!");
+        }
+
+        // Award Skill Points on level up!
+        m_SkillTree.AddSkillPoints(1);
+        Log::Info("Earned 1 Skill Point!");
+
+        // Spawn celebration particles
+        SpawnParticleBurst(Vec2(640.0f, 360.0f), Color(1.0f, 0.9f, 0.0f, 1.0f), 30);
+
+        // Recalculate for next level
+        xpRequired = GetXPForNextLevel();
+    }
+}
+
+void GameState::RenderCombat(Renderer* renderer) {
+    if (!m_ShowCombat) return;
+    
+    // Render the combat UI
+    m_CombatSystem.RenderCombatUI(renderer);
+    
+    // Show level/XP bar at the top
+    f32 xpBarWidth = 300.0f;
+    f32 xpBarHeight = 25.0f;
+    f32 xpBarX = 10.0f;
+    f32 xpBarY = 10.0f;
+    
+    f64 xpPercent = m_PlayerXP / GetXPForNextLevel();
+    
+    Rect xpBarBg(xpBarX, xpBarY, xpBarWidth, xpBarHeight);
+    Rect xpBarFill(xpBarX, xpBarY, xpBarWidth * xpPercent, xpBarHeight);
+    
+    renderer->DrawRect(xpBarBg, Color(0.2f, 0.2f, 0.2f, 0.8f), true);
+    renderer->DrawRect(xpBarFill, Color(1.0f, 0.9f, 0.0f, 1.0f), true);
+    
+    char levelText[64];
+    snprintf(levelText, sizeof(levelText), "Level %d - %.0f / %.0f XP", m_PlayerLevel, m_PlayerXP, GetXPForNextLevel());
+    renderer->DrawText(levelText, Vec2(xpBarX + 5.0f, xpBarY + 5.0f), Color::White(), 14.0f);
+}
+
+void GameState::RenderGatcha(Renderer* renderer) {
+    if (!m_ShowGatcha) return;
+
+    // Render the gatcha UI
+    m_GatchaSystem.RenderSummonUI(renderer, this);
+}
+
+void GameState::RenderSkillTree(Renderer* renderer) {
+    if (!m_ShowSkills) return;
+
+    // Render the skill tree UI
+    m_SkillTree.RenderSkillTree(renderer, this);
+}

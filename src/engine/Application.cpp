@@ -3,6 +3,7 @@
 #include "Input.h"
 #include "GameState.h"
 #include "Logger.h"
+#include "imgui_impl_sdl2.h"  // For ImGui SDL2 event processing
 #include "Platform.h"
 #include <SDL.h>
 #include <SDL_opengl.h>
@@ -115,7 +116,7 @@ bool Application::Initialize() {
 
     // Initialize subsystems
     m_Renderer = CreateScope<Renderer>();
-    if (!m_Renderer->Initialize(m_Config.windowWidth, m_Config.windowHeight)) {
+    if (!m_Renderer->Initialize(m_Window, m_GLContext, m_Config.windowWidth, m_Config.windowHeight)) {
         Log::Error("Failed to initialize renderer");
         return false;
     }
@@ -207,6 +208,9 @@ void Application::ProcessEvents() {
 
     SDL_Event event;
     while (SDL_PollEvent(&event)) {
+        // Let ImGui process the event first
+        ImGui_ImplSDL2_ProcessEvent(&event);
+
         if (event.type == SDL_QUIT) {
             m_Running = false;
         }
