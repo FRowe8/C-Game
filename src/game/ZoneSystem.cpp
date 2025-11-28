@@ -172,40 +172,14 @@ Enemy Zone::GenerateEnemyForStage(i32 stageIndex) const {
 
     const Stage& stage = m_Stages[stageIndex];
 
-    // Generate enemy based on zone theme
-    Enemy enemy = EnemyGenerator::GenerateEnemy(stage.recommendedLevel);
-
-    // Zone-specific enemy name prefixes
-    std::string prefix = "";
-    switch (m_ID) {
-        case ZoneID::AsteroidBelt:
-            prefix = stage.isBossStage ? "Asteroid Tyrant" : "Mining";
-            break;
-        case ZoneID::NebulaFrontier:
-            prefix = stage.isBossStage ? "Nebula Lord" : "Cosmic";
-            break;
-        case ZoneID::DerelictFleet:
-            prefix = stage.isBossStage ? "Fleet Admiral" : "Corrupted";
-            break;
-        case ZoneID::BlackHoleHorizon:
-            prefix = stage.isBossStage ? "Void Emperor" : "Temporal";
-            break;
-        case ZoneID::AncientArmada:
-            prefix = stage.isBossStage ? "Ancient Overlord" : "Legendary";
-            break;
-        default:
-            prefix = "Unknown";
-            break;
-    }
-
-    enemy.SetNamePrefix(prefix);
-
-    // Boss stages get tier upgrades
+    // Boss stages generate boss enemies
     if (stage.isBossStage) {
-        enemy.SetType(EnemyType::Boss);
+        EnemyTier tier = EnemyGenerator::GetTierFromLevel(stage.recommendedLevel);
+        return EnemyGenerator::GenerateBoss(tier);
     }
 
-    return enemy;
+    // Normal stages generate random enemies for the level
+    return EnemyGenerator::GenerateEnemy(stage.recommendedLevel);
 }
 
 void Zone::ClaimFirstClearReward(i32 stageIndex, GameState* state) {
