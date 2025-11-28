@@ -227,7 +227,7 @@ bool UIButton::WasClicked(const Vec2& mousePos, bool mousePressed) {
 GameState::GameState()
     : m_CurrentEvent(nullptr), m_TimeSinceLastEvent(0), m_EventCooldown(120.0),
       m_LastSaveTimestamp(0),
-      m_ShowAchievements(false), m_ShowStats(false), m_ShowResearch(false), m_ShowMilestones(false), m_ShowBuyables(false), m_ShowChallenges(false), m_ShowEssenceShop(false), m_ShowSingularityShop(false),
+      m_ShowAchievements(false), m_ShowStats(false), m_ShowResearch(false), m_ShowMilestones(false), m_ShowBuyables(false), m_ShowChallenges(false), m_ShowEssenceShop(false), m_ShowSingularityShop(false), m_ShowMoreMenu(false),
       m_NumberFormat(GameUtils::NumberFormat::Suffix),
       m_TotalTimePlayed(0), m_TimeSinceLastSave(0),
       m_Coherence(100), m_MaxCoherence(100), m_CoherenceDecayRate(1.0),
@@ -1099,6 +1099,56 @@ void GameState::UpdateUI(Input* input) {
                     break;  // Only handle one click per frame
                 }
             }
+
+            // Check MORE menu button
+            if (!handled) {
+                f32 boostBtnWidth = 200.0f;
+                f32 moreBtnWidth = 80.0f;
+                f32 moreBtnX = 1280.0f - boostBtnWidth - moreBtnWidth - 35.0f;
+                Rect moreBtnRect(moreBtnX, btnY, moreBtnWidth, btnHeight);
+
+                if (moreBtnRect.Contains(mousePos)) {
+                    m_ShowMoreMenu = !m_ShowMoreMenu;
+                    handled = true;
+                }
+            }
+
+            // Handle MORE menu popup clicks
+            if (!handled && m_ShowMoreMenu) {
+                f32 menuWidth = 250.0f;
+                f32 menuHeight = 140.0f;
+                f32 moreBtnWidth = 80.0f;
+                f32 boostBtnWidth = 200.0f;
+                f32 moreBtnX = 1280.0f - boostBtnWidth - moreBtnWidth - 35.0f;
+                f32 menuX = moreBtnX;
+                f32 menuY = navY + navHeight + 5.0f;
+
+                f32 itemHeight = 60.0f;
+                f32 itemY = menuY + 10.0f;
+
+                // Achievements button
+                Rect achievementsRect(menuX + 10.0f, itemY, menuWidth - 20.0f, itemHeight);
+                if (achievementsRect.Contains(mousePos)) {
+                    m_ShowAchievements = !m_ShowAchievements;
+                    m_ShowMoreMenu = false; // Close menu after selection
+                    handled = true;
+                }
+
+                // Singularity button
+                itemY += itemHeight + 10.0f;
+                Rect singularityRect(menuX + 10.0f, itemY, menuWidth - 20.0f, itemHeight);
+                if (singularityRect.Contains(mousePos)) {
+                    m_ShowSingularityShop = !m_ShowSingularityShop;
+                    m_ShowMoreMenu = false; // Close menu after selection
+                    handled = true;
+                }
+
+                // Click outside menu closes it
+                Rect menuBg(menuX, menuY, menuWidth, menuHeight);
+                if (!handled && !menuBg.Contains(mousePos)) {
+                    m_ShowMoreMenu = false;
+                }
+            }
         }
     }
 
@@ -1710,9 +1760,37 @@ void GameState::RenderUI(Renderer* renderer) {
         }
 
         // Button text (centered, LARGER font for readability)
-        f32 textWidth = strlen(btn.label) * 9.0f;  // Approximate width (larger)
-        Vec2 textPos(x + (btnWidth - textWidth) * 0.5f, btnY + (btnHeight - 16.0f) * 0.5f);
-        renderer->DrawText(btn.label, textPos, Color::White(), 16.0f); // Increased from 11px
+        // Better text width calculation: ~7.5px per character for 16px font
+        f32 textWidth = strlen(btn.label) * 7.5f;
+        Vec2 textPos(x + (btnWidth - textWidth) * 0.5f, btnY + (btnHeight - 16.0f) * 0.5f + 2.0f);
+        renderer->DrawText(btn.label, textPos, Color::White(), 16.0f);
+    }
+
+    // MORE menu button (hamburger menu for overflow items) - far right before boost
+    f32 moreBtnWidth = 80.0f;
+    f32 moreBtnX = static_cast<f32>(renderer->GetWidth()) - boostBtnWidth - moreBtnWidth - 35.0f;
+    Rect moreBtnRect(moreBtnX, btnY, moreBtnWidth, btnHeight);
+
+    Color moreColor = m_ShowMoreMenu ? Color::NeonCyan() : Color(0.5f, 0.5f, 0.5f, 1.0f);
+    renderer->DrawRect(moreBtnRect, moreColor * 0.25f, true);
+
+    if (m_ShowMoreMenu) {
+        Rect glowRect(moreBtnX - 2.0f, btnY - 2.0f, moreBtnWidth + 4.0f, btnHeight + 4.0f);
+        renderer->DrawRect(glowRect, Color::NeonCyan() * 0.9f, false);
+    } else {
+        renderer->DrawRect(moreBtnRect, Color::DarkBorder(), false);
+    }
+
+    // Hamburger icon (three lines)
+    f32 lineWidth = 30.0f;
+    f32 lineHeight = 3.0f;
+    f32 lineSpacing = 8.0f;
+    f32 lineStartX = moreBtnX + (moreBtnWidth - lineWidth) * 0.5f;
+    f32 lineStartY = btnY + (btnHeight - (lineHeight * 3 + lineSpacing * 2)) * 0.5f;
+
+    for (int i = 0; i < 3; i++) {
+        Rect line(lineStartX, lineStartY + i * (lineHeight + lineSpacing), lineWidth, lineHeight);
+        renderer->DrawRect(line, Color::White(), true);
     }
 
     // Boost button (right side of nav bar) - BIGGER for touch
@@ -1776,6 +1854,44 @@ void GameState::RenderUI(Renderer* renderer) {
         renderer->DrawText("SCROLL DOWN", arrowPos, glowColor, 13.0f);
         Vec2 arrowPos2(static_cast<f32>(renderer->GetWidth()) - 60.0f, indicatorY + 15.0f);
         renderer->DrawText("v v v", arrowPos2, glowColor, 14.0f);
+    }
+
+    // MORE Menu Popup (shows Achievements and Singularity Shop)
+    if (m_ShowMoreMenu) {
+        f32 menuWidth = 250.0f;
+        f32 menuHeight = 140.0f;
+        f32 menuX = moreBtnX;
+        f32 menuY = navY + navHeight + 5.0f;
+
+        // Background
+        Rect menuBg(menuX, menuY, menuWidth, menuHeight);
+        renderer->DrawRect(menuBg, Color::DarkPanel(), true);
+        renderer->DrawRect(menuBg, Color::NeonCyan() * 0.8f, false);
+
+        // Menu items
+        f32 itemHeight = 60.0f;
+        f32 itemY = menuY + 10.0f;
+
+        // Achievements button
+        Rect achievementsRect(menuX + 10.0f, itemY, menuWidth - 20.0f, itemHeight);
+        Color achievementsColor = m_ShowAchievements ? Color::ElectricBlue() : Color(0.3f, 0.3f, 0.3f, 1.0f);
+        renderer->DrawRect(achievementsRect, achievementsColor * 0.3f, true);
+        renderer->DrawRect(achievementsRect, achievementsColor, false);
+
+        f32 achievementsTextWidth = strlen("ACHIEVEMENTS") * 7.5f;
+        Vec2 achievementsTextPos(menuX + (menuWidth - achievementsTextWidth) * 0.5f, itemY + (itemHeight - 16.0f) * 0.5f + 2.0f);
+        renderer->DrawText("ACHIEVEMENTS", achievementsTextPos, Color::White(), 16.0f);
+
+        // Singularity Shop button
+        itemY += itemHeight + 10.0f;
+        Rect singularityRect(menuX + 10.0f, itemY, menuWidth - 20.0f, itemHeight);
+        Color singularityColor = m_ShowSingularityShop ? Color(0.5f, 0.0f, 1.0f, 1.0f) : Color(0.3f, 0.3f, 0.3f, 1.0f);
+        renderer->DrawRect(singularityRect, singularityColor * 0.3f, true);
+        renderer->DrawRect(singularityRect, singularityColor, false);
+
+        f32 singularityTextWidth = strlen("SINGULARITY") * 7.5f;
+        Vec2 singularityTextPos(menuX + (menuWidth - singularityTextWidth) * 0.5f, itemY + (itemHeight - 16.0f) * 0.5f + 2.0f);
+        renderer->DrawText("SINGULARITY", singularityTextPos, Color::White(), 16.0f);
     }
 }
 

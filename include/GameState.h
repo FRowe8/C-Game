@@ -335,6 +335,7 @@ private:
     bool m_ShowChallenges;
     bool m_ShowEssenceShop;
     bool m_ShowSingularityShop;
+    bool m_ShowMoreMenu; // Overflow menu for less frequent pages
     GameUtils::NumberFormat m_NumberFormat; // Toggle between suffix (1.23M) and scientific (1.23e6)
 
     // Game time
