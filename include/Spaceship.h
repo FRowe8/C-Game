@@ -41,12 +41,21 @@ struct ShipPart {
     bool installed;        // Is this part currently installed?
     i32 tier;              // Visual tier (1-5 based on rarity)
 
+    // Enhancement system
+    i32 enhancementLevel;  // +0 to +15 (adds 10% per level to bonuses)
+    i32 stars;             // 1 to 6 stars (major stat boosts)
+
     ShipPart();
     ShipPart(PartSlot slotType, PartRarity rarityTier);
 
     Color GetRarityColor() const;
     const char* GetRarityName() const;
     const char* GetSlotName() const;
+
+    // Enhancement helpers
+    f64 GetEnhancementMultiplier() const; // 1.0 + (enhancementLevel * 0.10)
+    f64 GetStarMultiplier() const;        // 1.0 + (stars - 1) * 0.25
+    f64 GetTotalMultiplier() const;       // Enhancement * Star multipliers
 };
 
 // Main spaceship progression system
