@@ -4,6 +4,8 @@
 #include <string>
 #include <functional>
 #include <vector>
+#include <cmath>
+
 
 // Forward declaration
 class GameState;
@@ -31,7 +33,7 @@ struct BuyableUpgrade {
         return baseCost * std::pow(costMultiplier, timesPurchased);
     }
 
-    // Helper: Check if can afford
+    // Helper: Check can afford
     bool CanAfford(f64 currentResources) const {
         if (timesPurchased >= maxPurchases && maxPurchases != -1) {
             return false; // Already maxed out

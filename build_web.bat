@@ -1,3 +1,4 @@
+
 @echo off
 REM Build script for Web (Emscripten) version - Windows
 

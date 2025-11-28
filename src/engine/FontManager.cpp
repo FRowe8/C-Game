@@ -9,6 +9,7 @@
 #ifdef PLATFORM_WINDOWS
 #include <windows.h>
 #include <GL/gl.h>
+
 #elif defined(PLATFORM_MACOS)
 #include <OpenGL/gl.h>
 #else
