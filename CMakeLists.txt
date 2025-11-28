@@ -56,6 +56,8 @@ endif()
 include_directories(
     ${CMAKE_SOURCE_DIR}/include
     ${CMAKE_SOURCE_DIR}/src
+    ${IMGUI_DIR}
+    ${IMGUI_DIR}/backends
 )
 
 # Find packages
@@ -121,6 +123,18 @@ else()
     endif()
 endif()
 
+# ImGui source files
+set(IMGUI_DIR "${CMAKE_SOURCE_DIR}/external/imgui")
+set(IMGUI_SOURCES
+    ${IMGUI_DIR}/imgui.cpp
+    ${IMGUI_DIR}/imgui_demo.cpp
+    ${IMGUI_DIR}/imgui_draw.cpp
+    ${IMGUI_DIR}/imgui_tables.cpp
+    ${IMGUI_DIR}/imgui_widgets.cpp
+    ${IMGUI_DIR}/backends/imgui_impl_sdl2.cpp
+    ${IMGUI_DIR}/backends/imgui_impl_opengl3.cpp
+)
+
 # Source files
 file(GLOB_RECURSE ENGINE_SOURCES
     "src/engine/*.cpp"
@@ -137,12 +151,14 @@ if(PLATFORM_ANDROID)
         src/Main.cpp
         ${ENGINE_SOURCES}
         ${GAME_SOURCES}
+        ${IMGUI_SOURCES}
     )
 else()
     add_executable(${PROJECT_NAME}
         src/Main.cpp
         ${ENGINE_SOURCES}
         ${GAME_SOURCES}
+        ${IMGUI_SOURCES}
     )
 endif()
 
