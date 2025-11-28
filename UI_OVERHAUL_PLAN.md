@@ -8,6 +8,8 @@
 3. **Fun & Rewarding**: Engaging graphics and animations that feel satisfying
 4. **Genre-Leading**: Stand head and shoulders above competition
 5. **Asset-Driven**: Thoughtful use of colors, effects, and visual feedback
+6. **Guided Progression**: Features unlock gradually, never overwhelming the player
+7. **Narrative Flow**: Each system connects to a cohesive space exploration story
 
 ### Visual Standards
 - **Touch-Friendly**: All buttons minimum 44px tap targets
@@ -16,6 +18,14 @@
 - **Color Theming**: Zone-specific colors that create distinct atmospheres
 - **Particle Effects**: Summons, upgrades, and victories feel spectacular
 - **Smooth Animations**: Transitions, reveals, and feedback animations
+
+### Progression Integration
+See **PROGRESSION_FLOW.md** for complete feature unlock system:
+- Features unlock based on player level (Combat@10, Summon@15, Skills@20, etc.)
+- Locked features show "🔒 Unlocks at Level X"
+- New features pulse/glow when first unlocked
+- Tutorial popups guide players through each new system
+- Never show more than 6 main features at once (prevents overwhelm)
 
 ## Current Issues
 

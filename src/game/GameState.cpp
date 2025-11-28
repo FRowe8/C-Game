@@ -375,6 +375,10 @@ void GameState::Initialize() {
     // Initialize enhancement system
     m_EnhancementSystem.Initialize();
 
+    // Initialize feature unlock manager
+    m_UnlockManager.Initialize();
+    m_UnlockManager.CheckUnlocks(m_PlayerLevel);
+
     Log::Info("Game state initialized");
 }
 
@@ -563,6 +567,9 @@ void GameState::Update(f64 deltaTime, Input* input, Renderer* renderer) {
     m_TotalTimePlayed += deltaTime;
     m_TimeSinceLastSave += deltaTime;
     m_TimeSinceLastEvent += deltaTime;
+
+    // Update feature unlock manager (handles notifications)
+    m_UnlockManager.Update(deltaTime);
 
     // Update boost timers
     if (m_BoostActive) {
@@ -806,6 +813,21 @@ void GameState::UpdateUI(Input* input) {
         else if (m_ShowAchievements) { m_ShowAchievements = false; }
         else if (m_ShowStats) { m_ShowStats = false; }
         else if (m_ShowMoreMenu) { m_ShowMoreMenu = false; } // Close hamburger menu last
+    }
+
+    // Handle unlock notification clicks (click to dismiss)
+    if (mousePressed && m_UnlockManager.HasActiveNotification()) {
+        f32 screenWidth = static_cast<f32>(input->GetWindowWidth());
+        f32 notifWidth = 400.0f;
+        f32 notifHeight = 100.0f;
+        f32 notifX = (screenWidth - notifWidth) * 0.5f;
+        f32 notifY = 100.0f;
+
+        Rect notifRect(notifX, notifY, notifWidth, notifHeight);
+        if (notifRect.Contains(Vec2(mousePos.x, mousePos.y))) {
+            m_UnlockManager.DismissNotification(0); // Dismiss the first (topmost) notification
+            return; // Don't process other clicks this frame
+        }
     }
 
     // Scrolling support
@@ -1603,6 +1625,9 @@ void GameState::Render(Renderer* renderer) {
     RenderParticleEffects(renderer, 1.0/60.0); // Assume 60 FPS for particles
     RenderAchievementNotifications(renderer);
     RenderMilestoneNotifications(renderer);
+
+    // Feature unlock notifications (render on top)
+    m_UnlockManager.RenderNotifications(renderer);
 
     // Prestige flash effect (screen overlay, on top of everything)
     if (m_PrestigeFlashActive) {
@@ -4527,6 +4552,9 @@ void GameState::AddXP(f64 amount) {
         m_PlayerLevel++;
 
         Log::Infof("LEVEL UP! You are now level ", m_PlayerLevel);
+
+        // Check for unlocked features
+        m_UnlockManager.OnLevelUp(m_PlayerLevel);
 
         // Award Stellar Shards on level up!
         i32 shardsEarned = 1 + (m_PlayerLevel / 10); // 1 shard + bonus every 10 levels
