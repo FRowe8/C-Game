@@ -8,6 +8,7 @@
 #include "EssenceShop.h"
 #include "SingularityShop.h"
 #include "GameUtils.h"
+#include "Spaceship.h"
 #include <vector>
 #include <string>
 #include <functional>
@@ -77,6 +78,12 @@ enum class AchievementID {
     Collector,            // Unlock all station types
     EventHunter,          // Experience 50 quantum events
     WeekStreak,           // Play 7 days in a row
+    // Spaceship achievements
+    FirstShipPart,        // Acquire your first ship part
+    ShipOperational,      // Repair ship to 25% (travel unlocked)
+    ShipFullyRepaired,    // Repair ship to 100%
+    FirstLegendaryPart,   // Find a legendary ship part
+    PartCollector,        // Collect 50 ship parts
     TotalCount            // Keep this last
 };
 
@@ -248,6 +255,9 @@ public:
     SingularityShopManager& GetSingularityShopManager() { return m_SingularityShopManager; }
     QuantumTimeline& GetTimeline() { return m_Timeline; }
 
+    // Spaceship System
+    Spaceship& GetSpaceship() { return m_Spaceship; }
+
     // Combo System (public so ResearchStation::Observe can use it)
     void AddComboPoint();
     f64 GetComboMultiplier() const;
@@ -273,6 +283,7 @@ private:
     void RenderChallenges(Renderer* renderer);
     void RenderEssenceShop(Renderer* renderer);
     void RenderSingularityShop(Renderer* renderer);
+    void RenderSpaceship(Renderer* renderer);
 
     // Particle system helpers
     void SpawnParticle(const Vec2& position, const Color& color, f64 lifetime = 1.0);
@@ -321,6 +332,9 @@ private:
     // Singularity Shop System
     SingularityShopManager m_SingularityShopManager;
 
+    // Spaceship System
+    Spaceship m_Spaceship;
+
     // Offline progress
     i64 m_LastSaveTimestamp;
 
@@ -335,6 +349,7 @@ private:
     bool m_ShowChallenges;
     bool m_ShowEssenceShop;
     bool m_ShowSingularityShop;
+    bool m_ShowSpaceship;
     bool m_ShowMoreMenu; // Overflow menu for less frequent pages
     GameUtils::NumberFormat m_NumberFormat; // Toggle between suffix (1.23M) and scientific (1.23e6)
 

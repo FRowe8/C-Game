@@ -118,6 +118,23 @@ void ResearchStation::Observe(GameState* state) {
     // Add combo point for observation
     state->AddComboPoint();
 
+    // Ship part drop chance! (20% base chance + bonus from ship's drop rate bonus)
+    f64 partDropChance = 0.20; // 20% base chance
+    f64 shipDropBonus = state->GetSpaceship().GetTotalDropRateBonus() / 100.0; // Convert % to decimal
+    partDropChance += shipDropBonus;
+
+    // Higher level stations have slightly better drop chances
+    partDropChance += (level / 100.0) * 0.05; // +5% per 100 levels
+
+    f64 partDropRoll = static_cast<f64>(rand()) / RAND_MAX;
+    if (partDropRoll < partDropChance) {
+        // Drop a ship part!
+        ShipPart droppedPart = ShipPartGenerator::GenerateRandomPart();
+        state->GetSpaceship().AddPart(droppedPart);
+
+        Log::Infof("Ship part dropped: ", droppedPart.GetRarityName(), " ", droppedPart.name);
+    }
+
     // Spawn particles for visual feedback (flying to resource counter)
     // Determine particle color based on resource type
     Color particleColor;
@@ -232,7 +249,7 @@ GameState::GameState()
     : m_CurrentEvent(nullptr), m_TimeSinceLastEvent(0), m_EventCooldown(120.0),
       m_QuantumEssence(0),
       m_LastSaveTimestamp(0),
-      m_ShowAchievements(false), m_ShowStats(false), m_ShowResearch(false), m_ShowMilestones(false), m_ShowBuyables(false), m_ShowChallenges(false), m_ShowEssenceShop(false), m_ShowSingularityShop(false), m_ShowMoreMenu(false),
+      m_ShowAchievements(false), m_ShowStats(false), m_ShowResearch(false), m_ShowMilestones(false), m_ShowBuyables(false), m_ShowChallenges(false), m_ShowEssenceShop(false), m_ShowSingularityShop(false), m_ShowSpaceship(false), m_ShowMoreMenu(false),
       m_NumberFormat(GameUtils::NumberFormat::Suffix),
       m_TotalTimePlayed(0), m_TimeSinceLastSave(0), m_TimeSinceLastPrestige(0),
       m_Coherence(100), m_MaxCoherence(100), m_CoherenceDecayRate(1.0),
@@ -283,6 +300,12 @@ void GameState::Initialize() {
         {AchievementID::Collector, "Collector", "Unlock all station types", 5, 10000, 10},
         {AchievementID::EventHunter, "Event Hunter", "Experience 50 events", 50, 5000, 5},
         {AchievementID::WeekStreak, "Dedicated", "Play 7 days in a row", 7, 20000, 15},
+        // Spaceship achievements
+        {AchievementID::FirstShipPart, "Salvage Crew", "Acquire your first ship part", 1, 500, 1},
+        {AchievementID::ShipOperational, "Flight Ready", "Repair ship to 25%", 1, 2000, 3},
+        {AchievementID::ShipFullyRepaired, "Master Engineer", "Fully repair the ship", 1, 10000, 10},
+        {AchievementID::FirstLegendaryPart, "Legendary Find", "Discover a legendary part", 1, 5000, 5},
+        {AchievementID::PartCollector, "Junkyard King", "Collect 50 ship parts", 50, 20000, 15},
     };
 
     m_Achievements.clear();
@@ -327,6 +350,10 @@ void GameState::Initialize() {
     // Initialize Singularity Shop System
     m_SingularityShopManager.Initialize(this);
     Log::Info("Singularity shop initialized");
+
+    // Initialize Spaceship System
+    m_Spaceship.Initialize();
+    Log::Info("Spaceship system initialized");
 
     // Try to load save file
     std::string savePath = Platform::GetSaveDirectory() + "quantum_save.json";
@@ -779,12 +806,13 @@ void GameState::UpdateUI(Input* input) {
     }
 
     // Keyboard shortcuts
-    // SDL_SCANCODE_A = 4, B = 5, C = 6, E = 8, F = 9, M = 13, R = 15, S = 16, ESCAPE = 41
+    // SDL_SCANCODE_A = 4, B = 5, C = 6, E = 8, F = 9, H = 11, M = 13, R = 15, S = 16, ESCAPE = 41
     const int KEY_A = 4;
     const int KEY_B = 5;
     const int KEY_C = 6;
     const int KEY_E = 8;
     const int KEY_F = 9;
+    const int KEY_H = 11;
     const int KEY_M = 13;
     const int KEY_R = 15;
     const int KEY_S = 16;
@@ -811,6 +839,9 @@ void GameState::UpdateUI(Input* input) {
     if (input->IsKeyPressed(KEY_E)) {
         m_ShowEssenceShop = !m_ShowEssenceShop;
     }
+    if (input->IsKeyPressed(KEY_H)) {
+        m_ShowSpaceship = !m_ShowSpaceship;
+    }
     if (input->IsKeyPressed(KEY_F)) {
         // Toggle number format between Suffix and Scientific
         m_NumberFormat = (m_NumberFormat == GameUtils::NumberFormat::Suffix)
@@ -827,6 +858,7 @@ void GameState::UpdateUI(Input* input) {
         m_ShowChallenges = false;
         m_ShowEssenceShop = false;
         m_ShowSingularityShop = false;
+        m_ShowSpaceship = false;
     }
 
     // Handle popup close button clicks (X button in top-right of panels)
@@ -1138,7 +1170,7 @@ void GameState::UpdateUI(Input* input) {
             // Handle MORE menu popup clicks
             if (!handled && m_ShowMoreMenu) {
                 f32 menuWidth = 250.0f;
-                f32 menuHeight = 140.0f;
+                f32 menuHeight = 210.0f; // Increased from 140 to fit 3 items
                 f32 moreBtnWidth = 80.0f;
                 f32 boostBtnWidth = 200.0f;
                 f32 moreBtnX = 1280.0f - boostBtnWidth - moreBtnWidth - 35.0f;
@@ -1161,6 +1193,15 @@ void GameState::UpdateUI(Input* input) {
                 Rect singularityRect(menuX + 10.0f, itemY, menuWidth - 20.0f, itemHeight);
                 if (singularityRect.Contains(mousePos)) {
                     m_ShowSingularityShop = !m_ShowSingularityShop;
+                    m_ShowMoreMenu = false; // Close menu after selection
+                    handled = true;
+                }
+
+                // Ship button
+                itemY += itemHeight + 10.0f;
+                Rect shipRect(menuX + 10.0f, itemY, menuWidth - 20.0f, itemHeight);
+                if (shipRect.Contains(mousePos)) {
+                    m_ShowSpaceship = !m_ShowSpaceship;
                     m_ShowMoreMenu = false; // Close menu after selection
                     handled = true;
                 }
@@ -1365,6 +1406,7 @@ void GameState::Render(Renderer* renderer) {
     RenderChallenges(renderer);
     RenderEssenceShop(renderer);
     RenderSingularityShop(renderer);
+    RenderSpaceship(renderer);
     RenderParticleEffects(renderer, 1.0/60.0); // Assume 60 FPS for particles
     RenderAchievementNotifications(renderer);
     RenderMilestoneNotifications(renderer);
@@ -1899,10 +1941,10 @@ void GameState::RenderUI(Renderer* renderer) {
         renderer->DrawText("v v v", arrowPos2, glowColor, 14.0f);
     }
 
-    // MORE Menu Popup (shows Achievements and Singularity Shop)
+    // MORE Menu Popup (shows Achievements, Singularity Shop, and Spaceship)
     if (m_ShowMoreMenu) {
         f32 menuWidth = 250.0f;
-        f32 menuHeight = 140.0f;
+        f32 menuHeight = 210.0f; // Increased from 140 to fit 3 items
         f32 menuX = moreBtnX;
         f32 menuY = navY + navHeight + 5.0f;
 
@@ -1935,6 +1977,17 @@ void GameState::RenderUI(Renderer* renderer) {
         f32 singularityTextWidth = strlen("SINGULARITY") * 7.5f;
         Vec2 singularityTextPos(menuX + (menuWidth - singularityTextWidth) * 0.5f, itemY + (itemHeight - 16.0f) * 0.5f + 2.0f);
         renderer->DrawText("SINGULARITY", singularityTextPos, Color::White(), 16.0f);
+
+        // Spaceship button
+        itemY += itemHeight + 10.0f;
+        Rect shipRect(menuX + 10.0f, itemY, menuWidth - 20.0f, itemHeight);
+        Color shipColor = m_ShowSpaceship ? Color(1.0f, 0.7f, 0.0f, 1.0f) : Color(0.3f, 0.3f, 0.3f, 1.0f); // Gold color
+        renderer->DrawRect(shipRect, shipColor * 0.3f, true);
+        renderer->DrawRect(shipRect, shipColor, false);
+
+        f32 shipTextWidth = strlen("SPACESHIP") * 7.5f;
+        Vec2 shipTextPos(menuX + (menuWidth - shipTextWidth) * 0.5f, itemY + (itemHeight - 16.0f) * 0.5f + 2.0f);
+        renderer->DrawText("SPACESHIP", shipTextPos, Color::White(), 16.0f);
     }
 }
 
@@ -2345,6 +2398,22 @@ void GameState::CheckAchievements() {
                 for (const auto& s : m_Stations) {
                     if (s.unlocked) ach.progress++;
                 }
+                break;
+            // Spaceship achievements
+            case AchievementID::FirstShipPart:
+                ach.progress = m_Spaceship.GetTotalPartsCollected();
+                break;
+            case AchievementID::ShipOperational:
+                ach.progress = m_Spaceship.GetRepairProgress() >= 25.0 ? 1 : 0;
+                break;
+            case AchievementID::ShipFullyRepaired:
+                ach.progress = m_Spaceship.GetRepairProgress() >= 100.0 ? 1 : 0;
+                break;
+            case AchievementID::FirstLegendaryPart:
+                ach.progress = m_Spaceship.GetLegendaryPartsCollected();
+                break;
+            case AchievementID::PartCollector:
+                ach.progress = m_Spaceship.GetTotalPartsCollected();
                 break;
             default:
                 break;
@@ -3846,6 +3915,63 @@ void GameState::RenderSingularityShop(Renderer* renderer) {
             renderer->DrawText("MAXED OUT", maxedPos, Color::CoherenceGreen(), 16.0f);
         }
     }
+}
+
+void GameState::RenderSpaceship(Renderer* renderer) {
+    if (!m_ShowSpaceship) return;
+
+    // Background overlay
+    Rect bg(0, 0, static_cast<f32>(renderer->GetWidth()), static_cast<f32>(renderer->GetHeight()));
+    renderer->DrawRect(bg, Color(0.0f, 0.0f, 0.0f, 0.8f), true);
+
+    // Main spaceship panel
+    f32 panelWidth = 1100.0f;
+    f32 panelHeight = 700.0f;
+    f32 panelX = (renderer->GetWidth() - panelWidth) / 2.0f;
+    f32 panelY = (renderer->GetHeight() - panelHeight) / 2.0f;
+
+    Rect panel(panelX, panelY, panelWidth, panelHeight);
+    renderer->DrawRect(panel, Color::DarkPanel(), true);
+    renderer->DrawRect(panel, Color(1.0f, 0.7f, 0.0f, 1.0f) * 0.8f, false); // Gold border
+
+    // Title
+    Vec2 titlePos(panelX + 20.0f, panelY + 15.0f);
+    renderer->DrawText("SPACESHIP - REPAIR AND UPGRADE", titlePos, Color(1.0f, 0.7f, 0.0f, 1.0f), 22.0f);
+
+    // Close button (X) in top right
+    f32 closeBtnSize = 30.0f;
+    f32 closeBtnX = panelX + panelWidth - closeBtnSize - 10.0f;
+    f32 closeBtnY = panelY + 10.0f;
+    Rect closeBtn(closeBtnX, closeBtnY, closeBtnSize, closeBtnSize);
+
+    renderer->DrawRect(closeBtn, Color(0.3f, 0.1f, 0.1f, 0.8f), true);
+    renderer->DrawRect(closeBtn, Color(1.0f, 0.7f, 0.0f, 1.0f) * 0.8f, false);
+
+    Vec2 xPos(closeBtnX + 10.0f, closeBtnY + 8.0f);
+    renderer->DrawText("X", xPos, Color::White(), 16.0f);
+
+    // Hint text
+    Vec2 hintPos(panelX + panelWidth - 250.0f, panelY + 45.0f);
+    renderer->DrawText("(Press H or ESC to close)", hintPos, Color(0.6f, 0.6f, 0.6f, 1.0f), 11.0f);
+
+    // Split panel into left (ship status) and right (inventory)
+    f32 leftPanelWidth = panelWidth * 0.5f - 15.0f;
+    f32 rightPanelWidth = panelWidth * 0.5f - 15.0f;
+    f32 contentY = panelY + 70.0f;
+    f32 contentHeight = panelHeight - 90.0f;
+
+    // Left panel: Ship status and installed parts
+    f32 leftPanelX = panelX + 10.0f;
+    m_Spaceship.RenderShipPanel(renderer, leftPanelX, contentY, leftPanelWidth, contentHeight);
+
+    // Right panel: Part inventory
+    f32 rightPanelX = panelX + leftPanelWidth + 20.0f;
+    m_Spaceship.RenderInventoryPanel(renderer, rightPanelX, contentY, rightPanelWidth, contentHeight);
+
+    // Instructions at bottom
+    Vec2 instructionPos(panelX + 20.0f, panelY + panelHeight - 25.0f);
+    renderer->DrawText("Ship parts drop from Research Station observations. Install parts to increase production & unlock travel!",
+                     instructionPos, Color(0.7f, 0.7f, 0.7f, 1.0f), 12.0f);
 }
 
 // ============================================================================
