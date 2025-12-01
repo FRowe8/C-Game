@@ -1,7 +1,7 @@
 #include "VisualFXManager.h"
 #include "Renderer.h"
 #include "GameUtils.h"
-#include "Log.h"
+#include "Logger.h"
 #include "imgui.h"
 #include "ImGuiUtils.h"
 #include <algorithm>
