@@ -62,10 +62,8 @@ set(IMGUI_SOURCES
         ${IMGUI_DIR}/imgui_widgets.cpp
         ${IMGUI_DIR}/backends/imgui_impl_sdl2.cpp
         ${IMGUI_DIR}/backends/imgui_impl_opengl3.cpp
-        include/ImGuiUtils.h
-        src/game/ui/UITheme.h
-        include/UIManager.h
-        src/game/UIManager.cpp
+        # NOTE: Project-specific files (ImGuiUtils.h, UIManager.h/cpp, UITheme.h)
+        # must be compiled with the main executable, NOT the ImGui library target.
 )
 
 add_library(ImGui STATIC ${IMGUI_SOURCES})
@@ -139,9 +137,18 @@ file(GLOB_RECURSE ENGINE_SOURCES
         "src/engine/*.c"
 )
 
+# Move UIManager.cpp and relevant headers back to the game executable's sources
+set(GAME_UI_SOURCES
+        include/ImGuiUtils.h
+        include/UIManager.h
+        src/game/UIManager.cpp
+)
+
 file(GLOB_RECURSE GAME_SOURCES
         "src/game/*.cpp"
 )
+list(APPEND GAME_SOURCES ${GAME_UI_SOURCES}) # Append the UI sources to the main list
+
 
 if(PLATFORM_ANDROID)
     add_library(${PROJECT_NAME} SHARED
