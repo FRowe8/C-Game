@@ -62,8 +62,6 @@ set(IMGUI_SOURCES
         ${IMGUI_DIR}/imgui_widgets.cpp
         ${IMGUI_DIR}/backends/imgui_impl_sdl2.cpp
         ${IMGUI_DIR}/backends/imgui_impl_opengl3.cpp
-        # NOTE: Project-specific files (ImGuiUtils.h, UIManager.h/cpp, UITheme.h)
-        # must be compiled with the main executable, NOT the ImGui library target.
 )
 
 add_library(ImGui STATIC ${IMGUI_SOURCES})
@@ -82,6 +80,14 @@ find_package(OpenGL REQUIRED)
 if(PLATFORM_WEB)
     set(SDL2_FOUND TRUE)
     message(STATUS "Using Emscripten's built-in SDL2")
+
+    # --- FIX START ---
+    # Apply Emscripten SDL compile options to the ImGui library target
+    target_compile_options(ImGui PRIVATE
+            "-sUSE_SDL=2"
+            "-sUSE_SDL_TTF=2"
+    )
+    # --- FIX END ---
 
 elseif(PLATFORM_ANDROID OR PLATFORM_IOS)
     if(PLATFORM_ANDROID)
