@@ -120,40 +120,39 @@ void UIManager::RenderBottomNavigation() {
         ImGui::SetCursorPosY(10.0f); // Padding top
 
         // 1. Stations (Home)
-        // Check if we are in "Base" state (no modal overlays open)
-        bool isBaseState = !m_GameState->m_ShowResearch && !m_GameState->m_ShowAchievements && !m_GameState->m_ShowCombat; // etc
+        bool isBaseState = (m_GameState->GetActiveModal() == ActiveModal::None);
         if (DrawNavButton("STATIONS", isBaseState, UITheme::ColorAccent, btnWidth, btnHeight)) {
-            // Close all overlays
-            m_GameState->m_ShowResearch = false;
-            m_GameState->m_ShowAchievements = false;
-            m_GameState->m_ShowStats = false;
-            m_GameState->m_ShowCombat = false;
-            // ... close others
+            // Close all overlays - return to base state
+            m_GameState->SetActiveModal(ActiveModal::None);
         }
-        ImGui::SameLine(0.0f, UITheme::ItemSpacing); // Use ItemSpacing for layout consistency
+        ImGui::SameLine(0.0f, UITheme::ItemSpacing);
 
         // 2. Research
-        if (DrawNavButton("RESEARCH", m_GameState->m_ShowResearch, UITheme::ColorPrimary, btnWidth, btnHeight)) {
-            m_GameState->m_ShowResearch = !m_GameState->m_ShowResearch;
+        bool showingResearch = (m_GameState->GetActiveModal() == ActiveModal::Research);
+        if (DrawNavButton("RESEARCH", showingResearch, UITheme::ColorPrimary, btnWidth, btnHeight)) {
+            m_GameState->SetActiveModal(showingResearch ? ActiveModal::None : ActiveModal::Research);
         }
         ImGui::SameLine(0.0f, UITheme::ItemSpacing);
 
         // 3. Upgrades (Buyables)
-        if (DrawNavButton("UPGRADES", m_GameState->m_ShowBuyables, UITheme::ColorSuccess, btnWidth, btnHeight)) {
-            m_GameState->m_ShowBuyables = !m_GameState->m_ShowBuyables;
+        bool showingBuyables = (m_GameState->GetActiveModal() == ActiveModal::Buyables);
+        if (DrawNavButton("UPGRADES", showingBuyables, UITheme::ColorSuccess, btnWidth, btnHeight)) {
+            m_GameState->SetActiveModal(showingBuyables ? ActiveModal::None : ActiveModal::Buyables);
         }
         ImGui::SameLine(0.0f, UITheme::ItemSpacing);
 
         // 4. Combat/Map
-        if (DrawNavButton("COMBAT", m_GameState->m_ShowCombat, UITheme::ColorDanger, btnWidth, btnHeight)) {
-            if(!m_GameState->m_ShowCombat) m_GameState->StartRandomCombat();
-            m_GameState->m_ShowCombat = !m_GameState->m_ShowCombat;
+        bool showingCombat = (m_GameState->GetActiveModal() == ActiveModal::Combat);
+        if (DrawNavButton("COMBAT", showingCombat, UITheme::ColorDanger, btnWidth, btnHeight)) {
+            if(!showingCombat) m_GameState->StartRandomCombat();
+            m_GameState->SetActiveModal(showingCombat ? ActiveModal::None : ActiveModal::Combat);
         }
         ImGui::SameLine(0.0f, UITheme::ItemSpacing);
 
         // 5. Menu (More)
-        if (DrawNavButton("MENU", m_GameState->m_ShowMoreMenu, UITheme::ColorText, btnWidth, btnHeight)) {
-            m_GameState->m_ShowMoreMenu = !m_GameState->m_ShowMoreMenu;
+        bool showingMenu = (m_GameState->GetActiveModal() == ActiveModal::MoreMenu);
+        if (DrawNavButton("MENU", showingMenu, UITheme::ColorText, btnWidth, btnHeight)) {
+            m_GameState->SetActiveModal(showingMenu ? ActiveModal::None : ActiveModal::MoreMenu);
         }
     }
     ImGui::End();
@@ -197,10 +196,18 @@ void UIManager::RenderOverlays() {
 
     if (ImGui::BeginPopup("MoreMenuPopup")) {
         // Render button items from GameState logic
-        if (ImGui::MenuItem("Achievements")) { m_GameState->m_ShowAchievements = true; m_GameState->m_ShowMoreMenu = false; }
-        if (ImGui::MenuItem("Statistics")) { m_GameState->m_ShowStats = true; m_GameState->m_ShowMoreMenu = false; }
+        if (ImGui::MenuItem("Achievements")) { m_GameState->SetActiveModal(ActiveModal::Achievements); }
+        if (ImGui::MenuItem("Statistics")) { m_GameState->SetActiveModal(ActiveModal::Statistics); }
+        if (ImGui::MenuItem("Milestones")) { m_GameState->SetActiveModal(ActiveModal::Milestones); }
+        if (ImGui::MenuItem("Challenges")) { m_GameState->SetActiveModal(ActiveModal::Challenges); }
+        if (ImGui::MenuItem("Essence Shop")) { m_GameState->SetActiveModal(ActiveModal::EssenceShop); }
+        if (ImGui::MenuItem("Singularity Shop")) { m_GameState->SetActiveModal(ActiveModal::SingularityShop); }
+        if (ImGui::MenuItem("Spaceship")) { m_GameState->SetActiveModal(ActiveModal::Spaceship); }
+        if (ImGui::MenuItem("Gatcha")) { m_GameState->SetActiveModal(ActiveModal::Gatcha); }
+        if (ImGui::MenuItem("Skills")) { m_GameState->SetActiveModal(ActiveModal::Skills); }
+        if (ImGui::MenuItem("Enhancement")) { m_GameState->SetActiveModal(ActiveModal::Enhancement); }
         ImGui::Separator();
-        if (ImGui::MenuItem("Close")) m_GameState->m_ShowMoreMenu = false;
+        if (ImGui::MenuItem("Close")) m_GameState->SetActiveModal(ActiveModal::None);
         ImGui::EndPopup();
     }
 }
