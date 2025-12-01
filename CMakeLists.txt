@@ -55,21 +55,21 @@ endif()
 set(IMGUI_DIR "${CMAKE_SOURCE_DIR}/external/imgui")
 
 set(IMGUI_SOURCES
-    ${IMGUI_DIR}/imgui.cpp
-    ${IMGUI_DIR}/imgui_demo.cpp
-    ${IMGUI_DIR}/imgui_draw.cpp
-    ${IMGUI_DIR}/imgui_tables.cpp
-    ${IMGUI_DIR}/imgui_widgets.cpp
-    ${IMGUI_DIR}/backends/imgui_impl_sdl2.cpp
-    ${IMGUI_DIR}/backends/imgui_impl_opengl3.cpp
+        ${IMGUI_DIR}/imgui.cpp
+        ${IMGUI_DIR}/imgui_demo.cpp
+        ${IMGUI_DIR}/imgui_draw.cpp
+        ${IMGUI_DIR}/imgui_tables.cpp
+        ${IMGUI_DIR}/imgui_widgets.cpp
+        ${IMGUI_DIR}/backends/imgui_impl_sdl2.cpp
+        ${IMGUI_DIR}/backends/imgui_impl_opengl3.cpp
         include/ImGuiUtils.h
 )
 
 add_library(ImGui STATIC ${IMGUI_SOURCES})
 
 target_include_directories(ImGui PUBLIC
-    ${IMGUI_DIR}
-    ${IMGUI_DIR}/backends
+        ${IMGUI_DIR}
+        ${IMGUI_DIR}/backends
 )
 
 target_link_libraries(ImGui PUBLIC OpenGL::GL)
@@ -131,31 +131,31 @@ endif()
 
 # Sources
 file(GLOB_RECURSE ENGINE_SOURCES
-    "src/engine/*.cpp"
-    "src/engine/*.c"
+        "src/engine/*.cpp"
+        "src/engine/*.c"
 )
 
 file(GLOB_RECURSE GAME_SOURCES
-    "src/game/*.cpp"
+        "src/game/*.cpp"
 )
 
 if(PLATFORM_ANDROID)
     add_library(${PROJECT_NAME} SHARED
-        src/Main.cpp
-        ${ENGINE_SOURCES}
-        ${GAME_SOURCES}
+            src/Main.cpp
+            ${ENGINE_SOURCES}
+            ${GAME_SOURCES}
     )
 else()
     add_executable(${PROJECT_NAME}
-        src/Main.cpp
-        ${ENGINE_SOURCES}
-        ${GAME_SOURCES}
+            src/Main.cpp
+            ${ENGINE_SOURCES}
+            ${GAME_SOURCES}
     )
 endif()
 
 target_include_directories(${PROJECT_NAME} PRIVATE
-    ${CMAKE_SOURCE_DIR}/include
-    ${CMAKE_SOURCE_DIR}/src
+        ${CMAKE_SOURCE_DIR}/include
+        ${CMAKE_SOURCE_DIR}/src
 )
 
 # Linking
@@ -213,9 +213,9 @@ elseif(PLATFORM_MACOS)
     find_library(COREVIDEO_LIBRARY CoreVideo)
 
     target_link_libraries(${PROJECT_NAME} PRIVATE
-        ${COCOA_LIBRARY}
-        ${IOKIT_LIBRARY}
-        ${COREVIDEO_LIBRARY}
+            ${COCOA_LIBRARY}
+            ${IOKIT_LIBRARY}
+            ${COREVIDEO_LIBRARY}
     )
 
     if(SDL2_FOUND)
@@ -238,32 +238,32 @@ elseif(PLATFORM_MACOS)
 
 elseif(PLATFORM_WEB)
     set_target_properties(${PROJECT_NAME} PROPERTIES
-        SUFFIX ".html"
-        OUTPUT_NAME "QuantumIdle"
+            SUFFIX ".html"
+            OUTPUT_NAME "QuantumIdle"
     )
 
     target_compile_options(${PROJECT_NAME} PRIVATE
-        "-sUSE_SDL=2"
-        "-sUSE_SDL_TTF=2"
+            "-sUSE_SDL=2"
+            "-sUSE_SDL_TTF=2"
     )
 
     set(EMSCRIPTEN_LINK_FLAGS
-        "-sUSE_SDL=2"
-        "-sUSE_SDL_TTF=2"
-        "-lidbfs.js"
-        "-sLEGACY_GL_EMULATION=1"
-        "-sGL_UNSAFE_OPTS=0"
-        "-sMIN_WEBGL_VERSION=1"
-        "-sMAX_WEBGL_VERSION=1"
-        "-sALLOW_MEMORY_GROWTH=1"
-        "-sINITIAL_MEMORY=67108864"
-        "-sMAXIMUM_MEMORY=268435456"
-        "-sSTACK_SIZE=5242880"
-        "-sASSERTIONS=1"
-        "-sGL_ASSERTIONS=1"
-        "-sDISABLE_EXCEPTION_CATCHING=1"
-        "--shell-file ${CMAKE_SOURCE_DIR}/web/index.html"
-        "--preload-file ${CMAKE_SOURCE_DIR}/assets@/assets"
+            "-sUSE_SDL=2"
+            "-sUSE_SDL_TTF=2"
+            "-lidbfs.js"
+            "-sLEGACY_GL_EMULATION=1"
+            "-sGL_UNSAFE_OPTS=0"
+            "-sMIN_WEBGL_VERSION=1"
+            "-sMAX_WEBGL_VERSION=1"
+            "-sALLOW_MEMORY_GROWTH=1"
+            "-sINITIAL_MEMORY=67108864"
+            "-sMAXIMUM_MEMORY=268435456"
+            "-sSTACK_SIZE=5242880"
+            "-sASSERTIONS=1"
+            "-sGL_ASSERTIONS=1"
+            "-sDISABLE_EXCEPTION_CATCHING=1"
+            "--shell-file ${CMAKE_SOURCE_DIR}/web/index.html"
+            "--preload-file ${CMAKE_SOURCE_DIR}/assets@/assets"
     )
 
     if(CMAKE_BUILD_TYPE STREQUAL "Release")
@@ -277,14 +277,14 @@ elseif(PLATFORM_WEB)
     target_link_libraries(${PROJECT_NAME} PRIVATE ImGui)
 
     set_target_properties(${PROJECT_NAME} PROPERTIES
-        LINK_FLAGS "${EMSCRIPTEN_LINK_FLAGS_STR}"
+            LINK_FLAGS "${EMSCRIPTEN_LINK_FLAGS_STR}"
     )
 
 endif()
 
 install(TARGETS ${PROJECT_NAME}
-    RUNTIME DESTINATION bin
-    LIBRARY DESTINATION lib
+        RUNTIME DESTINATION bin
+        LIBRARY DESTINATION lib
 )
 
 install(DIRECTORY ${CMAKE_SOURCE_DIR}/assets DESTINATION bin)
