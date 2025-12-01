@@ -1,7 +1,10 @@
 #include "FeatureUnlockManager.h"
 #include "Renderer.h"
+#include "ImGuiUtils.h"
 #include "Logger.h"
+#include "imgui.h" // ADDED: Necessary for ImGui integration
 #include <algorithm>
+#include <cmath>
 
 FeatureUnlockManager::FeatureUnlockManager()
     : m_LastCheckedLevel(0) {
@@ -160,47 +163,96 @@ void FeatureUnlockManager::Update(f64 deltaTime) {
 void FeatureUnlockManager::RenderNotifications(Renderer* renderer) {
     if (m_ActiveNotifications.empty()) return;
 
-    f32 screenWidth = static_cast<f32>(renderer->GetWidth());
+    // Use a fixed overlay window for notifications
+    f32 screenWidth = ImGui::GetIO().DisplaySize.x;
     f32 notifWidth = 400.0f;
     f32 notifHeight = 100.0f;
-    f32 notifX = (screenWidth - notifWidth) * 0.5f;
-    f32 notifY = 100.0f;
     f32 notifSpacing = 10.0f;
 
-    for (size_t i = 0; i < m_ActiveNotifications.size(); i++) {
-        const UnlockNotification& notif = m_ActiveNotifications[i];
+    // Set up a transparent, non-interactive overlay window
+    ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiCond_Always);
+    ImGui::SetNextWindowSize(ImGui::GetIO().DisplaySize, ImGuiCond_Always);
 
-        f32 currentY = notifY + i * (notifHeight + notifSpacing);
+    // Flags for a fixed, background overlay (NoInputs is CRITICAL for clicking through)
+    // We are deliberately using ImGuiWindowFlags_NoInputs to allow clicks to pass through to the game world.
+    // NOTE: If you later need to make these notifications clickable via ImGui, you must remove NoInputs
+    // and use ImGui::InvisibleButton or similar.
+    ImGuiWindowFlags windowFlags =
+        ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoInputs |
+        ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize |
+        ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoTitleBar |
+        ImGuiWindowFlags_NoBackground;
 
-        // Background with pulsing effect
-        f32 pulseAlpha = 0.9f + 0.1f * sinf(static_cast<f32>(notif.displayTime - notif.timeRemaining) * 3.0f);
-        Rect bgRect(notifX, currentY, notifWidth, notifHeight);
-        renderer->DrawRect(bgRect, Color(0.1f, 0.05f, 0.2f, pulseAlpha), true);
+    if (ImGui::Begin("##NotificationOverlay", nullptr, windowFlags)) {
 
-        // Glowing border
-        Color borderColor(1.0f, 0.8f, 0.3f, pulseAlpha);
-        renderer->DrawRect(bgRect, borderColor, false);
-        renderer->DrawRect(Rect(notifX + 2, currentY + 2, notifWidth - 4, notifHeight - 4), borderColor * 0.7f, false);
+        // Get draw list from the overlay window
+        ImDrawList* drawList = ImGui::GetWindowDrawList();
 
-        // Title
-        renderer->DrawText(notif.title, Vec2(notifX + 20.0f, currentY + 15.0f),
-                         Color(1.0f, 0.9f, 0.3f, 1.0f), 18.0f);
+        // Calculate the central starting point for the first notification
+        f32 notifX = (screenWidth - notifWidth) * 0.5f;
+        f32 notifY = 100.0f;
 
-        // Message
-        renderer->DrawText(notif.message, Vec2(notifX + 20.0f, currentY + 45.0f),
-                         Color(0.9f, 0.9f, 0.9f, 1.0f), 14.0f);
+        for (size_t i = 0; i < m_ActiveNotifications.size(); i++) {
+            const UnlockNotification& notif = m_ActiveNotifications[i];
 
-        // Progress bar (time remaining)
-        f32 progress = notif.timeRemaining / notif.displayTime;
-        f32 barWidth = notifWidth - 40.0f;
-        Rect progressBg(notifX + 20.0f, currentY + notifHeight - 20.0f, barWidth, 8.0f);
-        Rect progressFill(notifX + 20.0f, currentY + notifHeight - 20.0f, barWidth * progress, 8.0f);
-        renderer->DrawRect(progressBg, Color(0.2f, 0.2f, 0.2f, 0.8f), true);
-        renderer->DrawRect(progressFill, Color(1.0f, 0.8f, 0.3f, 0.8f), true);
+            f32 currentY = notifY + i * (notifHeight + notifSpacing);
 
-        // Click to dismiss hint
-        renderer->DrawText("Click to dismiss", Vec2(notifX + notifWidth - 120.0f, currentY + 12.0f),
-                         Color(0.6f, 0.6f, 0.6f, 1.0f), 10.0f);
+            // Calculate screen coordinates for the notification box
+            ImVec2 p_min(notifX, currentY);
+            ImVec2 p_max(notifX + notifWidth, currentY + notifHeight);
+
+            // 1. Background with pulsing effect
+            f32 pulseAlpha = 0.9f + 0.1f * sinf(static_cast<f32>(notif.displayTime - notif.timeRemaining) * 3.0f);
+            ImU32 bgColor = ImGui::GetColorU32(ToImVec4(Color(0.1f, 0.05f, 0.2f, pulseAlpha)));
+            drawList->AddRectFilled(p_min, p_max, bgColor, 4.0f);
+
+            // 2. Glowing border
+            ImU32 borderColor = ImGui::GetColorU32(ToImVec4(Color(1.0f, 0.8f, 0.3f, pulseAlpha)));
+            // We use the custom Color multiplication logic from the original code (must be defined for Color class)
+            ImU32 innerBorderColor = ImGui::GetColorU32(ToImVec4(Color(1.0f, 0.8f, 0.3f, pulseAlpha) * 0.7f));
+
+            drawList->AddRect(p_min, p_max, borderColor, 4.0f, 0, 2.0f); // Outer border
+            drawList->AddRect(ImVec2(p_min.x + 2, p_min.y + 2), ImVec2(p_max.x - 2, p_max.y - 2), innerBorderColor, 4.0f, 0, 1.0f); // Inner border
+
+            // 3. ImGui Text (Use a child window or group to place text relative to p_min)
+            // Set the cursor position to the start of the current notification's screen area
+            ImGui::SetCursorScreenPos(p_min);
+            // Create a temporary, un-styled child window to hold the text content
+            ImGui::BeginChild((std::string("##NotificationText") + std::to_string(i)).c_str(), ImVec2(notifWidth, notifHeight), false, ImGuiWindowFlags_NoBackground);
+
+            // Title
+            ImGui::SetCursorPosY(15.0f);
+            ImGui::SetCursorPosX(20.0f);
+            ImGui::TextColored(ToImVec4(Color(1.0f, 0.9f, 0.3f, 1.0f)), "%s", notif.title);
+
+            // Message
+            ImGui::SetCursorPosY(45.0f);
+            ImGui::SetCursorPosX(20.0f);
+            ImGui::TextColored(ToImVec4(Color(0.9f, 0.9f, 0.9f, 1.0f)), "%s", notif.message);
+
+            // Click to dismiss hint
+            // This is just text since the overlay is non-interactive (NoInputs flag)
+            ImGui::SetCursorPos(ImVec2(notifWidth - ImGui::CalcTextSize("Click to dismiss").x - 10.0f, 12.0f));
+            ImGui::TextColored(ToImVec4(Color(0.6f, 0.6f, 0.6f, 1.0f)), "Click to dismiss");
+
+            // 4. Progress bar (time remaining) - drawn manually on the main draw list
+            ImGui::EndChild();
+
+            f32 progress = notif.timeRemaining / notif.displayTime;
+            f32 barWidth = notifWidth - 40.0f;
+
+            ImVec2 progressBgMin(notifX + 20.0f, currentY + notifHeight - 20.0f);
+            ImVec2 progressBgMax(progressBgMin.x + barWidth, progressBgMin.y + 8.0f);
+            ImVec2 progressFillMax(progressBgMin.x + barWidth * progress, progressBgMin.y + 8.0f);
+
+            // Draw progress bar background
+            drawList->AddRectFilled(progressBgMin, progressBgMax, ImGui::GetColorU32(ToImVec4(Color(0.2f, 0.2f, 0.2f, 0.8f))), 2.0f);
+
+            // Draw progress bar fill
+            drawList->AddRectFilled(progressBgMin, progressFillMax, ImGui::GetColorU32(ToImVec4(Color(1.0f, 0.8f, 0.3f, 0.8f))), 2.0f);
+        }
+
+        ImGui::End();
     }
 }
 

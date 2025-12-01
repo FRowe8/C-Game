@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 #include <functional>
+#include <cmath>
 
 // Forward declaration
 class GameState;

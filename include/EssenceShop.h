@@ -3,6 +3,7 @@
 #include <string>
 #include <vector>
 #include <functional>
+#include <cmath>
 
 // Forward declaration
 class GameState;
@@ -59,6 +60,9 @@ public:
     f64 GetProductionMultiplier() const;
     f64 GetStartingQubits() const;
     f64 GetOfflineProgressMultiplier() const;
+
+    f64 GetGlobalProductionBonus() const;
+
 
 private:
     std::vector<EssenceUpgrade> m_Upgrades;

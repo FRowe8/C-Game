@@ -1,7 +1,6 @@
 #pragma once
 
 #include "Types.h"
-#include "Research.h"
 #include "Milestones.h"
 #include "Buyables.h"
 #include "Challenges.h"
@@ -22,13 +21,7 @@
 // Forward declarations
 class Renderer;
 class Input;
-
-// Quantum resource types
-enum class QuantumResource {
-    Qubits,        // Primary currency
-    Coherence,     // Stability resource
-    Entanglement   // Strategic resource
-};
+class ResearchTree;
 
 // Research station that generates resources
 struct ResearchStation {
@@ -130,6 +123,8 @@ struct GameStatistics {
     i32 currentStreak;
     i64 lastLoginTimestamp;
 
+
+
     GameStatistics();
     void Reset();
     void UpdateSession(f64 deltaTime);
@@ -208,6 +203,7 @@ public:
     void AddEssence(f64 amount);
     bool SpendEssence(f64 amount);
     f64 GetEssence() const { return m_QuantumEssence; }
+    f64 GetProductionMultiplier(QuantumResource type) const;
 
     // Save/Load
     bool Save(const std::string& filepath);
@@ -238,7 +234,7 @@ public:
     GameStatistics& GetStatistics() { return m_Statistics; }
 
     // Research Tree
-    ResearchTree& GetResearchTree() { return m_ResearchTree; }
+    ResearchTree& GetResearchTree() { return *m_ResearchTree; }
     bool CanAffordResearch(ResearchID id) const;
     bool PurchaseResearch(ResearchID id);
     void UpdateResearchBonuses();
@@ -290,6 +286,16 @@ public:
     void AddComboPoint();
     f64 GetComboMultiplier() const;
 
+    i32 GetPlayerCredits();
+
+    void DeductPlayerCredits(i32 amount);
+
+    bool IsGatchaUIVisible() const {
+        return m_ShowGatcha;
+    }
+
+    void SetGatchaUIVisible(bool visible);
+
 private:
     void InitializeStations();
     void InitializeUI();
@@ -324,6 +330,8 @@ private:
     // Resources
     f64 m_Resources[3]; // Qubits, Coherence, Entanglement
 
+    i32 m_PlayerCredits; // Currency for Gatcha/Summon system (or similar)
+
     // Game objects
     std::vector<ResearchStation> m_Stations;
     std::vector<EntanglementPair> m_Entanglements;
@@ -343,7 +351,7 @@ private:
     GameStatistics m_Statistics;
 
     // Research Tree
-    ResearchTree m_ResearchTree;
+    std::unique_ptr<ResearchTree> m_ResearchTree;
 
     // Milestone System
     MilestoneSystem m_MilestoneSystem;
@@ -473,4 +481,12 @@ private:
 
     Color GetStationTierColor(i32 level) const;
     void SpawnResourceParticles(const Vec2& start, const Vec2& end, const Color& color, i32 count);
+
+
+
+
+
 };
+
+
+

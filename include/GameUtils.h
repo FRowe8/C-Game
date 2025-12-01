@@ -57,7 +57,6 @@ inline std::string FormatNumber(f64 num, NumberFormat format = NumberFormat::Suf
     static const Suffix suffixes[] = {
         {1e303, "Cg"},  // Centillion
         {1e153, "Uvg"}, // Unvigintillion
-        {1e120, "Uvg"}, // Unvigintillion
         {1e102, "Tg"},  // Trigintillion
         {1e99,  "Vg"},  // Vigintillion
         {1e96,  "UDc"}, // Untrigintillion
@@ -71,7 +70,7 @@ inline std::string FormatNumber(f64 num, NumberFormat format = NumberFormat::Suf
         {1e72,  "SxVg"},// Sexvigintillion
         {1e69,  "SpVg"},// Septvigintillion
         {1e66,  "OcVg"},// Octovigintillion
-        {1e63,  "NoVg"},// Novevig intillion
+        {1e63,  "NoVg"},// Novevigintillion
         {1e60,  "Vg"},  // Vigintillion
         {1e57,  "UDc"}, // Undevigintillion
         {1e54,  "DDc"}, // Duodevigintillion

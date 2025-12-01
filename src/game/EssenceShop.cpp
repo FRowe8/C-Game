@@ -131,6 +131,12 @@ EssenceUpgrade* EssenceShopManager::GetUpgrade(const std::string& id) {
     return nullptr;
 }
 
+f64 EssenceShopManager::GetGlobalProductionBonus() const {
+    // This assumes the intention of this function is identical
+    // to the already declared GetProductionMultiplier().
+    return GetProductionMultiplier();
+}
+
 f64 EssenceShopManager::GetProductionMultiplier() const {
     const EssenceUpgrade* productionBoost = nullptr;
     for (const auto& upgrade : m_Upgrades) {
@@ -180,3 +186,5 @@ f64 EssenceShopManager::GetOfflineProgressMultiplier() const {
 
     return 1.25; // +25% offline progress
 }
+
+

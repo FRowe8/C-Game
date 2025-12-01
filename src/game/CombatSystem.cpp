@@ -1,10 +1,14 @@
 #include "CombatSystem.h"
 #include "Renderer.h"
 #include "Logger.h"
+#include "ImGuiUtils.h"
 #include "Spaceship.h"
 #include "GameState.h"
+#include "imgui.h" // ADDED: Necessary for ImGui integration
 #include <cstdlib>
 #include <cmath>
+#include <sstream>
+
 
 CombatSystem::CombatSystem()
     : m_State(CombatState::NotInCombat), m_CurrentEnemy(nullptr),
@@ -69,6 +73,27 @@ void CombatSystem::StartCombat(Enemy* enemy, i32 playerLevel, const Spaceship* s
     }
 
     Log::Infof("Combat started: Player (Lvl ", playerLevel, ") vs ", enemy->GetName(), " (Lvl ", enemy->GetLevel(), ")");
+}
+
+void CombatSystem::HandleClick(float mouseX, float mouseY, bool mousePressed) const {
+    // We are using ImGui buttons (ATTACK, DEFEND, SPECIAL) inside RenderCombatUI
+    // to handle all player turn input.
+    // However, this function is still called by GameState.cpp.
+    // If you had active combat elements (like clicking the enemy sprite itself)
+    // that were not ImGui buttons, that logic would go here.
+
+    // For now, we will leave it empty as a placeholder to satisfy the linker.
+    (void)mouseX;
+    (void)mouseY;
+    (void)mousePressed;
+
+    if (!IsInCombat()) {
+        return;
+    }
+
+    // Optional future logic:
+    // If m_State == CombatState::PlayerTurn && !m_AutoBattle:
+    //    if (Click hit enemy boundary) { PlayerAttack(); }
 }
 
 void CombatSystem::EndCombat() {
@@ -284,192 +309,222 @@ void CombatSystem::AddLog(const std::string& message, const Color& color) {
     }
 }
 
+// ====================================================================
+// NEW IMGUI RENDERING
+// ====================================================================
+
 void CombatSystem::RenderCombatUI(Renderer* renderer) {
     if (!IsInCombat() || !m_CurrentEnemy) return;
 
+    // --- Panel setup (matching old dimensions) ---
     f32 screenWidth = static_cast<f32>(renderer->GetWidth());
     f32 screenHeight = static_cast<f32>(renderer->GetHeight());
-
-    // Combat background overlay
-    Rect bgOverlay(0, 0, screenWidth, screenHeight);
-    renderer->DrawRect(bgOverlay, Color(0.0f, 0.0f, 0.05f, 0.7f), true);
-
-    // Main combat panel (centered)
     f32 panelWidth = 900.0f;
     f32 panelHeight = 600.0f;
     f32 panelX = (screenWidth - panelWidth) * 0.5f;
     f32 panelY = (screenHeight - panelHeight) * 0.5f;
 
-    Rect panelRect(panelX, panelY, panelWidth, panelHeight);
-    renderer->DrawRect(panelRect, Color(0.05f, 0.05f, 0.1f, 0.95f), true);
-    renderer->DrawRect(panelRect, Color::NeonCyan() * 0.7f, false);
+    // 1. Setup position and size
+    ImGui::SetNextWindowPos(ImVec2(panelX, panelY), ImGuiCond_Always);
+    ImGui::SetNextWindowSize(ImVec2(panelWidth, panelHeight), ImGuiCond_Always);
 
-    f32 yOffset = panelY + 15.0f;
+    // 2. Setup styles
+    ImGui::PushStyleColor(ImGuiCol_WindowBg, ToImVec4(Color(0.05f, 0.05f, 0.1f, 0.95f)));
+    ImGui::PushStyleColor(ImGuiCol_Border, ToImVec4(Color::NeonCyan() * 0.7f));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 1.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(10.0f, 10.0f));
 
-    // Title
-    renderer->DrawText("COMBAT", Vec2(panelX + panelWidth * 0.5f - 60.0f, yOffset), Color::NeonCyan(), 24.0f);
+    // 3. Begin the main combat window
+    if (ImGui::Begin("##CombatPanel", nullptr, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoTitleBar)) {
 
-    // Close button (top-right, 44px for mobile-first touch target)
-    f32 closeBtnSize = 44.0f;
-    f32 closeBtnX = panelX + panelWidth - closeBtnSize - 10.0f;
-    f32 closeBtnY = panelY + 10.0f;
-    Rect closeBtn(closeBtnX, closeBtnY, closeBtnSize, closeBtnSize);
-    renderer->DrawRect(closeBtn, Color(0.3f, 0.1f, 0.1f, 0.8f), true);
-    renderer->DrawRect(closeBtn, Color(1.0f, 0.3f, 0.3f, 1.0f), false);
-    renderer->DrawText("X", Vec2(closeBtnX + 14.0f, closeBtnY + 10.0f), Color::White(), 20.0f);
+        // --- Header and Close Button ---
+        ImGui::SetCursorPosX(panelWidth * 0.5f - ImGui::CalcTextSize("COMBAT").x * 0.5f);
+        ImGui::TextColored(ToImVec4(Color::NeonCyan()), "COMBAT");
 
-    yOffset += 35.0f;
+        // Close button (top right corner logic)
+        f32 closeBtnSize = 44.0f;
+        ImGui::SetCursorPos(ImVec2(panelWidth - closeBtnSize - 10.0f, 10.0f));
+        ImGui::PushStyleColor(ImGuiCol_Button, ToImVec4(Color(0.3f, 0.1f, 0.1f, 0.8f)));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ToImVec4(Color(0.5f, 0.2f, 0.2f, 1.0f)));
+        ImGui::PushStyleColor(ImGuiCol_Border, ToImVec4(Color(1.0f, 0.3f, 0.3f, 1.0f)));
 
-    // Player section (left side)
-    f32 sectionWidth = (panelWidth - 60.0f) * 0.5f;
-    f32 playerX = panelX + 20.0f;
+        if (ImGui::Button("X##CloseCombat", ImVec2(closeBtnSize, closeBtnSize))) {
+            // Note: The caller (GameState) must detect this and call EndCombat
+            // We can return a flag or set a state, but for this file, just let the click register.
+            // A more complete system would manage a `bool* p_open` passed to ImGui::Begin.
+        }
+        ImGui::PopStyleColor(3);
 
-    renderer->DrawText("YOUR SHIP", Vec2(playerX, yOffset), Color(0.5f, 1.0f, 0.5f, 1.0f), 18.0f);
-    yOffset += 25.0f;
+        ImGui::Separator();
 
-    char playerInfo[128];
-    snprintf(playerInfo, sizeof(playerInfo), "Level %d", m_PlayerLevel);
-    renderer->DrawText(playerInfo, Vec2(playerX, yOffset), Color::White(), 14.0f);
-    yOffset += 25.0f;
+        // --- Player and Enemy Sections (Side-by-Side) ---
+        f32 sectionWidth = (panelWidth - 40.0f) * 0.5f; // Adjusted width for cleaner SameLine
 
-    // Player HP bar
-    f32 barWidth = sectionWidth - 10.0f;
-    f32 barHeight = 30.0f;
-    Rect playerHPBg(playerX, yOffset, barWidth, barHeight);
-    f32 playerHPPercent = m_PlayerMaxHP > 0.0 ? (m_PlayerCurrentHP / m_PlayerMaxHP) : 0.0;
-    Rect playerHPFill(playerX, yOffset, barWidth * playerHPPercent, barHeight);
+        // Player Section (Left)
+        ImGui::BeginGroup();
+        {
+            ImGui::TextColored(ToImVec4(Color(0.5f, 1.0f, 0.5f, 1.0f)), "YOUR SHIP");
+            ImGui::TextColored(ToImVec4(Color::White()), "Level %d", m_PlayerLevel);
+            ImGui::Spacing();
 
-    renderer->DrawRect(playerHPBg, Color(0.2f, 0.2f, 0.2f, 1.0f), true);
-    Color playerHPColor = playerHPPercent > 0.5 ? Color(0.2f, 1.0f, 0.2f, 1.0f) :
-                          playerHPPercent > 0.25 ? Color(1.0f, 0.8f, 0.0f, 1.0f) :
-                          Color(1.0f, 0.2f, 0.2f, 1.0f);
-    renderer->DrawRect(playerHPFill, playerHPColor, true);
+            // Player HP bar
+            float playerHPPercent = m_PlayerMaxHP > 0.0 ? (m_PlayerCurrentHP / m_PlayerMaxHP) : 0.0f;
+            Color playerHPColor = playerHPPercent > 0.5f ? Color(0.2f, 1.0f, 0.2f, 1.0f) :
+                                  playerHPPercent > 0.25f ? Color(1.0f, 0.8f, 0.0f, 1.0f) :
+                                  Color(1.0f, 0.2f, 0.2f, 1.0f);
 
-    char hpText[64];
-    snprintf(hpText, sizeof(hpText), "%.0f / %.0f HP", m_PlayerCurrentHP, m_PlayerMaxHP);
-    renderer->DrawText(hpText, Vec2(playerX + barWidth * 0.5f - 50.0f, yOffset + 8.0f), Color::White(), 14.0f);
-    yOffset += 40.0f;
+            ImGui::PushStyleColor(ImGuiCol_PlotHistogram, ToImVec4(playerHPColor));
+            ImGui::PushStyleColor(ImGuiCol_FrameBg, ToImVec4(Color(0.2f, 0.2f, 0.2f, 1.0f)));
 
-    // Player stats
-    snprintf(playerInfo, sizeof(playerInfo), "ATK: %.0f | DEF: %.0f", m_PlayerAttack, m_PlayerDefense);
-    renderer->DrawText(playerInfo, Vec2(playerX, yOffset), Color(0.7f, 0.7f, 0.9f, 1.0f), 12.0f);
-    yOffset += 25.0f;
+            char hpText[64];
+            snprintf(hpText, sizeof(hpText), "%.0f / %.0f HP", m_PlayerCurrentHP, m_PlayerMaxHP);
 
-    // Enemy section (right side)
-    f32 enemyX = panelX + panelWidth * 0.5f + 10.0f;
-    yOffset = panelY + 50.0f;
+            ImGui::ProgressBar(playerHPPercent, ImVec2(sectionWidth, 30.0f), hpText);
 
-    m_CurrentEnemy->Render(renderer, enemyX, yOffset, sectionWidth, 180.0f);
+            ImGui::PopStyleColor(2);
+            ImGui::Spacing();
 
-    // Combat log (bottom section)
-    yOffset = panelY + 260.0f;
-    renderer->DrawText("Combat Log:", Vec2(panelX + 20.0f, yOffset), Color::NeonCyan(), 14.0f);
-    yOffset += 22.0f;
+            // Player stats
+            ImGui::TextColored(ToImVec4(Color(0.7f, 0.7f, 0.9f, 1.0f)), "ATK: %.0f | DEF: %.0f | SPD: %.1f", m_PlayerAttack, m_PlayerDefense, m_PlayerSpeed);
+            if (m_PlayerDefending) {
+                ImGui::TextColored(ToImVec4(Color(0.5f, 0.7f, 1.0f, 1.0f)), "DEFENDING");
+            }
+            ImGui::Spacing();
+        }
+        ImGui::EndGroup(); // End Player Section
 
-    // Draw log entries (last 8 visible)
-    i32 startIndex = static_cast<i32>(m_CombatLog.size()) - 8;
-    if (startIndex < 0) startIndex = 0;
+        ImGui::SameLine(sectionWidth + 20.0f); // Position Enemy section immediately after Player section
 
-    for (i32 i = startIndex; i < static_cast<i32>(m_CombatLog.size()); i++) {
-        const CombatLogEntry& entry = m_CombatLog[i];
-        renderer->DrawText(entry.message.c_str(), Vec2(panelX + 25.0f, yOffset), entry.color, 11.0f);
-        yOffset += 16.0f;
+        // Enemy Section (Right)
+        ImGui::BeginGroup();
+        {
+            // Since m_CurrentEnemy->Render is assumed to be converted to use ImGui::BeginChild/ImGui::Text,
+            // we pass coordinates relative to the screen to draw the enemy panel correctly.
+            // Note: The parameters (x, y, w, h) are largely vestigial if the Enemy::Render fully uses ImGui layout,
+            // but we keep the call structure for now.
+            // We pass the start position of the right column group.
+            m_CurrentEnemy->Render(renderer, panelX + sectionWidth + 20.0f, panelY + 50.0f, sectionWidth, 180.0f);
+        }
+        ImGui::EndGroup(); // End Enemy Section
+
+        // --- Combat Log ---
+        ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 20.0f); // Add separation
+        ImGui::Separator();
+        ImGui::TextColored(ToImVec4(Color::NeonCyan()), "Combat Log:");
+
+        // Use a Child Window for the scrollable log region
+        f32 logHeight = panelHeight - ImGui::GetCursorPosY() - 100.0f; // Calculate remaining space for log and buttons
+        if (ImGui::BeginChild("LogRegion", ImVec2(0, logHeight), true)) {
+            for (const auto& entry : m_CombatLog) {
+                ImGui::TextColored(ToImVec4(entry.color), "%.1fs: %s", entry.timestamp, entry.message.c_str());
+            }
+            if (ImGui::GetScrollY() >= ImGui::GetScrollMaxY())
+                ImGui::SetScrollHereY(1.0f); // Auto-scroll
+        }
+        ImGui::EndChild();
+        ImGui::Spacing();
+
+        // --- Action Buttons and Controls ---
+        ImGui::Separator();
+
+        // Action Buttons (Only visible on PlayerTurn)
+        if (m_State == CombatState::PlayerTurn) {
+            f32 btnWidth = 150.0f;
+            f32 btnHeight = 50.0f;
+
+            // ATTACK
+            ImGui::PushStyleColor(ImGuiCol_Button, ToImVec4(Color(0.2f, 0.6f, 0.2f, 0.8f)));
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ToImVec4(Color(0.3f, 1.0f, 0.3f, 1.0f)));
+            if (ImGui::Button("ATTACK", ImVec2(btnWidth, btnHeight))) {
+                PlayerAttack();
+            }
+            ImGui::PopStyleColor(2);
+            ImGui::SameLine();
+
+            // DEFEND
+            ImGui::PushStyleColor(ImGuiCol_Button, ToImVec4(Color(0.2f, 0.4f, 0.6f, 0.8f)));
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ToImVec4(Color(0.3f, 0.7f, 1.0f, 1.0f)));
+            if (ImGui::Button("DEFEND", ImVec2(btnWidth, btnHeight))) {
+                PlayerDefend();
+            }
+            ImGui::PopStyleColor(2);
+            ImGui::SameLine();
+
+            // SPECIAL
+            ImGui::PushStyleColor(ImGuiCol_Button, ToImVec4(Color(0.6f, 0.2f, 0.6f, 0.8f)));
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ToImVec4(Color(1.0f, 0.3f, 1.0f, 1.0f)));
+            if (ImGui::Button("SPECIAL", ImVec2(btnWidth, btnHeight))) {
+                PlayerSpecialAttack();
+            }
+            ImGui::PopStyleColor(2);
+        } else {
+            // Display waiting text if not player turn
+            ImGui::TextColored(ToImVec4(Color(0.6f, 0.6f, 0.6f, 1.0f)), "Waiting for opponent...");
+        }
+
+        // --- Auto-battle and Speed Controls (Bottom Right) ---
+        ImGui::SameLine(panelWidth - 300.0f);
+
+        // Auto Battle Toggle
+        if (ImGui::Checkbox("Auto Battle", &m_AutoBattle)) {
+            Log::Infof("Auto Battle: %s", m_AutoBattle ? "ON" : "OFF");
+        }
+
+        ImGui::SameLine();
+
+        // Battle Speed Control
+        ImGui::SetNextItemWidth(100.0f);
+        if (ImGui::SliderFloat("Speed", &m_BattleSpeed, 0.5f, 5.0f, "%.1fx")) {
+            Log::Infof("Battle Speed set to %.1fx", m_BattleSpeed);
+        }
+
+
+        // --- Victory/Defeat Overlay (Final Layer) ---
+        if (m_State == CombatState::Victory || m_State == CombatState::Defeat) {
+            ImDrawList* drawList = ImGui::GetWindowDrawList();
+            ImVec2 p_min = ImGui::GetWindowPos();
+            ImVec2 p_max = ImVec2(p_min.x + panelWidth, p_min.y + panelHeight);
+
+            ImVec4 overlayColor;
+            const char* message;
+            ImVec4 messageColor;
+
+            if (m_State == CombatState::Victory) {
+                overlayColor = ToImVec4(Color(0.0f, 0.3f, 0.0f, 0.7f));
+                message = "VICTORY!";
+                messageColor = ToImVec4(Color(0.3f, 1.0f, 0.3f, 1.0f));
+            } else { // Defeat
+                overlayColor = ToImVec4(Color(0.3f, 0.0f, 0.0f, 0.7f));
+                message = "DEFEAT";
+                messageColor = ToImVec4(Color(1.0f, 0.3f, 0.3f, 1.0f));
+            }
+
+            // Draw translucent overlay (Full window size)
+            drawList->AddRectFilled(p_min, p_max, ImGui::GetColorU32(overlayColor));
+
+            // Draw message centered
+            ImVec2 textSize = ImGui::CalcTextSize(message, NULL, true);
+            ImVec2 textPos(p_min.x + (panelWidth - textSize.x) * 0.5f, p_min.y + (panelHeight - textSize.y) * 0.5f);
+
+            // We need to use a larger font size for the dramatic title. Since ImGui doesn't easily change font size mid-drawlist,
+            // we will draw the text larger directly to the screen (best effort for simple integration)
+            // Note: True large text requires font loading/switching, so we'll just center normal text for now.
+            ImGui::SetCursorPos(ImVec2((panelWidth - textSize.x) * 0.5f, (panelHeight - textSize.y) * 0.5f));
+            ImGui::TextColored(messageColor, "%s", message);
+
+            // Add rewards info below the victory/defeat message
+            ImGui::SetCursorPos(ImVec2(panelWidth * 0.5f - 150.0f, (panelHeight - textSize.y) * 0.5f + textSize.y + 15.0f));
+            ImGui::TextColored(ToImVec4(Color(1.0f, 0.9f, 0.3f, 1.0f)), "Rewards: %d Credits | %d XP%s",
+                m_CreditsEarned, m_XPEarned, m_PartDropped ? " | Part Dropped" : "");
+        }
+
     }
+    ImGui::End();
 
-    // Action buttons (if player's turn)
-    if (m_State == CombatState::PlayerTurn) {
-        f32 btnY = panelY + panelHeight - 70.0f;
-        f32 btnWidth = 150.0f;
-        f32 btnHeight = 50.0f;
-        f32 btnSpacing = 20.0f;
-        f32 btnStartX = panelX + 30.0f;
-
-        // Attack button
-        Rect attackBtn(btnStartX, btnY, btnWidth, btnHeight);
-        renderer->DrawRect(attackBtn, Color(0.2f, 0.6f, 0.2f, 0.8f), true);
-        renderer->DrawRect(attackBtn, Color(0.3f, 1.0f, 0.3f, 1.0f), false);
-        renderer->DrawText("ATTACK", Vec2(btnStartX + 35.0f, btnY + 16.0f), Color::White(), 16.0f);
-
-        // Defend button
-        btnStartX += btnWidth + btnSpacing;
-        Rect defendBtn(btnStartX, btnY, btnWidth, btnHeight);
-        renderer->DrawRect(defendBtn, Color(0.2f, 0.4f, 0.6f, 0.8f), true);
-        renderer->DrawRect(defendBtn, Color(0.3f, 0.7f, 1.0f, 1.0f), false);
-        renderer->DrawText("DEFEND", Vec2(btnStartX + 35.0f, btnY + 16.0f), Color::White(), 16.0f);
-
-        // Special button
-        btnStartX += btnWidth + btnSpacing;
-        Rect specialBtn(btnStartX, btnY, btnWidth, btnHeight);
-        renderer->DrawRect(specialBtn, Color(0.6f, 0.2f, 0.6f, 0.8f), true);
-        renderer->DrawRect(specialBtn, Color(1.0f, 0.3f, 1.0f, 1.0f), false);
-        renderer->DrawText("SPECIAL", Vec2(btnStartX + 32.0f, btnY + 16.0f), Color::White(), 16.0f);
-    }
-
-    // Auto-battle toggle (bottom left)
-    f32 autoX = panelX + 20.0f;
-    f32 autoY = panelY + panelHeight - 25.0f;
-    Color autoColor = m_AutoBattle ? Color(0.2f, 1.0f, 0.2f, 1.0f) : Color(0.6f, 0.6f, 0.6f, 1.0f);
-    char autoText[64];
-    snprintf(autoText, sizeof(autoText), "[Auto: %s] [Speed: %.0fx]", m_AutoBattle ? "ON" : "OFF", m_BattleSpeed);
-    renderer->DrawText(autoText, Vec2(autoX, autoY), autoColor, 12.0f);
-
-    // Victory/Defeat overlay
-    if (m_State == CombatState::Victory) {
-        Rect victoryOverlay(panelX, panelY, panelWidth, panelHeight);
-        renderer->DrawRect(victoryOverlay, Color(0.0f, 0.3f, 0.0f, 0.7f), true);
-        renderer->DrawText("VICTORY!", Vec2(panelX + panelWidth * 0.5f - 80.0f, panelY + panelHeight * 0.5f - 20.0f),
-                         Color(0.3f, 1.0f, 0.3f, 1.0f), 32.0f);
-    } else if (m_State == CombatState::Defeat) {
-        Rect defeatOverlay(panelX, panelY, panelWidth, panelHeight);
-        renderer->DrawRect(defeatOverlay, Color(0.3f, 0.0f, 0.0f, 0.7f), true);
-        renderer->DrawText("DEFEAT", Vec2(panelX + panelWidth * 0.5f - 70.0f, panelY + panelHeight * 0.5f - 20.0f),
-                         Color(1.0f, 0.3f, 0.3f, 1.0f), 32.0f);
-    }
+    // 4. Pop styles
+    ImGui::PopStyleVar(3);
+    ImGui::PopStyleColor(2);
 }
 
-void CombatSystem::HandleClick(f32 mouseX, f32 mouseY, bool mousePressed) {
-    if (!IsInCombat() || m_State != CombatState::PlayerTurn) return;
 
-    f32 screenWidth = 1920.0f; // TODO: Get from renderer
-    f32 screenHeight = 1080.0f;
-
-    f32 panelWidth = 900.0f;
-    f32 panelHeight = 600.0f;
-    f32 panelX = (screenWidth - panelWidth) * 0.5f;
-    f32 panelY = (screenHeight - panelHeight) * 0.5f;
-
-    f32 btnY = panelY + panelHeight - 70.0f;
-    f32 btnWidth = 150.0f;
-    f32 btnHeight = 50.0f;
-    f32 btnSpacing = 20.0f;
-
-    // Attack button
-    Rect attackBtn(panelX + 30.0f, btnY, btnWidth, btnHeight);
-    if (mouseX >= attackBtn.x && mouseX <= attackBtn.x + attackBtn.width &&
-        mouseY >= attackBtn.y && mouseY <= attackBtn.y + attackBtn.height) {
-        if (mousePressed) {
-            PlayerAttack();
-        }
-        return;
-    }
-
-    // Defend button
-    Rect defendBtn(panelX + 30.0f + btnWidth + btnSpacing, btnY, btnWidth, btnHeight);
-    if (mouseX >= defendBtn.x && mouseX <= defendBtn.x + defendBtn.width &&
-        mouseY >= defendBtn.y && mouseY <= defendBtn.y + defendBtn.height) {
-        if (mousePressed) {
-            PlayerDefend();
-        }
-        return;
-    }
-
-    // Special button
-    Rect specialBtn(panelX + 30.0f + (btnWidth + btnSpacing) * 2, btnY, btnWidth, btnHeight);
-    if (mouseX >= specialBtn.x && mouseX <= specialBtn.x + specialBtn.width &&
-        mouseY >= specialBtn.y && mouseY <= specialBtn.y + specialBtn.height) {
-        if (mousePressed) {
-            PlayerSpecialAttack();
-        }
-        return;
-    }
-}

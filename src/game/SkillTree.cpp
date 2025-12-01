@@ -1,8 +1,12 @@
 #include "SkillTree.h"
+#include "ImGuiUtils.h"
 #include "Renderer.h"
 #include "Logger.h"
 #include "GameState.h"
+#include "imgui.h"
 #include <fstream>
+
+
 
 // Skill Implementation
 Skill::Skill()
@@ -379,242 +383,259 @@ Color SkillTreeSystem::GetBranchColor(SkillBranch branch) const {
 }
 
 void SkillTreeSystem::RenderBranchTabs(Renderer* renderer, f32 panelX, f32 panelY, f32 panelWidth) {
-    f32 yOffset = panelY + 60.0f;
+    (void)renderer; (void)panelX; (void)panelY; (void)panelWidth;
 
-    renderer->DrawText("SELECT BRANCH:", Vec2(panelX + 20.0f, yOffset), Color::NeonCyan(), 16.0f);
-    yOffset += 28.0f;
-
-    f32 tabWidth = (panelWidth - 60.0f) / 3.0f;
-    f32 tabHeight = 50.0f;
-    f32 tabSpacing = 10.0f;
+    ImGui::Text("SELECT BRANCH:");
+    ImGui::SameLine();
 
     const char* branchNames[] = {"COMBAT", "ENGINEERING", "EXPLORATION"};
     SkillBranch branches[] = {SkillBranch::Combat, SkillBranch::Engineering, SkillBranch::Exploration};
 
     for (i32 i = 0; i < 3; i++) {
-        f32 tabX = panelX + 20.0f + i * (tabWidth + tabSpacing);
-        Rect tabRect(tabX, yOffset, tabWidth, tabHeight);
+        if (i > 0) ImGui::SameLine();
 
-        bool selected = (m_SelectedBranch == branches[i]);
         Color branchColor = GetBranchColor(branches[i]);
-        Color bgColor = selected ? (branchColor * 0.4f) : (branchColor * 0.2f);
+        ImVec4 imColor(branchColor.r, branchColor.g, branchColor.b, 1.0f);
+        ImVec4 imColorBg(
+        imColor.x * 0.3f, // R * 0.3f
+        imColor.y * 0.3f, // G * 0.3f
+        imColor.z * 0.3f, // B * 0.3f
+        imColor.w         // Keep the Alpha (A) component as is, or scale it too if needed
+        );
 
-        renderer->DrawRect(tabRect, bgColor, true);
-        renderer->DrawRect(tabRect, branchColor, false);
+        // Apply styles
+        ImGui::PushStyleColor(ImGuiCol_FrameBg, m_SelectedBranch == branches[i] ? imColorBg : ImVec4(0.2f, 0.2f, 0.2f, 0.6f));
+        // 1. Define the scalar value
+        float brightnessFactor = 1.5f;
 
-        if (selected) {
-            Rect glowRect(tabX - 2.0f, yOffset - 2.0f, tabWidth + 4.0f, tabHeight + 4.0f);
-            renderer->DrawRect(glowRect, branchColor * 0.8f, false);
+        // 2. Create the new ImVec4 by scaling the components of imColorBg
+        ImVec4 imColorBgHovered(
+            imColorBg.x * brightnessFactor,
+            imColorBg.y * brightnessFactor,
+            imColorBg.z * brightnessFactor,
+            imColorBg.w // Keep alpha as is
+        );
+
+        // 3. Use the new scaled color
+        ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, imColorBgHovered);
+        ImGui::PushStyleColor(ImGuiCol_Text, imColor);
+
+        if (ImGui::RadioButton(branchNames[i], m_SelectedBranch == branches[i])) {
+            m_SelectedBranch = branches[i];
+            Log::Infof("Selected skill branch: ", i);
         }
 
-        f32 textWidth = strlen(branchNames[i]) * 6.5f;
-        Vec2 textPos(tabX + (tabWidth - textWidth) * 0.5f, yOffset + (tabHeight - 14.0f) * 0.5f);
-        renderer->DrawText(branchNames[i], textPos, Color::White(), 14.0f);
+        ImGui::PopStyleColor(3);
     }
 }
 
-void SkillTreeSystem::RenderSkillConnections(Renderer* renderer, f32 nodeStartX, f32 nodeStartY,
-                                             f32 nodeWidth, f32 nodeHeight) {
-    // Draw connections between skills and their prerequisites
-    auto skills = GetSkillsInBranch(m_SelectedBranch);
-    Color connectionColor = GetBranchColor(m_SelectedBranch) * 0.5f;
+// Note: RenderSkillConnections is integrated into this function.
 
+void SkillTreeSystem::RenderSkillNodes(Renderer* renderer, GameState* state, f32 panelX, f32 panelY, f32 panelWidth) {
+    (void)renderer; (void)panelX; (void)panelY; (void)panelWidth;
+
+    ImDrawList* draw_list = ImGui::GetWindowDrawList();
+    // Get the screen position of the current cursor (top-left of the scrollable child window)
+    ImVec2 contentStartPos = ImGui::GetCursorScreenPos();
+
+    f32 nodeWidth = 200.0f;
+    f32 nodeHeight = 80.0f;
+    f32 columnSpacing = 30.0f;
+    f32 rowSpacing = 40.0f;
+
+    auto skills = GetSkillsInBranch(m_SelectedBranch);
+    Color branchColor = GetBranchColor(m_SelectedBranch);
+    ImU32 connectionColor = ToImU32(branchColor * 0.5f);
+
+    // --- 1. Draw Connections (Behind Nodes) ---
     for (const Skill* skill : skills) {
         if (skill->prerequisites.empty()) continue;
 
-        f32 skillX = nodeStartX + skill->treeColumn * (nodeWidth + 30.0f) + nodeWidth * 0.5f;
-        f32 skillY = nodeStartY + skill->treeRow * (nodeHeight + 40.0f) + nodeHeight * 0.5f;
+        ImVec2 skillCenter(
+            contentStartPos.x + skill->treeColumn * (nodeWidth + columnSpacing) + nodeWidth * 0.5f,
+            contentStartPos.y + skill->treeRow * (nodeHeight + rowSpacing) + nodeHeight * 0.5f
+        );
 
         for (SkillID prereqID : skill->prerequisites) {
             const Skill* prereq = GetSkill(prereqID);
             if (!prereq) continue;
 
-            f32 prereqX = nodeStartX + prereq->treeColumn * (nodeWidth + 30.0f) + nodeWidth * 0.5f;
-            f32 prereqY = nodeStartY + prereq->treeRow * (nodeHeight + 40.0f) + nodeHeight * 0.5f;
+            ImVec2 prereqCenter(
+                contentStartPos.x + prereq->treeColumn * (nodeWidth + columnSpacing) + nodeWidth * 0.5f,
+                contentStartPos.y + prereq->treeRow * (nodeHeight + rowSpacing) + nodeHeight * 0.5f
+            );
 
-            // Draw line (simplified - just a colored rect for now)
-            // In a real implementation, you'd draw a proper line
-            renderer->DrawRect(Rect(prereqX - 1, prereqY, 2, skillY - prereqY), connectionColor, true);
+            // Draw line from prerequisite center to skill center
+            draw_list->AddLine(prereqCenter, skillCenter, connectionColor, 2.0f);
         }
     }
-}
 
-void SkillTreeSystem::RenderSkillNodes(Renderer* renderer, GameState* state, f32 panelX, f32 panelY, f32 panelWidth) {
-    f32 nodeStartY = panelY + 160.0f;
-    f32 nodeStartX = panelX + 80.0f;
-    f32 nodeWidth = 200.0f;
-    f32 nodeHeight = 80.0f;
-
-    // Draw connections first (behind nodes)
-    RenderSkillConnections(renderer, nodeStartX, nodeStartY, nodeWidth, nodeHeight);
-
-    // Get skills for selected branch
-    auto skills = GetSkillsInBranch(m_SelectedBranch);
+    // --- 2. Draw Nodes and Interaction ---
+    f32 maxNodeY = 0.0f; // Track max height needed for scroll area calculation
 
     for (Skill* skill : skills) {
-        f32 nodeX = nodeStartX + skill->treeColumn * (nodeWidth + 30.0f);
-        f32 nodeY = nodeStartY + skill->treeRow * (nodeHeight + 40.0f);
+        f32 nodeX = skill->treeColumn * (nodeWidth + columnSpacing);
+        f32 nodeY = skill->treeRow * (nodeHeight + rowSpacing);
 
-        Rect nodeRect(nodeX, nodeY, nodeWidth, nodeHeight);
+        ImVec2 nodeStart(contentStartPos.x + nodeX, contentStartPos.y + nodeY);
+        ImVec2 nodeEnd(nodeStart.x + nodeWidth, nodeStart.y + nodeHeight);
 
-        // Node background color
+        maxNodeY = std::max(maxNodeY, nodeY + nodeHeight);
+
+        // --- Node State & Colors ---
         Color bgColor;
+        bool canLearn = CanLearnSkill(skill->id, state);
+
         if (skill->IsMaxed()) {
             bgColor = Color(0.2f, 0.8f, 0.2f, 0.6f); // Green (maxed)
         } else if (skill->IsLearned()) {
             bgColor = Color(0.6f, 0.6f, 0.2f, 0.6f); // Yellow (learned)
-        } else if (CanLearnSkill(skill->id, state)) {
+        } else if (canLearn) {
             bgColor = Color(0.2f, 0.5f, 0.8f, 0.6f); // Blue (available)
         } else {
             bgColor = Color(0.3f, 0.3f, 0.3f, 0.6f); // Gray (locked)
         }
 
-        renderer->DrawRect(nodeRect, bgColor, true);
+        ImU32 imBgColor = ToImU32(bgColor);
+        ImU32 imBorderColor = ToImU32(branchColor);
 
-        Color borderColor = GetBranchColor(skill->branch);
-        renderer->DrawRect(nodeRect, borderColor, false);
+        // --- Draw Node Background and Border ---
+        draw_list->AddRectFilled(nodeStart, nodeEnd, imBgColor, 5.0f);
+        draw_list->AddRect(nodeStart, nodeEnd, imBorderColor, 5.0f);
 
-        // Skill name
-        renderer->DrawText(skill->name.c_str(), Vec2(nodeX + 5.0f, nodeY + 5.0f),
-                         Color::White(), 13.0f);
+        // --- Draw Text Content ---
+        ImVec2 textStart(nodeStart.x + 5.0f, nodeStart.y + 5.0f);
 
-        // Skill level
+        draw_list->AddText(textStart, ToImU32(Color::White()), skill->name.c_str());
+
         char levelText[32];
         snprintf(levelText, sizeof(levelText), "Lvl %d/%d", skill->level, skill->maxLevel);
-        renderer->DrawText(levelText, Vec2(nodeX + 5.0f, nodeY + 22.0f),
-                         Color(0.8f, 0.8f, 0.8f, 1.0f), 11.0f);
+        draw_list->AddText(ImVec2(textStart.x, textStart.y + 18.0f), ToImU32(Color(0.8f, 0.8f, 0.8f, 1.0f)), levelText);
 
-        // Cost
-        snprintf(levelText, sizeof(levelText), "Cost: %d SP", skill->cost);
-        renderer->DrawText(levelText, Vec2(nodeX + 5.0f, nodeY + 38.0f),
-                         Color(1.0f, 0.9f, 0.3f, 1.0f), 10.0f);
+        char costText[32];
+        snprintf(costText, sizeof(costText), "Cost: %d SP", skill->cost);
+        draw_list->AddText(ImVec2(textStart.x, textStart.y + 34.0f), ToImU32(Color(1.0f, 0.9f, 0.3f, 1.0f)), costText);
 
-        // Requirements
         if (state->GetPlayerLevel() < skill->minPlayerLevel) {
-            snprintf(levelText, sizeof(levelText), "Req: Lvl %d", skill->minPlayerLevel);
-            renderer->DrawText(levelText, Vec2(nodeX + 5.0f, nodeY + 52.0f),
-                             Color(1.0f, 0.5f, 0.5f, 1.0f), 10.0f);
+            char reqText[32];
+            snprintf(reqText, sizeof(reqText), "Req: Lvl %d", skill->minPlayerLevel);
+            draw_list->AddText(ImVec2(textStart.x, textStart.y + 50.0f), ToImU32(Color(1.0f, 0.5f, 0.5f, 1.0f)), reqText);
         }
 
-        // Effect
-        char effectText[64];
         if (skill->IsLearned()) {
+            char effectText[64];
             snprintf(effectText, sizeof(effectText), "+%.0f%%", skill->GetCurrentEffect());
-            renderer->DrawText(effectText, Vec2(nodeX + nodeWidth - 50.0f, nodeY + nodeHeight - 20.0f),
-                             Color(0.3f, 1.0f, 0.3f, 1.0f), 12.0f);
+            draw_list->AddText(ImVec2(nodeEnd.x - 70.0f, nodeEnd.y - 25.0f), ToImU32(Color(0.3f, 1.0f, 0.3f, 1.0f)), effectText);
+        }
+
+        // --- Interaction/Button Logic ---
+        // Use an invisible button overlay to capture clicks
+        ImGui::SetCursorScreenPos(nodeStart);
+        ImGui::InvisibleButton((skill->name + "##SkillNode").c_str(), ImVec2(nodeWidth, nodeHeight));
+
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("%s\n\n%s\n\n- Current Bonus: +%.1f%%\n- Next Level Cost: %d SP",
+                skill->name.c_str(),
+                skill->description.c_str(),
+                skill->GetCurrentEffect(),
+                skill->cost
+            );
+            draw_list->AddRect(nodeStart, nodeEnd, ToImU32(Color::White()), 5.0f, 0, 3.0f);
+        }
+
+        if (ImGui::IsItemClicked()) {
+            if (canLearn && !skill->IsMaxed()) {
+                // LearnSkill handles deduction and level increase
+                if (LearnSkill(skill->id, state)) {
+                    // Success, Log is inside LearnSkill
+                } else {
+                    Log::Info("Cannot learn this skill (check requirements)");
+                }
+            }
         }
     }
+
+    // Set the child window height to enable proper scrolling to the bottom-most node
+    ImGui::SetCursorScreenPos(ImVec2(contentStartPos.x, contentStartPos.y + maxNodeY + rowSpacing));
 }
 
 void SkillTreeSystem::RenderSkillInfo(Renderer* renderer, f32 panelX, f32 panelY, f32 panelWidth, f32 panelHeight) {
-    f32 infoY = panelY + panelHeight - 120.0f;
+    (void)renderer; (void)panelX; (void)panelY; (void)panelWidth; (void)panelHeight;
 
-    renderer->DrawText("SKILL POINTS:", Vec2(panelX + 20.0f, infoY), Color::NeonCyan(), 16.0f);
+    // Skill Points Info (Left side)
+    ImGui::TextColored(ImVec4(0.0f, 0.8f, 1.0f, 1.0f), "SKILL POINTS:");
 
-    char pointsText[64];
-    snprintf(pointsText, sizeof(pointsText), "%d available | %d spent", m_SkillPoints, m_TotalSpent);
-    renderer->DrawText(pointsText, Vec2(panelX + 20.0f, infoY + 22.0f),
-                     Color(1.0f, 0.9f, 0.3f, 1.0f), 14.0f);
+    // Align the value to the middle
+    ImGui::SameLine(ImGui::GetWindowWidth() * 0.4f);
 
-    // Reset button
-    Rect resetBtn(panelX + panelWidth - 170.0f, infoY, 150.0f, 40.0f);
-    Color resetColor = Color(0.8f, 0.3f, 0.3f, 0.8f);
-    renderer->DrawRect(resetBtn, resetColor, true);
-    renderer->DrawRect(resetBtn, Color(1.0f, 0.5f, 0.5f, 1.0f), false);
-    renderer->DrawText("RESET SKILLS", Vec2(panelX + panelWidth - 155.0f, infoY + 12.0f),
-                     Color::White(), 14.0f);
+    // 1. Create your desired color using your existing Color class
+    Color skillColor(1.0f, 0.9f, 0.3f, 1.0f);
+
+    // 2. Convert it to ImVec4
+    ImVec4 imSkillColor(skillColor.r, skillColor.g, skillColor.b, skillColor.a);
+
+    // 3. Pass the ImVec4 to ImGui::TextColored
+    ImGui::TextColored(imSkillColor,
+        "%d available | %d spent", m_SkillPoints, m_TotalSpent);
+    // Reset button (Right side)
+    ImGui::SameLine(ImGui::GetWindowWidth() - 160.0f);
+
+    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.8f, 0.3f, 0.3f, 0.8f));
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(1.0f, 0.5f, 0.5f, 1.0f));
+
+    if (ImGui::Button("RESET SKILLS", ImVec2(150.0f, 40.0f))) {
+        ResetSkills();
+    }
+
+    ImGui::PopStyleColor(2);
+
+    // Hint text
+    ImGui::Spacing();
+    ImGui::TextColored(ImVec4(0.6f, 0.6f, 0.6f, 1.0f), "Press ESC to close");
 }
+
 
 void SkillTreeSystem::RenderSkillTree(Renderer* renderer, GameState* state) {
-    // Background overlay
-    Rect bg(0, 0, static_cast<f32>(renderer->GetWidth()), static_cast<f32>(renderer->GetHeight()));
-    renderer->DrawRect(bg, Color(0.0f, 0.0f, 0.05f, 0.85f), true);
+    // Renderer pointer is no longer used for drawing UI components
+    (void)renderer;
 
-    // Main panel
-    f32 panelWidth = 1000.0f;
-    f32 panelHeight = 700.0f;
-    f32 panelX = (static_cast<f32>(renderer->GetWidth()) - panelWidth) * 0.5f;
-    f32 panelY = (static_cast<f32>(renderer->GetHeight()) - panelHeight) * 0.5f;
+    // Set consistent window size and position (e.g., center of the screen)
+    ImGui::SetNextWindowSize(ImVec2(1000, 700), ImGuiCond_Once);
+    // Calculate the center point correctly first
+    ImVec2 centerPos = ImVec2(
+        ImGui::GetIO().DisplaySize.x * 0.5f,
+        ImGui::GetIO().DisplaySize.y * 0.5f
+    );
 
-    Rect panelRect(panelX, panelY, panelWidth, panelHeight);
-    renderer->DrawRect(panelRect, Color(0.05f, 0.05f, 0.1f, 0.95f), true);
-    renderer->DrawRect(panelRect, Color::NeonCyan() * 0.7f, false);
+    // Use the calculated center position
+    ImGui::SetNextWindowPos(centerPos, ImGuiCond_Once, ImVec2(0.5f, 0.5f));
 
-    // Title
-    renderer->DrawText("SKILL TREE", Vec2(panelX + panelWidth * 0.5f - 80.0f, panelY + 15.0f),
-                     Color::NeonCyan(), 24.0f);
+    // The main Skill Tree window
+    if (ImGui::Begin("Skill Tree", NULL, ImGuiWindowFlags_NoCollapse)) {
 
-    // Close button (top-right, 44px for mobile-first touch target)
-    f32 closeBtnSize = 44.0f;
-    f32 closeBtnX = panelX + panelWidth - closeBtnSize - 10.0f;
-    f32 closeBtnY = panelY + 10.0f;
-    Rect closeBtn(closeBtnX, closeBtnY, closeBtnSize, closeBtnSize);
-    renderer->DrawRect(closeBtn, Color(0.3f, 0.1f, 0.1f, 0.8f), true);
-    renderer->DrawRect(closeBtn, Color(1.0f, 0.3f, 0.3f, 1.0f), false);
-    renderer->DrawText("X", Vec2(closeBtnX + 14.0f, closeBtnY + 10.0f), Color::White(), 20.0f);
+        // --- TITLE ---
+        ImGui::SetCursorPosX(ImGui::GetWindowWidth() * 0.5f - ImGui::CalcTextSize("SKILL TREE").x * 0.5f);
+        ImGui::TextColored(ImVec4(0.0f, 0.8f, 1.0f, 1.0f), "SKILL TREE");
+        ImGui::Separator();
 
-    // Render components
-    RenderBranchTabs(renderer, panelX, panelY, panelWidth);
-    RenderSkillNodes(renderer, state, panelX, panelY, panelWidth);
-    RenderSkillInfo(renderer, panelX, panelY, panelWidth, panelHeight);
+        // --- BRANCH TABS ---
+        RenderBranchTabs(renderer, 0.0f, 0.0f, 0.0f); // Parameters now ignored
+        ImGui::Separator();
 
-    // Close hint
-    renderer->DrawText("Press ESC to close", Vec2(panelX + panelWidth - 150.0f, panelY + panelHeight - 30.0f),
-                     Color(0.6f, 0.6f, 0.6f, 1.0f), 12.0f);
-}
+        // --- SKILL NODE AREA (Scrollable) ---
+        // Use ImGui::BeginChild to create the scrollable view for the skill map.
+        // The height is set to fill the available space minus the info panel height (approx 120px)
+        ImGui::BeginChild("##SkillNodeArea", ImVec2(0, ImGui::GetContentRegionAvail().y - 120.0f), true, ImGuiWindowFlags_HorizontalScrollbar);
 
-void SkillTreeSystem::HandleClick(f32 mouseX, f32 mouseY, bool mousePressed, GameState* state) {
-    if (!mousePressed) return;
+        RenderSkillNodes(renderer, state, 0.0f, 0.0f, 0.0f); // Parameters now ignored
 
-    f32 panelWidth = 1000.0f;
-    f32 panelHeight = 700.0f;
-    f32 panelX = (1920.0f - panelWidth) * 0.5f;  // TODO: Use actual screen width
-    f32 panelY = (1080.0f - panelHeight) * 0.5f;
+        ImGui::EndChild();
+        ImGui::Separator();
 
-    // Branch tab clicks
-    f32 tabY = panelY + 88.0f;
-    f32 tabWidth = (panelWidth - 60.0f) / 3.0f;
-    f32 tabHeight = 50.0f;
-    f32 tabSpacing = 10.0f;
+        // --- INFO AND RESET PANEL ---
+        RenderSkillInfo(renderer, 0.0f, 0.0f, 0.0f, 0.0f); // Parameters now ignored
 
-    for (i32 i = 0; i < 3; i++) {
-        f32 tabX = panelX + 20.0f + i * (tabWidth + tabSpacing);
-        Rect tabRect(tabX, tabY, tabWidth, tabHeight);
-
-        if (tabRect.Contains(Vec2(mouseX, mouseY))) {
-            m_SelectedBranch = static_cast<SkillBranch>(i);
-            Log::Infof("Selected skill branch: ", i);
-            return;
-        }
-    }
-
-    // Skill node clicks
-    f32 nodeStartY = panelY + 160.0f;
-    f32 nodeStartX = panelX + 80.0f;
-    f32 nodeWidth = 200.0f;
-    f32 nodeHeight = 80.0f;
-
-    auto skills = GetSkillsInBranch(m_SelectedBranch);
-    for (Skill* skill : skills) {
-        f32 nodeX = nodeStartX + skill->treeColumn * (nodeWidth + 30.0f);
-        f32 nodeY = nodeStartY + skill->treeRow * (nodeHeight + 40.0f);
-
-        Rect nodeRect(nodeX, nodeY, nodeWidth, nodeHeight);
-
-        if (nodeRect.Contains(Vec2(mouseX, mouseY))) {
-            if (LearnSkill(skill->id, state)) {
-                Log::Infof("Learned skill: ", skill->name);
-            } else {
-                Log::Info("Cannot learn this skill (check requirements)");
-            }
-            return;
-        }
-    }
-
-    // Reset button click
-    Rect resetBtn(panelX + panelWidth - 170.0f, panelY + panelHeight - 120.0f, 150.0f, 40.0f);
-    if (resetBtn.Contains(Vec2(mouseX, mouseY))) {
-        ResetSkills();
+        ImGui::End();
     }
 }
 

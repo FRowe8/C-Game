@@ -1,6 +1,7 @@
 #include "Milestones.h"
 #include "GameState.h"
 #include "Logger.h"
+#include "Research.h"
 
 // Milestone implementation
 Milestone::Milestone()
@@ -366,6 +367,18 @@ bool MilestoneSystem::IsCompleted(MilestoneID id) const
         }
     }
     return false;
+}
+
+
+// ADD THIS: Definition of the non-const getter
+std::vector<Milestone>& MilestoneSystem::GetMilestones() {
+    return m_Milestones;
+}
+
+// --- Add this function to the MilestoneSystem implementation ---
+const std::vector<Milestone>& MilestoneSystem::GetMilestones() const
+{
+    return m_Milestones;
 }
 
 Milestone* MilestoneSystem::GetMilestone(MilestoneID id)

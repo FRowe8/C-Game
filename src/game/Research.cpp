@@ -1,6 +1,7 @@
 #include "Research.h"
 #include "Logger.h"
 #include <algorithm>
+#include "GameState.h"
 
 // ResearchNode implementation
 ResearchNode::ResearchNode()
@@ -490,4 +491,33 @@ std::vector<const ResearchNode*> ResearchTree::GetNodesByCategory(ResearchCatego
         }
     }
     return nodes;
+}
+
+f64 ResearchTree::GetResourceBonus(QuantumResource type) const
+{
+    f64 cumulativeMultiplier = 1.0;
+    f64 additiveBonus = 0.0;
+
+    for (const auto& node : m_Nodes) {
+        if (node.researched) {
+
+            // Qubits and Entanglement: Apply the cumulative production multiplier (e.g., 1.5x, 2.0x)
+            if (type == QuantumResource::Qubits || type == QuantumResource::Entanglement) {
+                cumulativeMultiplier *= node.productionMultiplier;
+            }
+
+            // Coherence: Apply the additive bonus (e.g., 1.0 for +100% rate)
+            else if (type == QuantumResource::Coherence) {
+                additiveBonus += node.coherenceBonus;
+            }
+        }
+    }
+
+    if (type == QuantumResource::Coherence) {
+        // Return 1.0 (base) plus the total additive bonus
+        return 1.0 + additiveBonus;
+    }
+
+    // Return the cumulative multiplier for Qubits and Entanglement
+    return cumulativeMultiplier;
 }

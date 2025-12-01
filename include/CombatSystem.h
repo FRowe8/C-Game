@@ -79,7 +79,7 @@ public:
     void RenderCombatUI(Renderer* renderer);
 
     // UI interaction
-    void HandleClick(f32 mouseX, f32 mouseY, bool mousePressed);
+    void HandleClick(f32 mouseX, f32 mouseY, bool mousePressed) const;
 
 private:
     // Combat state

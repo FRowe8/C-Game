@@ -27,11 +27,6 @@ public:
     void DrawRect(const Rect& rect, const Color& color, bool filled = true);
     void DrawCircle(const Vec2& center, f32 radius, const Color& color, bool filled = true);
     void DrawLine(const Vec2& start, const Vec2& end, const Color& color, f32 thickness = 1.0f);
-    void DrawText(const std::string& text, const Vec2& position, const Color& color, f32 size = 16.0f);
-    void DrawProgressBar(const Vec2& position, f32 width, f32 height,
-                        f64 current, f64 max,
-                        const Color& fillColor, const Color& bgColor = Color(0.2f, 0.2f, 0.2f, 1.0f),
-                        bool showPercentage = true, f32 textSize = 12.0f);
 
     // Particle system (will be migrated to ImGui custom rendering later)
     struct Particle {

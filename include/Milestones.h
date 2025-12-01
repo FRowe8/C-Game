@@ -57,11 +57,13 @@ struct Milestone {
     f64 progress;
     f64 target;
     bool completed;
+    bool claimed;   // <-- ADD THIS FOR THE CLAIMED STATE (was 'unlocked')
 
     // Rewards
     f64 qubitReward;
     f64 photonReward;
     f64 permanentProductionBonus;  // Permanent +X% production
+    f64 rewardSingularities; // <-- ADD THIS FOR THE SINGULARITY REWARD
     bool unlocksFeature;
     std::string featureName;
 
@@ -79,6 +81,8 @@ public:
     bool IsCompleted(MilestoneID id) const;
     Milestone* GetMilestone(MilestoneID id);
 
+    std::vector<Milestone>& GetMilestones();
+    const std::vector<Milestone>& GetMilestones() const;
     std::vector<Milestone*> GetActiveMilestones();      // In progress
     std::vector<Milestone*> GetCompletedMilestones();   // Completed
     std::vector<Milestone*> GetRecentCompletions();     // Recently completed (for UI)

@@ -115,6 +115,6 @@ private:
     void RenderBannerSelection(Renderer* renderer, f32 panelX, f32 panelY, f32 panelWidth);
     void RenderSummonButtons(Renderer* renderer, GameState* state, f32 panelX, f32 panelY, f32 panelWidth);
     void RenderPityCounters(Renderer* renderer, f32 panelX, f32 panelY, f32 panelWidth);
-    void RenderSummonAnimation(Renderer* renderer);
+    void RenderSummonAnimation(Renderer* renderer, GameState* state);
     void RenderRateInfo(Renderer* renderer, f32 panelX, f32 panelY, f32 panelWidth);
 };

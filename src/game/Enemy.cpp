@@ -1,8 +1,11 @@
 #include "Enemy.h"
+#include "ImGuiUtils.h"
 #include "Renderer.h"
 #include "Logger.h"
+#include "imgui.h" // ADDED: Necessary for all ImGui calls
 #include <cstdlib>
 #include <cmath>
+#include <sstream> // Using std::stringstream for complex text formatting
 
 // Enemy Implementation
 Enemy::Enemy()
@@ -224,62 +227,99 @@ const char* Enemy::GetTierName() const {
     return "Unknown";
 }
 
+// ====================================================================
+// NEW IMGUI RENDERING
+// ====================================================================
+
 void Enemy::Render(Renderer* renderer, f32 x, f32 y, f32 width, f32 height) {
-    // Background panel
-    Rect bgRect(x, y, width, height);
-    Color bgColor = GetTypeColor() * 0.15f;
-    bgColor.a = 0.9f;
-    renderer->DrawRect(bgRect, bgColor, true);
+    // 1. Set up the ImGui drawing space to match the old coordinates
+    ImGui::SetNextWindowPos(ImVec2(x, y), ImGuiCond_Always);
+    ImGui::SetNextWindowSize(ImVec2(width, height), ImGuiCond_Always);
 
-    // Border (brighter for bosses)
-    Color borderColor = IsBoss() ? GetTypeColor() : (GetTypeColor() * 0.6f);
-    renderer->DrawRect(bgRect, borderColor, false);
+    // Use a unique name for the Child Window based on the enemy name/address
+    std::string windowName = "##EnemyPanel_" + std::to_string(reinterpret_cast<uintptr_t>(this));
 
-    f32 yOffset = y + 10.0f;
+    // Calculate background color based on type
+    Color baseColor = GetTypeColor();
+    ImVec4 bgColor = ToImVec4(baseColor * 0.15f);
+    bgColor.w = 0.9f;
 
-    // Enemy name
-    Color nameColor = IsBoss() ? Color(1.0f, 0.5f, 1.0f, 1.0f) : GetTypeColor();
-    renderer->DrawText(m_Name.c_str(), Vec2(x + 10.0f, yOffset), nameColor, IsBoss() ? 20.0f : 18.0f);
-    yOffset += IsBoss() ? 25.0f : 22.0f;
+    // Set custom style colors for the window background and border
+    ImGui::PushStyleColor(ImGuiCol_ChildBg, bgColor);
 
-    // Type and level
-    char typeLevel[64];
-    snprintf(typeLevel, sizeof(typeLevel), "%s | Level %d | %s", GetTypeName(), m_Level, GetTierName());
-    renderer->DrawText(typeLevel, Vec2(x + 10.0f, yOffset), Color(0.8f, 0.8f, 0.8f, 1.0f), 12.0f);
-    yOffset += 20.0f;
+    // Border color is the base type color
+    ImVec4 borderColor = ToImVec4(IsBoss() ? baseColor : (baseColor * 0.6f));
+    ImGui::PushStyleColor(ImGuiCol_Border, borderColor);
+    ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 4.0f);
 
-    // Health bar
-    f32 barWidth = width - 20.0f;
-    f32 barHeight = 25.0f;
-    Rect hpBarBg(x + 10.0f, yOffset, barWidth, barHeight);
-    Rect hpBarFill(x + 10.0f, yOffset, barWidth * (m_CurrentHealth / m_MaxHealth), barHeight);
+    // Draw the panel using ImGui::BeginChild
+    if (ImGui::BeginChild(windowName.c_str(), ImVec2(width, height), ImGuiChildFlags_AlwaysUseWindowPadding | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse)) {
+        // --- Enemy Name ---
+        ImVec4 nameColor = ToImVec4(IsBoss() ? Color(1.0f, 0.5f, 1.0f, 1.0f) : baseColor);
 
-    renderer->DrawRect(hpBarBg, Color(0.2f, 0.2f, 0.2f, 1.0f), true);
+        // Use a temporary font scale for the name (if multiple fonts aren't set up)
+        // If you loaded different fonts in ImGui::Initialize, you would use ImGui::PushFont(BossFont)
+        if (IsBoss()) {
+            ImGui::PushFont(ImGui::GetIO().Fonts->Fonts[0]); // Pushing default font for now
+            ImGui::SetWindowFontScale(1.2f); // Emulate 20.0f size
+        } else {
+            ImGui::SetWindowFontScale(1.0f); // Emulate 18.0f size
+        }
 
-    Color hpColor = GetHealthPercent() > 50.0 ? Color(0.2f, 1.0f, 0.2f, 1.0f) :
-                    GetHealthPercent() > 25.0 ? Color(1.0f, 0.8f, 0.0f, 1.0f) :
-                    Color(1.0f, 0.2f, 0.2f, 1.0f);
-    renderer->DrawRect(hpBarFill, hpColor, true);
+        ImGui::TextColored(nameColor, "%s", m_Name.c_str());
 
-    char hpText[64];
-    snprintf(hpText, sizeof(hpText), "%.0f / %.0f HP", m_CurrentHealth, m_MaxHealth);
-    renderer->DrawText(hpText, Vec2(x + width * 0.5f - 40.0f, yOffset + 6.0f), Color::White(), 14.0f);
-    yOffset += 35.0f;
+        ImGui::SetWindowFontScale(1.0f); // Reset scale after name
 
-    // Stats
-    char stats[256];
-    snprintf(stats, sizeof(stats), "ATK: %.0f | DEF: %.0f | SPD: %.0f", m_Attack, m_Defense, m_Speed);
-    renderer->DrawText(stats, Vec2(x + 10.0f, yOffset), Color(0.7f, 0.7f, 0.9f, 1.0f), 12.0f);
-    yOffset += 20.0f;
+        // --- Type and Level ---
+        std::stringstream typeLevelStream;
+        typeLevelStream << GetTypeName() << " | Level " << m_Level << " | " << GetTierName();
+        ImGui::TextColored(ToImVec4(Color(0.8f, 0.8f, 0.8f, 1.0f)), "%s", typeLevelStream.str().c_str());
+        ImGui::Spacing();
 
-    // Rewards preview
-    char rewards[256];
-    snprintf(rewards, sizeof(rewards), "Rewards: %d Credits | %d XP | %.0f%% Part Drop",
-             m_CreditReward, m_XPReward, m_PartDropChance * 100.0);
-    renderer->DrawText(rewards, Vec2(x + 10.0f, yOffset), Color(1.0f, 0.9f, 0.3f, 1.0f), 11.0f);
+        // --- Health Bar ---
+        float healthPercent = static_cast<f32>(m_CurrentHealth / m_MaxHealth);
+
+        // Determine health color dynamically
+        Color hpColor = GetHealthPercent() > 50.0 ? Color(0.2f, 1.0f, 0.2f, 1.0f) :
+                        GetHealthPercent() > 25.0 ? Color(1.0f, 0.8f, 0.0f, 1.0f) :
+                        Color(1.0f, 0.2f, 0.2f, 1.0f);
+
+        ImGui::PushStyleColor(ImGuiCol_PlotHistogram, ToImVec4(hpColor));
+        ImGui::PushStyleColor(ImGuiCol_FrameBg, ToImVec4(Color(0.2f, 0.2f, 0.2f, 1.0f)));
+
+        // Overlay text for health bar
+        char hpText[64];
+        snprintf(hpText, sizeof(hpText), "%.0f / %.0f HP", m_CurrentHealth, m_MaxHealth);
+
+        // ImGui::ProgressBar (replaces DrawRect for bar, and DrawText for overlay)
+        // ImVec2(-1, 0) means full width, and default height
+        ImGui::ProgressBar(healthPercent, ImVec2(-1, 25.0f), hpText);
+
+        ImGui::PopStyleColor(2); // Pop PlotHistogram and FrameBg
+        ImGui::Spacing();
+
+        // --- Stats ---
+        std::stringstream statsStream;
+        statsStream.precision(0);
+        statsStream << std::fixed << "ATK: " << m_Attack << " | DEF: " << m_Defense << " | SPD: " << m_Speed;
+        ImGui::TextColored(ToImVec4(Color(0.7f, 0.7f, 0.9f, 1.0f)), "%s", statsStream.str().c_str());
+        ImGui::Spacing();
+
+        // --- Rewards Preview ---
+        std::stringstream rewardsStream;
+        rewardsStream.precision(0);
+        rewardsStream << std::fixed << "Rewards: " << m_CreditReward << " Credits | " << m_XPReward << " XP | " << m_PartDropChance * 100.0 << "%% Part Drop";
+
+        ImGui::TextColored(ToImVec4(Color(1.0f, 0.9f, 0.3f, 1.0f)), "%s", rewardsStream.str().c_str());
+
+    }
+    ImGui::EndChild();
+
+    ImGui::PopStyleColor(2); // Pop ChildBg and Border
+    ImGui::PopStyleVar(); // Pop ChildRounding
 }
 
-// EnemyGenerator Implementation
+// EnemyGenerator Implementation (NO CHANGES BELOW HERE)
 namespace EnemyGenerator {
     EnemyTier GetTierFromLevel(i32 level) {
         if (level <= 20) return EnemyTier::Tier1;

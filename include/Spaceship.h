@@ -93,11 +93,8 @@ public:
     i32 GetLegendaryPartsCollected() const { return m_LegendaryPartsCollected; }
 
     // Rendering
-    void RenderShipPanel(Renderer* renderer, f32 panelX, f32 panelY, f32 panelWidth, f32 panelHeight);
-    void RenderInventoryPanel(Renderer* renderer, f32 panelX, f32 panelY, f32 panelWidth, f32 panelHeight);
-
-    // UI interaction
-    void HandleClick(f32 mouseX, f32 mouseY, bool mousePressed);
+    void RenderShipPanel();
+    void RenderInventoryPanel();
 
     // Save/Load
     void SaveToJson(std::ofstream& file) const;

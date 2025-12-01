@@ -1,9 +1,12 @@
 #include "EnhancementSystem.h"
 #include "Renderer.h"
+#include "ImGuiUtils.h"
 #include "Logger.h"
 #include "GameState.h"
+#include "imgui.h" // ADDED: Necessary for ImGui integration
 #include <cstdlib>
 #include <cmath>
+#include <sstream> // ADDED: For string manipulation in UI
 
 EnhancementSystem::EnhancementSystem()
     : m_SelectedInventoryIndex(-1), m_ShowEnhancementUI(false), m_ShowConfirmDismantle(false) {
@@ -21,7 +24,7 @@ void EnhancementSystem::Initialize() {
     Log::Info("Enhancement system initialized");
 }
 
-// ===== Material Management =====
+// ===== Material Management (Untouched) =====
 
 void EnhancementSystem::AddMaterial(MaterialType type, i32 amount) {
     switch (type) {
@@ -83,7 +86,7 @@ i32 EnhancementSystem::GetMaterial(MaterialType type) const {
     }
 }
 
-// ===== Enhancement System =====
+// ===== Enhancement System (Untouched) =====
 
 f64 EnhancementSystem::GetSuccessRate(i32 currentLevel) const {
     if (currentLevel < 0) return 0.0;
@@ -184,7 +187,7 @@ EnhancementResult EnhancementSystem::EnhancePart(ShipPart& part, GameState* stat
     }
 }
 
-// ===== Star Ascension =====
+// ===== Star Ascension (Untouched) =====
 
 AscensionCost EnhancementSystem::GetAscensionCost(const ShipPart& part) const {
     AscensionCost cost;
@@ -245,7 +248,7 @@ bool EnhancementSystem::AscendPart(ShipPart& part, GameState* state, bool useDup
     return true;
 }
 
-// ===== Dismantling =====
+// ===== Dismantling (Untouched) =====
 
 MaterialInventory EnhancementSystem::GetDismantleReward(const ShipPart& part) const {
     MaterialInventory reward;
@@ -297,53 +300,95 @@ void EnhancementSystem::DismantlePart(const ShipPart& part) {
     Log::Infof("Dismantled ", part.name, " for materials");
 }
 
-// ===== Rendering =====
+// ===== Rendering (MIGRATED TO IMGUI) =====
 
 void EnhancementSystem::RenderEnhancementUI(Renderer* renderer, GameState* state) {
     if (!m_ShowEnhancementUI) return;
 
-    // Background overlay
-    Rect bg(0, 0, static_cast<f32>(renderer->GetWidth()), static_cast<f32>(renderer->GetHeight()));
-    renderer->DrawRect(bg, Color(0.0f, 0.0f, 0.05f, 0.85f), true);
-
-    // Main panel
+    // Window dimensions
     f32 panelWidth = 900.0f;
     f32 panelHeight = 700.0f;
-    f32 panelX = (static_cast<f32>(renderer->GetWidth()) - panelWidth) * 0.5f;
-    f32 panelY = (static_cast<f32>(renderer->GetHeight()) - panelHeight) * 0.5f;
 
-    Rect panelRect(panelX, panelY, panelWidth, panelHeight);
-    renderer->DrawRect(panelRect, Color(0.05f, 0.05f, 0.1f, 0.95f), true);
-    renderer->DrawRect(panelRect, Color(0.8f, 0.6f, 0.2f, 0.8f), false); // Gold border
+    // 1. Setup position and size (Centered)
+    ImGui::SetNextWindowSize(ImVec2(panelWidth, panelHeight), ImGuiCond_Always);
+    ImVec2 displaySize = ImGui::GetIO().DisplaySize;
+    ImGui::SetNextWindowPos(ImVec2(displaySize.x * 0.5f, displaySize.y * 0.5f), ImGuiCond_Always, ImVec2(0.5f, 0.5f));
 
-    // Title
-    renderer->DrawText("PART ENHANCEMENT", Vec2(panelX + panelWidth * 0.5f - 150.0f, panelY + 15.0f),
-                     Color(1.0f, 0.8f, 0.3f, 1.0f), 24.0f);
+    // 2. Setup styles (matching old background/border)
+    ImGui::PushStyleColor(ImGuiCol_WindowBg, ToImVec4(Color(0.05f, 0.05f, 0.1f, 0.95f)));
+    ImGui::PushStyleColor(ImGuiCol_Border, ToImVec4(Color(0.8f, 0.6f, 0.2f, 0.8f))); // Gold border
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 1.0f);
 
-    // Close button (top-right, 44px for mobile-first touch target)
-    f32 closeBtnSize = 44.0f;
-    f32 closeBtnX = panelX + panelWidth - closeBtnSize - 10.0f;
-    f32 closeBtnY = panelY + 10.0f;
-    Rect closeBtn(closeBtnX, closeBtnY, closeBtnSize, closeBtnSize);
-    renderer->DrawRect(closeBtn, Color(0.3f, 0.1f, 0.1f, 0.8f), true);
-    renderer->DrawRect(closeBtn, Color(1.0f, 0.3f, 0.3f, 1.0f), false);
-    renderer->DrawText("X", Vec2(closeBtnX + 14.0f, closeBtnY + 10.0f), Color::White(), 20.0f);
+    // Use the NoTitleBar flag since we are drawing a custom title and close button
+    if (ImGui::Begin("##PartEnhancementPanel", &m_ShowEnhancementUI, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoTitleBar)) {
 
-    // Render components
-    RenderMaterialDisplay(renderer, panelX, panelY, panelWidth);
-    RenderPartDetails(renderer, state, panelX, panelY, panelWidth);
-    RenderEnhancementOptions(renderer, state, panelX, panelY, panelWidth);
+        // --- Title (Replaces line 320) ---
+        ImGui::SetCursorPosX(panelWidth * 0.5f - ImGui::CalcTextSize("PART ENHANCEMENT").x * 0.5f);
+        ImGui::TextColored(ToImVec4(Color(1.0f, 0.8f, 0.3f, 1.0f)), "PART ENHANCEMENT");
 
-    // Close hint
-    renderer->DrawText("Press ESC to close", Vec2(panelX + panelWidth - 150.0f, panelY + panelHeight - 30.0f),
-                     Color(0.6f, 0.6f, 0.6f, 1.0f), 12.0f);
+        // --- Close button (Replaces lines 322-330) ---
+        f32 closeBtnSize = 44.0f;
+        ImGui::SetCursorPos(ImVec2(panelWidth - closeBtnSize - 10.0f, 10.0f));
+
+        ImGui::PushStyleColor(ImGuiCol_Button, ToImVec4(Color(0.3f, 0.1f, 0.1f, 0.8f)));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ToImVec4(Color(0.5f, 0.2f, 0.2f, 1.0f)));
+
+        // This will toggle m_ShowEnhancementUI to false when clicked
+        if (ImGui::Button("X##CloseEnhancement", ImVec2(closeBtnSize, closeBtnSize))) {
+            m_ShowEnhancementUI = false;
+        }
+        ImGui::PopStyleColor(2);
+
+        ImGui::Separator();
+        ImGui::Spacing();
+
+        // --- Material Display (Left) ---
+        // We will allocate the left 2/5 of the panel for materials
+        f32 materialWidth = panelWidth * 0.35f;
+        f32 detailWidth = panelWidth * 0.60f;
+
+        ImGui::BeginGroup();
+        {
+            ImGui::BeginChild("##MaterialDisplayChild", ImVec2(materialWidth, 180.0f), true, ImGuiWindowFlags_NoScrollbar);
+            RenderMaterialDisplay(renderer, 0, 0, materialWidth); // ImGui handles layout, args are mostly ignored now
+            ImGui::EndChild();
+        }
+        ImGui::EndGroup();
+
+        ImGui::SameLine();
+
+        // --- Part Details (Right) ---
+        ImGui::BeginGroup();
+        {
+            ImGui::BeginChild("##PartDetailsChild", ImVec2(detailWidth, 350.0f), true);
+            RenderPartDetails(renderer, state, 0, 0, detailWidth); // ImGui handles layout, args are mostly ignored now
+            ImGui::EndChild();
+
+            // Enhancement Options (below Part Details)
+            RenderEnhancementOptions(renderer, state, 0, 0, detailWidth);
+        }
+        ImGui::EndGroup();
+
+
+        // --- Close hint (Replaces line 338) ---
+        ImGui::SetCursorPosY(panelHeight - 35.0f);
+        ImGui::SetCursorPosX(panelWidth - ImGui::CalcTextSize("Press ESC to close").x - 20.0f);
+        ImGui::TextColored(ToImVec4(Color(0.6f, 0.6f, 0.6f, 1.0f)), "Press ESC to close");
+
+        ImGui::End();
+    }
+    // 3. Pop styles
+    ImGui::PopStyleVar(2); // Pop WindowRounding, WindowBorderSize
+    ImGui::PopStyleColor(2); // Pop Border, WindowBg
 }
 
 void EnhancementSystem::RenderMaterialDisplay(Renderer* renderer, f32 panelX, f32 panelY, f32 panelWidth) {
-    f32 yOffset = panelY + 60.0f;
+    (void)renderer; // No longer needed
+    (void)panelX; (void)panelY; (void)panelWidth; // No longer used for absolute positioning
 
-    renderer->DrawText("MATERIALS:", Vec2(panelX + 20.0f, yOffset), Color::White(), 14.0f);
-    yOffset += 25.0f;
+    ImGui::TextColored(ToImVec4(Color::White()), "MATERIALS:"); // Replaces line 345
+    ImGui::Spacing();
 
     // Display each material
     const char* materialNames[] = {"Tech Scraps", "Nano-Alloy", "Quantum Core", "Universal Shards"};
@@ -352,31 +397,39 @@ void EnhancementSystem::RenderMaterialDisplay(Renderer* renderer, f32 panelX, f3
                               Color(0.8f, 0.3f, 1.0f, 1.0f), Color(1.0f, 0.9f, 0.3f, 1.0f)};
 
     for (i32 i = 0; i < 4; i++) {
-        char matText[64];
-        snprintf(matText, sizeof(matText), "%s: %d", materialNames[i], materialCounts[i]);
-        renderer->DrawText(matText, Vec2(panelX + 20.0f + (i % 2) * 220.0f, yOffset + (i / 2) * 22.0f),
-                         materialColors[i], 12.0f);
+        std::stringstream ss;
+        ss << materialNames[i] << ": " << materialCounts[i];
+
+        ImGui::TextColored(ToImVec4(materialColors[i]), "%s", ss.str().c_str()); // Replaces line 357
+
+        // This simulates the two-column layout from the original code (i % 2) * 220.0f
+        if (i % 2 == 0 && i < 3) {
+             // Use SameLine to place the next item on the same row (column 2)
+            ImGui::SameLine(panelWidth * 0.5f);
+        }
     }
 }
 
 void EnhancementSystem::RenderPartDetails(Renderer* renderer, GameState* state, f32 panelX, f32 panelY, f32 panelWidth) {
+    (void)renderer; // No longer needed
     (void)state;
-    (void)panelWidth;
+    (void)panelX; (void)panelY; (void)panelWidth;
 
-    f32 yOffset = panelY + 150.0f;
-
-    renderer->DrawText("SELECT PART TO ENHANCE", Vec2(panelX + 20.0f, yOffset),
-                     Color(0.8f, 0.8f, 0.8f, 1.0f), 14.0f);
+    ImGui::TextColored(ToImVec4(Color(0.8f, 0.8f, 0.8f, 1.0f)), "SELECT PART TO ENHANCE"); // Replaces line 368
+    ImGui::Separator();
 
     // TODO: Display selected part details, stats, enhancement level, stars
+    ImGui::Text("Part List / Details Placeholder...");
 }
 
 void EnhancementSystem::RenderEnhancementOptions(Renderer* renderer, GameState* state, f32 panelX, f32 panelY, f32 panelWidth) {
     (void)state;
     (void)renderer;
-    (void)panelX;
-    (void)panelY;
-    (void)panelWidth;
+    (void)panelX; (void)panelY; (void)panelWidth;
+
+    ImGui::Spacing();
+    ImGui::Separator();
+    ImGui::Text("Enhancement Options Placeholder...");
 
     // TODO: Render enhancement buttons, success rates, costs
 }
@@ -388,9 +441,11 @@ void EnhancementSystem::HandleClick(f32 mouseX, f32 mouseY, bool mousePressed, G
     (void)state;
 
     // TODO: Handle UI clicks for enhancement/ascension/dismantle
+    // NOTE: This function should be removed once all UI interaction
+    // is handled by ImGui::Button and ImGui::Checkbox calls in the Render functions.
 }
 
-// ===== Helpers =====
+// ===== Helpers (Untouched) =====
 
 Color EnhancementSystem::GetMaterialColor(MaterialType type) const {
     switch (type) {
@@ -412,7 +467,7 @@ const char* EnhancementSystem::GetMaterialName(MaterialType type) const {
     }
 }
 
-// ===== Serialization =====
+// ===== Serialization (Untouched) =====
 
 std::string EnhancementSystem::SaveToJson() const {
     char buffer[512];

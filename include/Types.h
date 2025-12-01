@@ -109,6 +109,8 @@ struct Color {
     static Color DarkBackground() { return Color(0.08f, 0.08f, 0.12f, 1.0f); }
     static Color DarkPanel() { return Color(0.12f, 0.12f, 0.18f, 0.95f); }
     static Color DarkBorder() { return Color(0.2f, 0.2f, 0.3f, 1.0f); }
+
+    static Color Transparent() { return Color(0.0f, 0.0f, 0.0f, 0.0f); }
 };
 
 struct Rect {
@@ -123,4 +125,60 @@ struct Rect {
     }
 
     Vec2 Center() const { return Vec2(x + width * 0.5f, y + height * 0.5f); }
+};
+
+enum class QuantumResource {
+    Qubits,        // Primary currency
+    Coherence,     // Stability resource
+    Entanglement   // Strategic resource
+};
+
+
+
+enum class ResearchID {
+    // Tier 1 - Basic Research (Early game)
+    QuantumMechanics101,      // Unlock basic concepts
+    WaveFunctionTheory,       // +10% observation probability
+    CoherenceStabilization,   // Slower coherence decay
+    EntanglementBasics,       // Unlock entanglement system
+
+    // Tier 2 - Intermediate (Mid game)
+    QuantumComputing,         // +25% production
+    SuperpositionMastery,     // Superposition accumulates faster
+    ParticlePhysics,          // Unlock particle collection
+    QuantumTunneling,         // Resources can "tunnel" between types
+
+    // Tier 3 - Advanced (Late game)
+    QuantumFieldTheory,       // Unlock quantum field effects
+    StringTheory,             // +50% all production
+    QuantumGravity,           // Gravity affects resource generation
+    TimeDialation,            // Slow down/speed up time
+
+    // Tier 4 - Exotic (End game)
+    MultiverseTheory,         // Run parallel universes
+    QuantumImmortality,       // Never lose progress
+    ZeroPointEnergy,          // Infinite energy source
+    QuantumSingularity,       // The ultimate discovery
+
+    // Automation
+    AutoObserver,             // Auto-observe every 10 seconds
+    AutoUpgrade,              // Auto-buy cheapest upgrade
+    AutoPrestige,             // Auto-prestige at photon threshold
+    SmartInvestor,            // AI decides best purchases
+
+    // Special
+    QuantumLuck,              // Better event chances
+    PhotonMultiplier,         // More photons on prestige
+    OfflineBoost,             // Better offline production
+
+    COUNT
+};
+
+enum class ResearchCategory {
+    Production,      // Increase production
+    Observation,     // Observation bonuses
+    Coherence,       // Coherence bonuses
+    Entanglement,    // Entanglement bonuses
+    Automation,      // Quality of life
+    Special          // Unique effects
 };

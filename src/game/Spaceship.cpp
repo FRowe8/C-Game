@@ -1,6 +1,7 @@
 #include "Spaceship.h"
 #include "Renderer.h"
 #include "Logger.h"
+#include "imgui.h" // <--- ADD THIS LINE
 #include <cstdlib>
 #include <cmath>
 
@@ -290,181 +291,177 @@ void Spaceship::UpdateStatistics(const ShipPart& part) {
     }
 }
 
-void Spaceship::RenderShipPanel(Renderer* renderer, f32 panelX, f32 panelY, f32 panelWidth, f32 panelHeight) {
-    // Draw panel background
-    Rect panelRect(panelX, panelY, panelWidth, panelHeight);
-    renderer->DrawRect(panelRect, Color(0.1f, 0.1f, 0.15f, 0.9f), true);
+void Spaceship::RenderShipPanel() {
+    // Note: Removed Renderer*, panelX, etc. arguments. ImGui handles them.
 
-    f32 yOffset = panelY + 10.0f;
+    // --- Ship Status ---
 
-    // Title
-    renderer->DrawText("SPACESHIP", Vec2(panelX + 10.0f, yOffset), Color::NeonCyan(), 20.0f);
-    yOffset += 30.0f;
+    // Title (Use ImGui::Text and large font if desired)
+    ImGui::TextColored(ImVec4(0.0f, 0.8f, 1.0f, 1.0f), "SPACESHIP STATUS"); // Neon Cyan
 
-    // Repair progress bar
-    renderer->DrawText("Repair Progress:", Vec2(panelX + 10.0f, yOffset), Color::White(), 16.0f);
-    yOffset += 25.0f;
+    // --- Repair Progress Bar ---
+    ImGui::Separator();
+    ImGui::Text("Repair Progress:");
 
-    f32 barWidth = panelWidth - 20.0f;
-    f32 barHeight = 30.0f;
-    Rect progressBarBg(panelX + 10.0f, yOffset, barWidth, barHeight);
-    Rect progressBarFill(panelX + 10.0f, yOffset, barWidth * (m_RepairProgress / 100.0f), barHeight);
+    // Get progress and color
+    float progress = static_cast<float>(m_RepairProgress / 100.0f);
+    ImVec4 progressColor;
+    if (m_RepairProgress >= 100.0) {
+        progressColor = ImVec4(0.0f, 1.0f, 0.0f, 1.0f); // Green
+    } else if (m_RepairProgress >= 25.0) {
+        progressColor = ImVec4(1.0f, 0.7f, 0.0f, 1.0f); // Orange
+    } else {
+        progressColor = ImVec4(0.8f, 0.3f, 0.3f, 1.0f); // Red
+    }
 
-    renderer->DrawRect(progressBarBg, Color(0.2f, 0.2f, 0.2f, 1.0f), true);
+    char overlay[32];
+    snprintf(overlay, sizeof(overlay), "%.1f%%", m_RepairProgress);
 
-    Color progressColor = m_RepairProgress >= 100.0f ? Color(0.0f, 1.0f, 0.0f, 1.0f) :
-                          m_RepairProgress >= 25.0f ? Color(1.0f, 0.7f, 0.0f, 1.0f) :
-                          Color(0.8f, 0.3f, 0.3f, 1.0f);
-    renderer->DrawRect(progressBarFill, progressColor, true);
-
-    char progressText[32];
-    snprintf(progressText, sizeof(progressText), "%.1f%%", m_RepairProgress);
-    renderer->DrawText(progressText, Vec2(panelX + panelWidth * 0.5f - 20.0f, yOffset + 7.0f),
-                      Color::White(), 16.0f);
-    yOffset += 40.0f;
+    // Use ImGui::ProgressBar
+    ImGui::PushStyleColor(ImGuiCol_PlotHistogram, progressColor);
+    ImGui::ProgressBar(progress, ImVec2(-1.0f, 30.0f), overlay);
+    ImGui::PopStyleColor();
 
     // Status text
     const char* statusText = m_RepairProgress >= 100.0f ? "STATUS: FULLY OPERATIONAL" :
                             m_RepairProgress >= 25.0f ? "STATUS: TRAVEL READY" :
                             "STATUS: CRITICAL DAMAGE";
-    renderer->DrawText(statusText, Vec2(panelX + 10.0f, yOffset), progressColor, 14.0f);
-    yOffset += 30.0f;
+    ImGui::TextColored(progressColor, "%s", statusText);
+    ImGui::Spacing();
 
-    // Part slots (4 slots in 2x2 grid)
-    f32 slotSize = (panelWidth - 40.0f) * 0.5f;
-    f32 slotSpacing = 10.0f;
+    // --- Part Slots (2x2 Grid) ---
+    ImGui::Separator();
+    ImGui::TextColored(ImVec4(0.0f, 0.8f, 1.0f, 1.0f), "INSTALLED PARTS");
 
     const char* slotNames[] = {"HULL", "ENGINE", "WEAPONS", "SHIELDS"};
+
+    // Calculate button width for 2 columns
+    float totalWidth = ImGui::GetContentRegionAvail().x;
+    float slotSize = (totalWidth - ImGui::GetStyle().ItemSpacing.x) * 0.5f;
 
     for (i32 row = 0; row < 2; row++) {
         for (i32 col = 0; col < 2; col++) {
             i32 slotIndex = row * 2 + col;
-            f32 slotX = panelX + 10.0f + col * (slotSize + slotSpacing);
-            f32 slotY = yOffset + row * (slotSize + slotSpacing);
-
-            Rect slotRect(slotX, slotY, slotSize, slotSize);
-
             ShipPart* installedPart = m_InstalledParts[slotIndex];
 
-            if (installedPart != nullptr) {
-                // Draw slot with installed part
-                Color slotColor = installedPart->GetRarityColor() * 0.3f;
-                slotColor.a = 0.8f;
-                renderer->DrawRect(slotRect, slotColor, true);
+            // Start new column for the second item in the row
+            if (col > 0) ImGui::SameLine();
 
-                // Part name
-                renderer->DrawText(slotNames[slotIndex], Vec2(slotX + 5.0f, slotY + 5.0f),
-                                 Color::White(), 12.0f);
-                renderer->DrawText(installedPart->GetRarityName(), Vec2(slotX + 5.0f, slotY + 20.0f),
-                                 installedPart->GetRarityColor(), 10.0f);
+            ImGui::BeginChild(slotNames[slotIndex], ImVec2(slotSize, slotSize), true, ImGuiWindowFlags_None);
+
+            // Draw slot header (HULL, ENGINE, etc.)
+            ImGui::TextColored(ImVec4(0.5f, 0.5f, 0.5f, 1.0f), "%s", slotNames[slotIndex]);
+
+            if (installedPart != nullptr) {
+                // Apply rarity color to text
+                Color c = installedPart->GetRarityColor();
+                ImVec4 rarityColor(c.r, c.g, c.b, c.a);
+
+                ImGui::TextColored(rarityColor, "%s", installedPart->name.c_str());
+                ImGui::TextColored(rarityColor, "(%s)", installedPart->GetRarityName());
 
                 // Bonuses
-                char bonusText[64];
-                snprintf(bonusText, sizeof(bonusText), "+%.0f%% Power", installedPart->powerBonus);
-                renderer->DrawText(bonusText, Vec2(slotX + 5.0f, slotY + slotSize - 35.0f),
-                                 Color(0.7f, 0.7f, 0.7f, 1.0f), 10.0f);
-
+                ImGui::Spacing();
+                ImGui::Text("+%.0f%% Power", installedPart->powerBonus * installedPart->GetTotalMultiplier());
                 if (installedPart->combatBonus > 0) {
-                    snprintf(bonusText, sizeof(bonusText), "+%.0f%% Combat", installedPart->combatBonus);
-                    renderer->DrawText(bonusText, Vec2(slotX + 5.0f, slotY + slotSize - 22.0f),
-                                     Color(0.7f, 0.7f, 0.7f, 1.0f), 10.0f);
+                    ImGui::Text("+%.0f%% Combat", installedPart->combatBonus * installedPart->GetTotalMultiplier());
                 }
+
+                // Tooltip on hover
+                if (ImGui::IsItemHovered()) {
+                    ImGui::SetTooltip("%s\nTier %d, Level +%d\nContribution: %.1f",
+                        installedPart->description.c_str(), installedPart->tier,
+                        installedPart->enhancementLevel, installedPart->repairContribution);
+                }
+
             } else {
-                // Draw empty slot
-                renderer->DrawRect(slotRect, Color(0.2f, 0.2f, 0.2f, 0.6f), true);
-                renderer->DrawText(slotNames[slotIndex], Vec2(slotX + 5.0f, slotY + 5.0f),
-                                 Color(0.5f, 0.5f, 0.5f, 1.0f), 12.0f);
-                renderer->DrawText("EMPTY", Vec2(slotX + 5.0f, slotY + slotSize * 0.5f - 7.0f),
-                                 Color(0.4f, 0.4f, 0.4f, 1.0f), 14.0f);
+                ImGui::Spacing();
+                ImGui::TextDisabled("EMPTY");
             }
+
+            ImGui::EndChild();
         }
     }
-    yOffset += (slotSize + slotSpacing) * 2 + 10.0f;
 
-    // Total bonuses summary
-    renderer->DrawText("TOTAL BONUSES:", Vec2(panelX + 10.0f, yOffset), Color::NeonCyan(), 14.0f);
-    yOffset += 20.0f;
+    // --- Total Bonuses Summary ---
+    ImGui::Spacing();
+    ImGui::Separator();
+    ImGui::TextColored(ImVec4(0.0f, 0.8f, 1.0f, 1.0f), "TOTAL BONUSES:");
 
-    char bonusLine[128];
-    snprintf(bonusLine, sizeof(bonusLine), "Production: +%.0f%%", m_TotalPowerBonus);
-    renderer->DrawText(bonusLine, Vec2(panelX + 10.0f, yOffset), Color(0.2f, 1.0f, 0.2f, 1.0f), 12.0f);
-    yOffset += 18.0f;
-
-    snprintf(bonusLine, sizeof(bonusLine), "Combat: +%.0f%%", m_TotalCombatBonus);
-    renderer->DrawText(bonusLine, Vec2(panelX + 10.0f, yOffset), Color(1.0f, 0.5f, 0.2f, 1.0f), 12.0f);
-    yOffset += 18.0f;
-
-    snprintf(bonusLine, sizeof(bonusLine), "Drop Rate: +%.0f%%", m_TotalDropRateBonus);
-    renderer->DrawText(bonusLine, Vec2(panelX + 10.0f, yOffset), Color(0.5f, 0.5f, 1.0f, 1.0f), 12.0f);
+    ImGui::TextColored(ImVec4(0.2f, 1.0f, 0.2f, 1.0f), "Production: +%.0f%%", m_TotalPowerBonus);
+    ImGui::TextColored(ImVec4(1.0f, 0.5f, 0.2f, 1.0f), "Combat: +%.0f%%", m_TotalCombatBonus);
+    ImGui::TextColored(ImVec4(0.5f, 0.5f, 1.0f, 1.0f), "Drop Rate: +%.0f%%", m_TotalDropRateBonus);
 }
 
-void Spaceship::RenderInventoryPanel(Renderer* renderer, f32 panelX, f32 panelY, f32 panelWidth, f32 panelHeight) {
-    // Draw inventory panel background
-    Rect panelRect(panelX, panelY, panelWidth, panelHeight);
-    renderer->DrawRect(panelRect, Color(0.1f, 0.1f, 0.15f, 0.9f), true);
+// You might want to call this something like RenderInventoryList()
+void Spaceship::RenderInventoryPanel() {
+    // Note: Removed Renderer*, panelX, etc. arguments. ImGui handles them.
 
-    f32 yOffset = panelY + 10.0f;
+    // --- Title ---
+    ImGui::TextColored(ImVec4(0.0f, 0.8f, 1.0f, 1.0f), "INVENTORY (%zu parts)", m_Inventory.size());
+    ImGui::Separator();
 
-    // Title
-    char title[64];
-    snprintf(title, sizeof(title), "INVENTORY (%d parts)", GetInventoryCount());
-    renderer->DrawText(title, Vec2(panelX + 10.0f, yOffset), Color::NeonCyan(), 16.0f);
-    yOffset += 25.0f;
-
-    // Render inventory items (scrollable list)
-    f32 itemHeight = 60.0f;
-    f32 maxHeight = panelHeight - 50.0f;
-    i32 visibleItems = static_cast<i32>(maxHeight / itemHeight);
-
-    for (i32 i = 0; i < static_cast<i32>(m_Inventory.size()) && i < visibleItems; i++) {
-        const ShipPart& part = m_Inventory[i];
-
-        f32 itemY = yOffset + i * itemHeight;
-        Rect itemRect(panelX + 10.0f, itemY, panelWidth - 20.0f, itemHeight - 5.0f);
-
-        Color bgColor = part.installed ?
-                       Color(0.2f, 0.3f, 0.2f, 0.6f) :
-                       Color(0.15f, 0.15f, 0.2f, 0.6f);
-        renderer->DrawRect(itemRect, bgColor, true);
-
-        // Rarity border
-        Rect rarityBorder(panelX + 10.0f, itemY, 4.0f, itemHeight - 5.0f);
-        renderer->DrawRect(rarityBorder, part.GetRarityColor(), true);
-
-        // Part info
-        f32 textX = panelX + 20.0f;
-        renderer->DrawText(part.name.c_str(), Vec2(textX, itemY + 5.0f),
-                         part.GetRarityColor(), 12.0f);
-        renderer->DrawText(part.GetSlotName(), Vec2(textX, itemY + 20.0f),
-                         Color(0.7f, 0.7f, 0.7f, 1.0f), 10.0f);
-
-        char stats[128];
-        snprintf(stats, sizeof(stats), "Pwr:+%.0f%% Cbt:+%.0f%% Drop:+%.0f%%",
-                part.powerBonus, part.combatBonus, part.dropRateBonus);
-        renderer->DrawText(stats, Vec2(textX, itemY + 35.0f),
-                         Color(0.6f, 0.6f, 0.6f, 1.0f), 9.0f);
-
-        if (part.installed) {
-            renderer->DrawText("INSTALLED", Vec2(panelX + panelWidth - 90.0f, itemY + 20.0f),
-                             Color(0.2f, 1.0f, 0.2f, 1.0f), 11.0f);
-        } else {
-            renderer->DrawText("[Click to Install]", Vec2(panelX + panelWidth - 120.0f, itemY + 20.0f),
-                             Color(0.5f, 0.8f, 1.0f, 1.0f), 10.0f);
-        }
-    }
+    // Use BeginChild for a fixed-size, scrollable inventory area
+    ImGui::BeginChild("InventoryScrollRegion", ImVec2(0, 0), false, ImGuiWindowFlags_AlwaysVerticalScrollbar);
 
     if (m_Inventory.empty()) {
-        renderer->DrawText("No parts in inventory", Vec2(panelX + 10.0f, yOffset + 20.0f),
-                         Color(0.5f, 0.5f, 0.5f, 1.0f), 14.0f);
-        renderer->DrawText("Observe research stations to find parts!",
-                         Vec2(panelX + 10.0f, yOffset + 40.0f),
-                         Color(0.6f, 0.6f, 0.6f, 1.0f), 12.0f);
-    }
-}
+        ImGui::TextColored(ImVec4(0.5f, 0.5f, 0.5f, 1.0f), "No parts in inventory");
+        ImGui::TextColored(ImVec4(0.6f, 0.6f, 0.6f, 1.0f), "Observe research stations to find parts!");
+    } else {
+        for (i32 i = 0; i < static_cast<i32>(m_Inventory.size()); i++) {
+            ShipPart& part = m_Inventory[i]; // Use reference for click feedback
 
-void Spaceship::HandleClick(f32 mouseX, f32 mouseY, bool mousePressed) {
-    // TODO: Implement click handling for installing parts from inventory
-    // Will be implemented when integrating with GameState UI
+            // Apply rarity color to the current ImGui element
+            Color c = part.GetRarityColor();
+            ImVec4 rarityColor(c.r, c.g, c.b, c.a);
+            ImGui::PushStyleColor(ImGuiCol_Text, rarityColor);
+
+            // Item Header and Status
+            ImGui::Text("%s - %s", part.name.c_str(), part.GetSlotName());
+            ImGui::PopStyleColor(); // End rarity color for the header
+
+            // Item Details
+            ImGui::SameLine(ImGui::GetContentRegionAvail().x - 100.0f); // Move status to the right
+
+            if (part.installed) {
+                ImGui::TextColored(ImVec4(0.2f, 1.0f, 0.2f, 1.0f), "INSTALLED");
+                // Uninstall button
+                ImGui::SameLine();
+                ImGui::PushID(i); // Unique ID for the button
+                if (ImGui::Button("Uninstall", ImVec2(80.0f, 0))) {
+                    UninstallPart(part.slot);
+                }
+                ImGui::PopID();
+            } else {
+                ImGui::TextDisabled("Available");
+                // Install button
+                ImGui::SameLine();
+                ImGui::PushID(i); // Unique ID for the button
+                if (ImGui::Button("Install", ImVec2(80.0f, 0))) {
+                    InstallPart(i); // Assuming 'i' is the index in m_Inventory
+                }
+                ImGui::PopID();
+            }
+
+            // Stats line
+            ImGui::TextColored(ImVec4(0.6f, 0.6f, 0.6f, 1.0f),
+                               "Pwr:+%.0f%% Cbt:+%.0f%% Drop:+%.0f%% (Lvl +%d)",
+                               part.powerBonus * part.GetTotalMultiplier(),
+                               part.combatBonus * part.GetTotalMultiplier(),
+                               part.dropRateBonus * part.GetTotalMultiplier(),
+                               part.enhancementLevel);
+
+            // Tooltip for full description
+            if (ImGui::IsItemHovered()) {
+                ImGui::SetTooltip("%s\nTier %d | Rarity: %s",
+                    part.description.c_str(), part.tier, part.GetRarityName());
+            }
+
+            ImGui::Separator(); // Visual separator between parts
+        }
+    }
+
+    ImGui::EndChild();
 }
 
 // ShipPartGenerator Implementation

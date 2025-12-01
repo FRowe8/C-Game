@@ -62,6 +62,7 @@ set(IMGUI_SOURCES
     ${IMGUI_DIR}/imgui_widgets.cpp
     ${IMGUI_DIR}/backends/imgui_impl_sdl2.cpp
     ${IMGUI_DIR}/backends/imgui_impl_opengl3.cpp
+        include/ImGuiUtils.h
 )
 
 add_library(ImGui STATIC ${IMGUI_SOURCES})
@@ -115,6 +116,18 @@ else()
         message(FATAL_ERROR "SDL2_ttf not found!")
     endif()
 endif()
+
+# Make SDL2 available to ImGui backend
+if(SDL2_FOUND)
+    if(TARGET SDL2::SDL2)
+        target_link_libraries(ImGui PUBLIC SDL2::SDL2)
+        target_include_directories(ImGui PUBLIC $<TARGET_PROPERTY:SDL2::SDL2,INTERFACE_INCLUDE_DIRECTORIES>)
+    else()
+        target_include_directories(ImGui PUBLIC ${SDL2_INCLUDE_DIRS})
+        target_link_libraries(ImGui PUBLIC ${SDL2_LIBRARIES})
+    endif()
+endif()
+
 
 # Sources
 file(GLOB_RECURSE ENGINE_SOURCES

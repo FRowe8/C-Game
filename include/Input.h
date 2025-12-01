@@ -50,6 +50,10 @@ public:
         m_WindowHeight = height;
     }
 
+    // ADDED PUBLIC ACCESSORS to fix compilation errors
+    inline f32 GetWindowWidth() const { return m_WindowWidth; }
+    inline f32 GetWindowHeight() const { return m_WindowHeight; }
+
 private:
     // Keyboard state
     std::unordered_map<int, bool> m_KeysDown;
