@@ -1201,40 +1201,14 @@ void GameState::Render(Renderer* renderer) {
     }
 
     // --- RENDER IMGUI WINDOWS ---
-    // The UIManager is now the central authority for the main layout.
+    // The UIManager is now the central authority for the main layout and all overlays
     if (m_UIManager) {
-        m_UIManager->Render();
+        m_UIManager->Render(renderer);
     } else {
         // Fallback or legacy calls
         RenderResources(renderer);
         RenderUI(renderer);
     }
-
-    // Render panels/popups (on top of gameplay)
-    // These must remain here until their implementation is moved into UIManager::RenderOverlays()
-    RenderActiveEvent(renderer);
-    RenderAchievements(renderer);
-    RenderStatistics(renderer);
-    RenderResearchTree(renderer);
-    RenderMilestones(renderer);
-    RenderBuyables(renderer);
-    RenderChallenges(renderer);
-    RenderEssenceShop(renderer);
-    RenderSingularityShop(renderer);
-    RenderSpaceship(renderer);
-    RenderCombat(renderer); // Combat overlay renders on top
-    RenderGatcha(renderer); // Gatcha overlay renders on top
-    RenderSkillTree(renderer); // Skill tree overlay renders on top
-
-    // Render enhancement UI
-    if (m_ShowEnhancement) {
-        m_EnhancementSystem.RenderEnhancementUI(renderer, this);
-    }
-
-    // Render notifications
-    RenderAchievementNotifications(renderer);
-    RenderMilestoneNotifications(renderer);
-    m_UnlockManager.RenderNotifications(renderer);
 
     // Prestige flash effect (screen overlay, on top of everything)
     if (m_PrestigeFlashActive) {
@@ -1702,8 +1676,9 @@ void GameState::RenderUI(Renderer* renderer) {
         // Draw boost button
         if (ImGui::Button(boostText.c_str(), ImVec2(boostBtnWidth, btnHeight))) {
             if (boostClickable) {
-                // Placeholder for boost logic
-                // TryActivateBoost();
+                // Activate the boost
+                m_BoostActive = true;
+                m_BoostTimeRemaining = m_BoostDuration;
             }
         }
 
@@ -2940,8 +2915,8 @@ void GameState::RenderResearchTree(Renderer* renderer) {
                         ImGui::PushStyleColor(ImGuiCol_Border, ToImVec4(autoToggleColor));
 
                         if (ImGui::Button("AUTO", ImVec2(autoToggleW, autoToggleH))) {
-                            // Placeholder for toggle logic
-                            // if (mutableNode) mutableNode->autoResearch = !mutableNode->autoResearch;
+                            // Toggle auto-research
+                            if (mutableNode) mutableNode->autoResearch = !mutableNode->autoResearch;
                         }
                         ImGui::PopStyleColor(3);
 
@@ -2983,8 +2958,8 @@ void GameState::RenderResearchTree(Renderer* renderer) {
                         ImGui::PushStyleColor(ImGuiCol_Border, ToImVec4(btnHoveredColor));
 
                         if (ImGui::Button("RESEARCH", ImVec2(110.0f, 30.0f)) && canAfford) {
-                            // Placeholder for research logic
-                            // m_ResearchTree->TryResearch(node->id, this);
+                            // Purchase the research
+                            PurchaseResearch(node->id);
                         }
                         ImGui::PopStyleColor(3);
 
@@ -3467,8 +3442,8 @@ void GameState::RenderBuyables(Renderer* renderer) {
                         ImGui::PushStyleColor(ImGuiCol_Border, ToImVec4(btnHoveredColor));
 
                         if (ImGui::Button(btnText.c_str(), ImVec2(110.0f, 35.0f)) && interactive) {
-                            // Placeholder for actual purchase logic
-                            // m_BuyableManager.Buy(i);
+                            // Purchase the buyable
+                            m_BuyableManager.Purchase(buyable.id, this);
                         }
                         ImGui::PopStyleColor(3);
 
@@ -3680,7 +3655,8 @@ void GameState::RenderChallenges(Renderer* renderer) {
                             ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ToImVec4(Color::Red() * 0.5f));
                             ImGui::PushStyleColor(ImGuiCol_Border, ToImVec4(Color::Red()));
                             if (ImGui::Button("EXIT##ChallengeBtn", ImVec2(110.0f, 30.0f))) {
-                                // m_ChallengeManager.ExitChallenge(); // Placeholder logic
+                                // Exit the current challenge
+                                m_ChallengeManager.ExitChallenge(this);
                             }
                             ImGui::PopStyleColor(3);
                         } else {
@@ -3693,7 +3669,8 @@ void GameState::RenderChallenges(Renderer* renderer) {
                             ImGui::PushStyleColor(ImGuiCol_Border, ToImVec4(btnHoveredColor));
 
                             if (ImGui::Button("ENTER##ChallengeBtn", ImVec2(110.0f, 30.0f)) && canEnter) {
-                                // m_ChallengeManager.EnterChallenge(i); // Placeholder logic
+                                // Enter the challenge
+                                m_ChallengeManager.EnterChallenge(challenge.id, this);
                             }
                             ImGui::PopStyleColor(3);
                         }
