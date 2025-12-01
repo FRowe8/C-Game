@@ -187,6 +187,25 @@ struct UIButton {
     bool WasClicked(const Vec2& mousePos, bool mousePressed);
 };
 
+// Modal Window Management - ensures only one modal is active at a time
+enum class ActiveModal {
+    None,           // Stations view (base state)
+    Achievements,
+    Statistics,
+    Research,
+    Milestones,
+    Buyables,
+    Challenges,
+    EssenceShop,
+    SingularityShop,
+    Spaceship,
+    Combat,
+    Gatcha,
+    Skills,
+    Enhancement,
+    MoreMenu
+};
+
 class GameState {
 public:
     GameState();
@@ -301,6 +320,10 @@ public:
     // NEW: Expose render logic content only (no window creation)
     void RenderStationsContent();
 
+    // Modal Window Management
+    void SetActiveModal(ActiveModal modal);
+    ActiveModal GetActiveModal() const { return m_ActiveModal; }
+
     // NEW: Friend the manager so it can access private members
     friend class UIManager;
 
@@ -407,6 +430,11 @@ private:
     // UI
     std::vector<UIButton> m_StationButtons; // Persistent buttons (unlock, observe, upgrade per station + prestige)
     Vec2 m_ScrollOffset;
+
+    // Modal Window Management System
+    ActiveModal m_ActiveModal;
+
+    // Legacy UI flags (synchronized by SetActiveModal)
     bool m_ShowAchievements;
     bool m_ShowStats;
     bool m_ShowResearch;
