@@ -15,7 +15,7 @@ enum class MouseButton {
 class Input {
 public:
     Input();
-    ~Input();
+    ~Input() = default;
 
     void ProcessEvent(const SDL_Event& event);
     void Update();

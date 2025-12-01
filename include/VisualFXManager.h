@@ -136,6 +136,6 @@ private:
     void UpdateAnomalies(f64 deltaTime);
     void UpdateScreenEffects(f64 deltaTime);
 
-    void RenderParticles(Renderer* renderer);
-    void RenderAnomalies(Renderer* renderer);
+    void RenderParticles(Renderer* /*renderer*/);
+    void RenderAnomalies(Renderer* /*renderer*/);
 };

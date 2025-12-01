@@ -96,9 +96,7 @@ void VisualFXManager::UpdateParticles(f64 deltaTime) {
     }
 }
 
-void VisualFXManager::RenderParticles(Renderer* renderer) {
-    (void)renderer; // Using ImGui directly
-
+void VisualFXManager::RenderParticles(Renderer* /*renderer*/) {
     if (!m_ParticlesEnabled) return;
 
     ImDrawList* bg_draw_list = ImGui::GetBackgroundDrawList();
@@ -209,9 +207,7 @@ void VisualFXManager::UpdateAnomalies(f64 deltaTime) {
     }
 }
 
-void VisualFXManager::RenderAnomalies(Renderer* renderer) {
-    (void)renderer; // Using ImGui directly
-
+void VisualFXManager::RenderAnomalies(Renderer* /*renderer*/) {
     if (!m_AnomaliesEnabled) return;
 
     ImDrawList* draw_list = ImGui::GetBackgroundDrawList();
