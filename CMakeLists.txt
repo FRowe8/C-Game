@@ -73,6 +73,7 @@ add_library(ImGui STATIC ${IMGUI_SOURCES})
 target_include_directories(ImGui PUBLIC
         ${IMGUI_DIR}
         ${IMGUI_DIR}/backends
+        ${CMAKE_SOURCE_DIR}/include
 )
 
 target_link_libraries(ImGui PUBLIC OpenGL::GL)

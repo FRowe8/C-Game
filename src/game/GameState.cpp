@@ -1134,10 +1134,10 @@ f64 GameState::GetProductionMultiplier(QuantumResource type) const {
     return multiplier;
 }
 
+// In src/game/GameState.cpp
+
 void GameState::Render(Renderer* renderer) {
-    // The legacy renderer pointer is now primarily used for its width/height access
-    // and particle cleanup, but not for direct drawing of UI.
-    (void)renderer;
+    (void)renderer; // We still pass the renderer, but rely on ImGui for drawing primitives
 
     // Get the draw list for background elements (behind all ImGui windows)
     ImDrawList* bg_draw_list = ImGui::GetBackgroundDrawList();
@@ -1165,22 +1165,22 @@ void GameState::Render(Renderer* renderer) {
         bg_draw_list->AddRectFilled(
             ImVec2(0, 0),
             ImVec2(screenWidth, screenHeight),
-            ImGui::GetColorU32(ImVec4(bgTint.r, bgTint.g, bgTint.b, bgTint.a))
+            ImGui::GetColorU32(ToImVec4(bgTint))
         );
     }
 
     // Render active gameplay elements (before popups)
     RenderQuantumAnomalies(renderer); // Clickable orbs
 
-    // Render particles (visual feedback) (Replaces renderer->DrawCircle)
+    // Render particles (visual feedback)
     for (const auto& particle : m_Particles) {
         f32 size = 3.0f + (1.0f - particle.lifetime / particle.maxLifetime) * 3.0f;
         Color color = particle.color;
 
         bg_draw_list->AddCircleFilled(
-            ImVec2(particle.position.x, particle.position.y),
+            ToImVec2(particle.position),
             size,
-            ImGui::GetColorU32(ImVec4(color.r, color.g, color.b, color.a))
+            ToImU32(color)
         );
     }
 
@@ -1189,22 +1189,14 @@ void GameState::Render(Renderer* renderer) {
         std::string comboText = std::to_string(m_ComboCount) + "x COMBO!";
         ImVec2 comboPos(screenWidth - 150.0f, 180.0f);
 
-        // Pulsing effect for high combos
-        f32 pulseScale = 1.0f + 0.1f * sinf(m_ComboTimeRemaining * 10.0f);
-        // Note: ImGui doesn't easily support variable font size per call.
-        // We will skip the `pulseScale` for simplicity or use the smallest standard font.
-
-        // Color based on combo level
         Color comboColor = (m_ComboCount >= 5) ? Color(1.0f, 0.8f, 0.0f, 1.0f) : // Gold for 5+
                           (m_ComboCount >= 3) ? Color(1.0f, 0.0f, 1.0f, 1.0f) : // Magenta for 3-4
                           Color::NeonCyan(); // Cyan for 2
 
-        ImVec4 comboImVec4(comboColor.r, comboColor.g, comboColor.b, comboColor.a);
+        // Draw Combo Text
+        bg_draw_list->AddText(comboPos, ToImU32(comboColor), comboText.c_str());
 
-        // Draw Combo Text (Replaces renderer->DrawText)
-        bg_draw_list->AddText(comboPos, ImGui::GetColorU32(comboImVec4), comboText.c_str());
-
-        // Time remaining bar (Replaces renderer->DrawRect calls)
+        // Time remaining bar
         f32 barWidth = 100.0f;
         f32 barHeight = 6.0f;
         ImVec2 barPos(screenWidth - 140.0f, 200.0f);
@@ -1216,21 +1208,59 @@ void GameState::Render(Renderer* renderer) {
         // Draw Fill Rect
         f32 timeRatio = static_cast<f32>(m_ComboTimeRemaining / m_ComboWindow);
         ImVec2 barFillEnd(barPos.x + barWidth * timeRatio, barEnd.y);
-        bg_draw_list->AddRectFilled(barPos, barFillEnd, ImGui::GetColorU32(comboImVec4));
+        bg_draw_list->AddRectFilled(barPos, barFillEnd, ToImU32(comboColor));
     }
 
     // --- RENDER IMGUI WINDOWS ---
-    // These must be called sequentially within the main ImGui loop (which is outside this function)
-    // The order here controls which window is drawn on top of others if they overlap.
+    // The UIManager is now the central authority for the main layout.
+    if (m_UIManager) {
+        m_UIManager->Render();
+    } else {
+        // Fallback or legacy calls
+        RenderResources(renderer);
+        RenderUI(renderer);
+    }
 
-    // Replace all UI calls with:
-    m_UIManager->Render();
+    // Render panels/popups (on top of gameplay)
+    // These must remain here until their implementation is moved into UIManager::RenderOverlays()
+    RenderActiveEvent(renderer);
+    RenderAchievements(renderer);
+    RenderStatistics(renderer);
+    RenderResearchTree(renderer);
+    RenderMilestones(renderer);
+    RenderBuyables(renderer);
+    RenderChallenges(renderer);
+    RenderEssenceShop(renderer);
+    RenderSingularityShop(renderer);
+    RenderSpaceship(renderer);
+    RenderCombat(renderer); // Combat overlay renders on top
+    RenderGatcha(renderer); // Gatcha overlay renders on top
+    RenderSkillTree(renderer); // Skill tree overlay renders on top
 
+    // Render enhancement UI
+    if (m_ShowEnhancement) {
+        m_EnhancementSystem.RenderEnhancementUI(renderer, this);
+    }
 
+    // Render notifications
+    RenderAchievementNotifications(renderer);
+    RenderMilestoneNotifications(renderer);
     m_UnlockManager.RenderNotifications(renderer);
-}
 
-// In src/game/GameState.cpp (Around line 800)
+    // Prestige flash effect (screen overlay, on top of everything)
+    if (m_PrestigeFlashActive) {
+        f32 alpha = static_cast<f32>(m_PrestigeFlashTimer / 0.5); // Fade over 0.5 seconds
+        alpha = std::min(alpha, 1.0f); // Clamp to max 1.0
+
+        Color flashColor(1.0f, 1.0f, 1.0f, alpha * 0.3f); // White flash, max 30% opacity
+
+        bg_draw_list->AddRectFilled(
+            ImVec2(0, 0),
+            ImVec2(screenWidth, screenHeight),
+            ToImU32(flashColor)
+        );
+    }
+}
 
 void GameState::RenderResources(Renderer* renderer) {
     (void)renderer; // We don't use the legacy renderer object here anymore
@@ -1301,177 +1331,153 @@ void GameState::RenderResources(Renderer* renderer) {
 
 // In src/game/GameState.cpp (Around line 870)
 
-void GameState::RenderStations(Renderer* renderer) {
-    (void)renderer;
+// In src/game/GameState.cpp
 
-    // Use ImGui::GetIO().DisplaySize for screen dimensions
-    f32 screenWidth = ImGui::GetIO().DisplaySize.x;
-    f32 startY = 100.0f; // Below the Resource Panel
+void GameState::RenderStationsContent() {
+    // NOTE: This function is the content rendering module for UIManager,
+    // so it does NOT create its own window (ImGui::Begin/End are omitted).
 
-    // Calculate the height from the bottom of the screen to startY
-    f32 height = ImGui::GetIO().DisplaySize.y - startY;
+    // We rely on ImGui's built-in scrollbar now.
 
-    // Set the position and size of the Stations window
-    ImGui::SetNextWindowPos(ImVec2(0.0f, startY), ImGuiCond_Always);
-    ImGui::SetNextWindowSize(ImVec2(screenWidth, height), ImGuiCond_Always);
+    f64 currentQubits = GetResource(QuantumResource::Qubits);
+    f64 effectiveBonus = GetProductionMultiplier(QuantumResource::Qubits);
+    bool canUpgrade = !m_ChallengeManager.HasModifier(ChallengeModifier::NoUpgrades);
 
-    ImGuiWindowFlags windowFlags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoBringToFrontOnFocus;
+    // Iterate through all stations
+    for (size_t i = 0; i < m_Stations.size(); i++) {
+        auto& station = m_Stations[i];
 
-    if (ImGui::Begin("##StationsPanel", NULL, windowFlags)) {
+        // Get the unique button ID indices created in InitializeUI
+        size_t unlockBtnIndex = i * 4;
+        size_t observeBtnIndex = i * 4 + 1;
+        size_t upgradeBtnIndex = i * 4 + 2;
+        size_t buyMaxBtnIndex = i * 4 + 3;
 
-        // Use ImGui::BeginChild to create a scrollable area
-        // We use its total size (ImVec2(0, 0)) minus padding
-        if (ImGui::BeginChild("StationScrollArea", ImVec2(0, 0), false)) {
+        // --- Station Display Header ---
+        Color tierColor = GetStationTierColor(station.level);
+        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(tierColor.r, tierColor.g, tierColor.b, 1.0f));
+        ImGui::Text(">> %s (Level %d)", station.name.c_str(), station.level);
+        ImGui::PopStyleColor();
 
-            // NATIVE SCROLLING: We rely on ImGui's built-in scrollbar here.
-            // Custom m_ScrollOffset logic has been removed to prevent conflicts.
+        // Removed problematic ImGui::SameLine(ImGui::GetWindowWidth() - 100.0f)
 
-            f64 currentQubits = GetResource(QuantumResource::Qubits);
-            f64 effectiveBonus = GetProductionMultiplier(QuantumResource::Qubits);
-            bool canUpgrade = !m_ChallengeManager.HasModifier(ChallengeModifier::NoUpgrades);
+        ImGui::TextWrapped("%s", station.description.c_str());
+        ImGui::Separator();
 
-            // Iterate through all stations
-            for (size_t i = 0; i < m_Stations.size(); i++) {
-                auto& station = m_Stations[i];
+        // --- UNLOCKED STATION UI ---
+        if (station.unlocked) {
 
-                // Get the unique button ID indices created in InitializeUI
-                size_t unlockBtnIndex = i * 4;
-                size_t observeBtnIndex = i * 4 + 1;
-                size_t upgradeBtnIndex = i * 4 + 2;
-                size_t buyMaxBtnIndex = i * 4 + 3;
+            f64 productionRate = station.currentProduction * effectiveBonus;
 
-                // --- Station Display Header ---
-                Color tierColor = GetStationTierColor(station.level);
-                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(tierColor.r, tierColor.g, tierColor.b, 1.0f));
-                ImGui::Text(">> %s (Level %d)", station.name.c_str(), station.level);
-                ImGui::PopStyleColor();
-                ImGui::SameLine(ImGui::GetWindowWidth() - 100.0f);
-                ImGui::Text("ID: %zu", i);
-
-                ImGui::TextWrapped("%s", station.description.c_str());
-                ImGui::Separator();
-
-                // --- UNLOCKED STATION UI ---
-                if (station.unlocked) {
-
-                    f64 productionRate = station.currentProduction * effectiveBonus;
-
-                    // Superposition progress bar
-                    char barOverlay[64];
-                    // Safety check for division by zero
-                    f32 progress = 0.0f;
-                    if (station.upgradeCost > 0.0) {
-                        progress = static_cast<f32>(station.superpositionValue / (station.upgradeCost * 0.1));
-                        if (progress > 1.0f) progress = 1.0f;
-                    }
-
-                    snprintf(barOverlay, sizeof(barOverlay), "Superposition: %.2s (%.2s / sec)",
-                             GameUtils::FormatNumber(station.superpositionValue, m_NumberFormat).c_str(),
-                             GameUtils::FormatNumber(productionRate, m_NumberFormat).c_str());
-
-                    // Show progress bar
-                    ImGui::ProgressBar(progress, ImVec2(-1, 0), barOverlay);
-
-                    // Button Row 1 (Observe, Upgrade, Buy Max)
-
-                    // OBSERVE Button
-                    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(m_StationButtons[observeBtnIndex].color.r, m_StationButtons[observeBtnIndex].color.g, m_StationButtons[observeBtnIndex].color.b, 0.7f));
-                    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(m_StationButtons[observeBtnIndex].hoverColor.r, m_StationButtons[observeBtnIndex].hoverColor.g, m_StationButtons[observeBtnIndex].hoverColor.b, 1.0f));
-                    // Added unique ID to button label to prevent conflicts
-                    if (ImGui::Button(("OBSERVE##ObserveBtn" + std::to_string(i)).c_str(), ImVec2(ImGui::GetContentRegionAvail().x * 0.30f, 40.0f))) {
-                        m_StationButtons[observeBtnIndex].onClick();
-                    }
-                    ImGui::PopStyleColor(2);
-
-                    // UPGRADE Button
-                    ImGui::SameLine();
-                    f64 effectiveUpgradeCost = station.upgradeCost * (m_ChallengeManager.HasModifier(ChallengeModifier::ExpensiveUpgrades) ? 3.0 : 1.0);
-                    bool canAffordUpgrade = currentQubits >= effectiveUpgradeCost && canUpgrade;
-
-                    // Disabled/Enabled styling based on affordability
-                    if (!canAffordUpgrade) ImGui::PushStyleVar(ImGuiStyleVar_Alpha, 0.5f);
-
-                    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(m_StationButtons[upgradeBtnIndex].color.r, m_StationButtons[upgradeBtnIndex].color.g, m_StationButtons[upgradeBtnIndex].color.b, 0.7f));
-                    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(m_StationButtons[upgradeBtnIndex].hoverColor.r, m_StationButtons[upgradeBtnIndex].hoverColor.g, m_StationButtons[upgradeBtnIndex].hoverColor.b, 1.0f));
-
-                    std::string upgradeText = "Upgrade (" + GameUtils::FormatNumber(effectiveUpgradeCost, m_NumberFormat) + ")";
-
-                    if (ImGui::Button((upgradeText + "##UpgradeBtn" + std::to_string(i)).c_str(), ImVec2(ImGui::GetContentRegionAvail().x * 0.45f, 40.0f)) && canAffordUpgrade) {
-                        m_StationButtons[upgradeBtnIndex].onClick();
-                    }
-                    ImGui::PopStyleColor(2);
-                    if (!canAffordUpgrade) ImGui::PopStyleVar();
-
-                    // BUY MAX Button
-                    ImGui::SameLine();
-                    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(m_StationButtons[buyMaxBtnIndex].color.r, m_StationButtons[buyMaxBtnIndex].color.g, m_StationButtons[buyMaxBtnIndex].color.b, 0.7f));
-                    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(m_StationButtons[buyMaxBtnIndex].hoverColor.r, m_StationButtons[buyMaxBtnIndex].hoverColor.g, m_StationButtons[buyMaxBtnIndex].hoverColor.b, 1.0f));
-
-                    if (ImGui::Button(("BUY MAX##BuyMaxBtn" + std::to_string(i)).c_str(), ImVec2(ImGui::GetContentRegionAvail().x, 40.0f))) {
-                        m_StationButtons[buyMaxBtnIndex].onClick();
-                    }
-                    ImGui::PopStyleColor(2);
-
-                    // Auto-Upgrade Toggle
-                    ImGui::Checkbox(("Auto-Upgrade##" + std::to_string(i)).c_str(), &station.autoUpgrade);
-
-                }
-                // --- LOCKED STATION UI ---
-                else {
-                    // UNLOCK Button
-                    bool canAffordUnlock = currentQubits >= station.unlockCost;
-                    if (!canAffordUnlock) ImGui::PushStyleVar(ImGuiStyleVar_Alpha, 0.5f);
-
-                    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(m_StationButtons[unlockBtnIndex].color.r, m_StationButtons[unlockBtnIndex].color.g, m_StationButtons[unlockBtnIndex].color.b, 0.7f));
-                    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(m_StationButtons[unlockBtnIndex].hoverColor.r, m_StationButtons[unlockBtnIndex].hoverColor.g, m_StationButtons[unlockBtnIndex].hoverColor.b, 1.0f));
-
-                    std::string unlockText = "Unlock for " + GameUtils::FormatNumber(station.unlockCost, m_NumberFormat) + " Qubits";
-                    if (ImGui::Button((unlockText + "##UnlockBtn" + std::to_string(i)).c_str(), ImVec2(-1, 50.0f)) && canAffordUnlock) {
-                         m_StationButtons[unlockBtnIndex].onClick();
-                    }
-                    ImGui::PopStyleColor(2);
-                    if (!canAffordUnlock) ImGui::PopStyleVar();
-                }
-
-                ImGui::Spacing();
-                ImGui::Separator();
-                ImGui::Spacing();
-
-            } // End station loop
-
-            // --- Prestige Button (Last button in the list) ---
-            f32 photonsToGain = CalculatePhotonsOnPrestige();
-            ImGui::Spacing();
-            ImGui::Spacing();
-
-            // Set button color and text for Prestige
-            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.5f, 0.0f, 0.5f, 0.8f)); // Magenta
-            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(1.0f, 0.0f, 1.0f, 1.0f));
-
-            std::string prestigeText = "PERFORM PRESTIGE (" + std::to_string(static_cast<i32>(photonsToGain)) + " Photons)";
-            if (photonsToGain <= 0.0) {
-                prestigeText = "PRESTIGE (Need more progress)";
-                ImGui::PushStyleVar(ImGuiStyleVar_Alpha, 0.3f);
+            // Superposition progress bar
+            char barOverlay[64];
+            f32 progress = 0.0f;
+            if (station.upgradeCost > 0.0) {
+                // Estimate bar length based on next upgrade cost
+                progress = static_cast<f32>(station.superpositionValue / (station.upgradeCost * 0.1));
+                if (progress > 1.0f) progress = 1.0f;
             }
 
-            // Check for the prestige button click (m_StationButtons.back() is the prestige button)
-            // Safety check for empty vector
-            if (!m_StationButtons.empty()) {
-                if (ImGui::Button(prestigeText.c_str(), ImVec2(-1, 80.0f)) && photonsToGain > 0.0) {
-                    m_StationButtons.back().onClick();
-                }
-            }
+            snprintf(barOverlay, sizeof(barOverlay), "Superposition: %.2s (%.2s / sec)",
+                     GameUtils::FormatNumber(station.superpositionValue, m_NumberFormat).c_str(),
+                     GameUtils::FormatNumber(productionRate, m_NumberFormat).c_str());
 
-            if (photonsToGain <= 0.0) {
-                ImGui::PopStyleVar();
-            }
+            // Show progress bar
+            ImGui::ProgressBar(progress, ImVec2(-1, 0), barOverlay);
 
+            // Button Row 1 (Observe, Upgrade, Buy Max)
+
+            // OBSERVE Button
+            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(m_StationButtons[observeBtnIndex].color.r, m_StationButtons[observeBtnIndex].color.g, m_StationButtons[observeBtnIndex].color.b, 0.7f));
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(m_StationButtons[observeBtnIndex].hoverColor.r, m_StationButtons[observeBtnIndex].hoverColor.g, m_StationButtons[observeBtnIndex].hoverColor.b, 1.0f));
+            if (ImGui::Button(("OBSERVE##ObserveBtn" + std::to_string(i)).c_str(), ImVec2(ImGui::GetContentRegionAvail().x * 0.30f, 40.0f))) {
+                m_StationButtons[observeBtnIndex].onClick();
+            }
             ImGui::PopStyleColor(2);
 
-            ImGui::EndChild(); // End StationScrollArea
+            // UPGRADE Button
+            ImGui::SameLine();
+            f64 effectiveUpgradeCost = station.upgradeCost * (m_ChallengeManager.HasModifier(ChallengeModifier::ExpensiveUpgrades) ? 3.0 : 1.0);
+            bool canAffordUpgrade = currentQubits >= effectiveUpgradeCost && canUpgrade;
+
+            // Disabled/Enabled styling based on affordability
+            if (!canAffordUpgrade) ImGui::PushStyleVar(ImGuiStyleVar_Alpha, 0.5f);
+
+            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(m_StationButtons[upgradeBtnIndex].color.r, m_StationButtons[upgradeBtnIndex].color.g, m_StationButtons[upgradeBtnIndex].color.b, 0.7f));
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(m_StationButtons[upgradeBtnIndex].hoverColor.r, m_StationButtons[upgradeBtnIndex].hoverColor.g, m_StationButtons[upgradeBtnIndex].hoverColor.b, 1.0f));
+
+            std::string upgradeText = "Upgrade (" + GameUtils::FormatNumber(effectiveUpgradeCost, m_NumberFormat) + ")";
+
+            if (ImGui::Button((upgradeText + "##UpgradeBtn" + std::to_string(i)).c_str(), ImVec2(ImGui::GetContentRegionAvail().x * 0.45f, 40.0f)) && canAffordUpgrade) {
+                m_StationButtons[upgradeBtnIndex].onClick();
+            }
+            ImGui::PopStyleColor(2);
+            if (!canAffordUpgrade) ImGui::PopStyleVar();
+
+            // BUY MAX Button
+            ImGui::SameLine();
+            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(m_StationButtons[buyMaxBtnIndex].color.r, m_StationButtons[buyMaxBtnIndex].color.g, m_StationButtons[buyMaxBtnIndex].color.b, 0.7f));
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(m_StationButtons[buyMaxBtnIndex].hoverColor.r, m_StationButtons[buyMaxBtnIndex].hoverColor.g, m_StationButtons[buyMaxBtnIndex].hoverColor.b, 1.0f));
+
+            if (ImGui::Button(("BUY MAX##BuyMaxBtn" + std::to_string(i)).c_str(), ImVec2(ImGui::GetContentRegionAvail().x, 40.0f))) {
+                m_StationButtons[buyMaxBtnIndex].onClick();
+            }
+            ImGui::PopStyleColor(2);
+
+            // Auto-Upgrade Toggle
+            ImGui::Checkbox(("Auto-Upgrade##" + std::to_string(i)).c_str(), &station.autoUpgrade);
+
+        }
+        // --- LOCKED STATION UI ---
+        else {
+            // UNLOCK Button
+            bool canAffordUnlock = currentQubits >= station.unlockCost;
+            if (!canAffordUnlock) ImGui::PushStyleVar(ImGuiStyleVar_Alpha, 0.5f);
+
+            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(m_StationButtons[unlockBtnIndex].color.r, m_StationButtons[unlockBtnIndex].color.g, m_StationButtons[unlockBtnIndex].color.b, 0.7f));
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(m_StationButtons[unlockBtnIndex].hoverColor.r, m_StationButtons[unlockBtnIndex].hoverColor.g, m_StationButtons[unlockBtnIndex].hoverColor.b, 1.0f));
+
+            std::string unlockText = "Unlock for " + GameUtils::FormatNumber(station.unlockCost, m_NumberFormat) + " Qubits";
+            if (ImGui::Button((unlockText + "##UnlockBtn" + std::to_string(i)).c_str(), ImVec2(-1, 50.0f)) && canAffordUnlock) {
+                 m_StationButtons[unlockBtnIndex].onClick();
+            }
+            ImGui::PopStyleColor(2);
+            if (!canAffordUnlock) ImGui::PopStyleVar();
+        }
+
+        ImGui::Spacing();
+        ImGui::Separator();
+        ImGui::Spacing();
+
+    } // End station loop
+
+    // --- Prestige Button (Last button in the list) ---
+    f32 photonsToGain = CalculatePhotonsOnPrestige();
+    ImGui::Spacing();
+    ImGui::Spacing();
+
+    // Set button color and text for Prestige
+    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.5f, 0.0f, 0.5f, 0.8f)); // Magenta
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(1.0f, 0.0f, 1.0f, 1.0f));
+
+    std::string prestigeText = "PERFORM PRESTIGE (" + std::to_string(static_cast<i32>(photonsToGain)) + " Photons)";
+    if (photonsToGain <= 0.0) {
+        prestigeText = "PRESTIGE (Need more progress)";
+        ImGui::PushStyleVar(ImGuiStyleVar_Alpha, 0.3f);
+    }
+
+    // Check for the prestige button click (m_StationButtons.back() is the prestige button)
+    if (!m_StationButtons.empty()) {
+        if (ImGui::Button(prestigeText.c_str(), ImVec2(-1, 80.0f)) && photonsToGain > 0.0) {
+            m_StationButtons.back().onClick();
         }
     }
-    ImGui::End(); // End StationsPanel
+
+    if (photonsToGain <= 0.0) {
+        ImGui::PopStyleVar();
+    }
+
+    ImGui::PopStyleColor(2);
 }
 
 void GameState::RenderUI(Renderer* renderer) {

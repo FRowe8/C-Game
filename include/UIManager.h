@@ -1,6 +1,6 @@
 #pragma once
 #include "GameState.h"
-#include "UITheme.h"
+#include "../src/game/ui/UITheme.h"
 
 class UIManager {
 public:
@@ -24,5 +24,5 @@ private:
     
     // --- Helpers ---
     void DrawResourceCounter(const char* label, double value, const ImVec4& color);
-    bool DrawNavButton(const char* label, bool isActive, const ImVec4& activeColor);
+    bool DrawNavButton(const char* label, bool isActive, const ImVec4& activeColor, float width, float height);
 };

@@ -20,10 +20,10 @@
 #include <functional>
 
 // Forward declarations
-class UIManager; // Forward declare
 class Renderer;
 class Input;
 class ResearchTree;
+class UIManager; // Forward declare
 
 // Research station that generates resources
 struct ResearchStation {
