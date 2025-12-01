@@ -190,6 +190,7 @@ GameState::GameState()
       m_PlayerXP(0.0),
       m_PlayerCredits(0),
       m_LastSaveTimestamp(0),
+      m_ActiveModal(ActiveModal::None),
       m_ShowAchievements(false), m_ShowStats(false), m_ShowResearch(false), m_ShowMilestones(false), m_ShowBuyables(false), m_ShowChallenges(false), m_ShowEssenceShop(false), m_ShowSingularityShop(false), m_ShowSpaceship(false), m_ShowCombat(false), m_ShowGatcha(false), m_ShowSkills(false), m_ShowEnhancement(false), m_ShowMoreMenu(false),
       m_NumberFormat(GameUtils::NumberFormat::Suffix),
       m_TotalTimePlayed(0), m_TimeSinceLastSave(0), m_TimeSinceLastPrestige(0),
@@ -745,24 +746,13 @@ void GameState::UpdateUI(Input* input) {
     Vec2 mousePos = input->GetMousePosition();
     bool mousePressed = input->IsMouseButtonPressed(MouseButton::Left);
 
-    // ESC key to close overlays (Highest priority: only need to check flag)
+    // ESC key to close any open modal (Highest priority)
     const int KEY_ESC = 41; // SDL_SCANCODE_ESCAPE
     if (input->IsKeyPressed(KEY_ESC)) {
-        // Close overlays in priority order (most recently opened first - LIFO)
-        if (m_ShowEnhancement) { m_ShowEnhancement = false; }
-        else if (m_ShowSkills) { m_ShowSkills = false; }
-        else if (m_ShowGatcha) { m_ShowGatcha = false; }
-        else if (m_ShowCombat) { m_ShowCombat = false; }
-        else if (m_ShowSpaceship) { m_ShowSpaceship = false; }
-        else if (m_ShowChallenges) { m_ShowChallenges = false; }
-        else if (m_ShowBuyables) { m_ShowBuyables = false; }
-        else if (m_ShowMilestones) { m_ShowMilestones = false; }
-        else if (m_ShowResearch) { m_ShowResearch = false; }
-        else if (m_ShowEssenceShop) { m_ShowEssenceShop = false; }
-        else if (m_ShowSingularityShop) { m_ShowSingularityShop = false; }
-        else if (m_ShowAchievements) { m_ShowAchievements = false; }
-        else if (m_ShowStats) { m_ShowStats = false; }
-        else if (m_ShowMoreMenu) { m_ShowMoreMenu = false; } // Close hamburger menu last
+        // Close any open modal and return to base state
+        if (m_ActiveModal != ActiveModal::None) {
+            SetActiveModal(ActiveModal::None);
+        }
     }
 
     // --- REMOVED: Custom scrolling logic (m_ScrollOffset) is removed as RenderStations now uses native ImGui scrolling. ---
@@ -782,7 +772,7 @@ void GameState::UpdateUI(Input* input) {
         }
     }
 
-    // --- Keyboard shortcuts (A/S/R/M/B/C/E/H/F) remain unchanged (correct as they toggle flags) ---
+    // --- Keyboard shortcuts - exclusive modal activation ---
     const int KEY_A = 4;
     const int KEY_B = 5;
     const int KEY_C = 6;
@@ -792,31 +782,30 @@ void GameState::UpdateUI(Input* input) {
     const int KEY_M = 13;
     const int KEY_R = 15;
     const int KEY_S = 16;
-    // const int KEY_ESCAPE = 41; // ESC is handled above.
 
     if (input->IsKeyPressed(KEY_A)) {
-        m_ShowAchievements = !m_ShowAchievements;
+        SetActiveModal(m_ActiveModal == ActiveModal::Achievements ? ActiveModal::None : ActiveModal::Achievements);
     }
     if (input->IsKeyPressed(KEY_S)) {
-        m_ShowStats = !m_ShowStats;
+        SetActiveModal(m_ActiveModal == ActiveModal::Statistics ? ActiveModal::None : ActiveModal::Statistics);
     }
     if (input->IsKeyPressed(KEY_R)) {
-        m_ShowResearch = !m_ShowResearch;
+        SetActiveModal(m_ActiveModal == ActiveModal::Research ? ActiveModal::None : ActiveModal::Research);
     }
     if (input->IsKeyPressed(KEY_M)) {
-        m_ShowMilestones = !m_ShowMilestones;
+        SetActiveModal(m_ActiveModal == ActiveModal::Milestones ? ActiveModal::None : ActiveModal::Milestones);
     }
     if (input->IsKeyPressed(KEY_B)) {
-        m_ShowBuyables = !m_ShowBuyables;
+        SetActiveModal(m_ActiveModal == ActiveModal::Buyables ? ActiveModal::None : ActiveModal::Buyables);
     }
     if (input->IsKeyPressed(KEY_C)) {
-        m_ShowChallenges = !m_ShowChallenges;
+        SetActiveModal(m_ActiveModal == ActiveModal::Challenges ? ActiveModal::None : ActiveModal::Challenges);
     }
     if (input->IsKeyPressed(KEY_E)) {
-        m_ShowEssenceShop = !m_ShowEssenceShop;
+        SetActiveModal(m_ActiveModal == ActiveModal::EssenceShop ? ActiveModal::None : ActiveModal::EssenceShop);
     }
     if (input->IsKeyPressed(KEY_H)) {
-        m_ShowSpaceship = !m_ShowSpaceship;
+        SetActiveModal(m_ActiveModal == ActiveModal::Spaceship ? ActiveModal::None : ActiveModal::Spaceship);
     }
     if (input->IsKeyPressed(KEY_F)) {
         // Toggle number format between Suffix and Scientific
@@ -1904,6 +1893,27 @@ bool GameState::SpendEssence(f64 amount) {
     return false;
 }
 
+// Modal Window Management - ensures only one modal is active at a time
+void GameState::SetActiveModal(ActiveModal modal) {
+    m_ActiveModal = modal;
+
+    // Synchronize legacy bool flags
+    m_ShowAchievements = (modal == ActiveModal::Achievements);
+    m_ShowStats = (modal == ActiveModal::Statistics);
+    m_ShowResearch = (modal == ActiveModal::Research);
+    m_ShowMilestones = (modal == ActiveModal::Milestones);
+    m_ShowBuyables = (modal == ActiveModal::Buyables);
+    m_ShowChallenges = (modal == ActiveModal::Challenges);
+    m_ShowEssenceShop = (modal == ActiveModal::EssenceShop);
+    m_ShowSingularityShop = (modal == ActiveModal::SingularityShop);
+    m_ShowSpaceship = (modal == ActiveModal::Spaceship);
+    m_ShowCombat = (modal == ActiveModal::Combat);
+    m_ShowGatcha = (modal == ActiveModal::Gatcha);
+    m_ShowSkills = (modal == ActiveModal::Skills);
+    m_ShowEnhancement = (modal == ActiveModal::Enhancement);
+    m_ShowMoreMenu = (modal == ActiveModal::MoreMenu);
+}
+
 f64 GameState::CalculatePhotonsOnPrestige() const {
     // Photons based on total qubits earned
     // Formula adjusted for better progression balance
@@ -2859,33 +2869,12 @@ void GameState::RenderResearchTree(Renderer* renderer) {
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(15.0f, 15.0f));
 
     // 3. Begin the main research window
-    if (ImGui::Begin("##ResearchPanel", nullptr,
+    if (ImGui::Begin("Research Tree", &m_ShowResearch,
                      ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
-                     ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoTitleBar)) {
+                     ImGuiWindowFlags_NoCollapse)) {
 
-        // --- Header (Title, Close Button, Hint) ---
-
-        // Title
-        ImGui::TextColored(ToImVec4(Color::QuantumPurple()), "RESEARCH TREE");
-
-        // Close button (X) in top right
-        f32 closeBtnSize = 30.0f;
-        ImGui::SameLine(panelWidth - closeBtnSize - 15.0f);
-        ImGui::SetCursorPosY(ImGui::GetCursorPosY() - 15.0f);
-
-        // Note: Close button uses Red border as per original code
-        ImGui::PushStyleColor(ImGuiCol_Button, ToImVec4(Color(0.3f, 0.1f, 0.1f, 0.8f)));
-        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ToImVec4(Color(0.5f, 0.2f, 0.2f, 1.0f)));
-        ImGui::PushStyleColor(ImGuiCol_Border, ToImVec4(Color::Red() * 0.8f));
-
-        if (ImGui::Button("X##CloseResearch", ImVec2(closeBtnSize, closeBtnSize))) {
-            m_ShowResearch = false;
-        }
-        ImGui::PopStyleColor(3);
-
-        // Hint text (right aligned with panel content width)
-        ImGui::SetCursorPos(ImVec2(panelWidth - 200.0f, 45.0f));
-        ImGui::TextColored(ToImVec4(Color(0.6f, 0.6f, 0.6f, 1.0f)), "(Click X or press R/ESC)");
+        // --- Header (ImGui provides built-in close button) ---
+        ImGui::TextColored(ToImVec4(Color(0.6f, 0.6f, 0.6f, 1.0f)), "(Press R or ESC to close)");
 
         // Research count (left aligned)
         i32 researched = m_ResearchTree->GetResearchedCount();
@@ -3409,34 +3398,12 @@ void GameState::RenderBuyables(Renderer* renderer) {
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(15.0f, 15.0f));
 
     // 3. Begin the main buyables window
-    if (ImGui::Begin("##BuyablesPanel", nullptr,
+    if (ImGui::Begin("Buyable Upgrades", &m_ShowBuyables,
                      ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
-                     ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoTitleBar)) {
+                     ImGuiWindowFlags_NoCollapse)) {
 
-        // --- Header (Title, Close Button, Hint) ---
-
-        // Title
-        ImGui::TextColored(ToImVec4(Color::ElectricBlue()), "BUYABLE UPGRADES");
-
-        // Close button (X) in top right
-        f32 closeBtnSize = 30.0f;
-        ImGui::SameLine(panelWidth - closeBtnSize - 15.0f);
-        ImGui::SetCursorPosY(ImGui::GetCursorPosY() - 15.0f);
-
-        // Note: The original code used a RED border for the close button, we replicate this style here.
-        ImGui::PushStyleColor(ImGuiCol_Button, ToImVec4(Color(0.3f, 0.1f, 0.1f, 0.8f)));
-        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ToImVec4(Color(0.5f, 0.2f, 0.2f, 1.0f)));
-        ImGui::PushStyleColor(ImGuiCol_Border, ToImVec4(Color::Red() * 0.8f));
-
-        if (ImGui::Button("X##CloseBuyables", ImVec2(closeBtnSize, closeBtnSize))) {
-            m_ShowBuyables = false;
-        }
-        ImGui::PopStyleColor(3);
-
-        // Hint text
-        ImGui::SetCursorPos(ImVec2(panelWidth - 200.0f, 45.0f));
-        ImGui::TextColored(ToImVec4(Color(0.6f, 0.6f, 0.6f, 1.0f)), "(Click X or press B/ESC)");
-
+        // --- Header (ImGui provides built-in close button) ---
+        ImGui::TextColored(ToImVec4(Color(0.6f, 0.6f, 0.6f, 1.0f)), "(Press B or ESC to close)");
         ImGui::Separator();
 
         // --- Buyables List (Scrollable Child Window) ---
@@ -3613,33 +3580,12 @@ void GameState::RenderChallenges(Renderer* renderer) {
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(15.0f, 15.0f));
 
     // 3. Begin the main challenges window
-    if (ImGui::Begin("##ChallengesPanel", nullptr,
+    if (ImGui::Begin("Quantum Challenges", &m_ShowChallenges,
                      ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
-                     ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoTitleBar)) {
+                     ImGuiWindowFlags_NoCollapse)) {
 
-        // --- Header (Title, Close Button, Hint) ---
-
-        // Title
-        ImGui::TextColored(ToImVec4(Color::Red()), "QUANTUM CHALLENGES");
-
-        // Close button (X) in top right
-        f32 closeBtnSize = 30.0f;
-        ImGui::SameLine(panelWidth - closeBtnSize - 15.0f);
-        ImGui::SetCursorPosY(ImGui::GetCursorPosY() - 15.0f);
-
-        ImGui::PushStyleColor(ImGuiCol_Button, ToImVec4(Color(0.3f, 0.1f, 0.1f, 0.8f)));
-        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ToImVec4(Color(0.5f, 0.2f, 0.2f, 1.0f)));
-        ImGui::PushStyleColor(ImGuiCol_Border, ToImVec4(mainBorderColor));
-
-        if (ImGui::Button("X##CloseChallenges", ImVec2(closeBtnSize, closeBtnSize))) {
-            m_ShowChallenges = false;
-        }
-        ImGui::PopStyleColor(3);
-
-        // Hint text
-        ImGui::SetCursorPos(ImVec2(panelWidth - 200.0f, 45.0f));
-        ImGui::TextColored(ToImVec4(Color(0.6f, 0.6f, 0.6f, 1.0f)), "(Click X or press C/ESC)");
-
+        // --- Header (ImGui provides built-in close button) ---
+        ImGui::TextColored(ToImVec4(Color(0.6f, 0.6f, 0.6f, 1.0f)), "(Press C or ESC to close)");
         ImGui::Separator();
 
         // Current challenge info (if in challenge)
@@ -3797,33 +3743,12 @@ void GameState::RenderEssenceShop(Renderer* renderer) {
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(15.0f, 15.0f));
 
     // 3. Begin the main shop window
-    if (ImGui::Begin("##EssenceShopPanel", nullptr,
+    if (ImGui::Begin("💎 Essence Shop - Permanent Upgrades", &m_ShowEssenceShop,
                      ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
-                     ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoTitleBar)) {
+                     ImGuiWindowFlags_NoCollapse)) {
 
-        // --- Header (Title, Close Button, Hint) ---
-
-        // Title
-        ImGui::TextColored(ToImVec4(Color::Magenta()), "💎 ESSENCE SHOP - PERMANENT UPGRADES");
-
-        // Close button (X) in top right
-        f32 closeBtnSize = 30.0f;
-        ImGui::SameLine(panelWidth - closeBtnSize - 15.0f); // Move cursor right
-        ImGui::SetCursorPosY(ImGui::GetCursorPosY() - 15.0f); // Move up to align with title
-
-        ImGui::PushStyleColor(ImGuiCol_Button, ToImVec4(Color(0.3f, 0.1f, 0.1f, 0.8f)));
-        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ToImVec4(Color(0.5f, 0.2f, 0.2f, 1.0f)));
-        ImGui::PushStyleColor(ImGuiCol_Border, ToImVec4(mainBorderColor));
-
-        if (ImGui::Button("X##CloseEssenceShop", ImVec2(closeBtnSize, closeBtnSize))) {
-            m_ShowEssenceShop = false;
-        }
-        ImGui::PopStyleColor(3);
-
-        // Hint text
-        ImGui::SetCursorPos(ImVec2(panelWidth - 200.0f, 45.0f)); // Fixed position relative to window
-        ImGui::TextColored(ToImVec4(Color(0.6f, 0.6f, 0.6f, 1.0f)), "(Click X or press E/ESC)");
-
+        // --- Header (ImGui provides built-in close button) ---
+        ImGui::TextColored(ToImVec4(Color(0.6f, 0.6f, 0.6f, 1.0f)), "(Press E or ESC to close)");
         ImGui::Separator();
 
         // Current Essence display
@@ -3940,33 +3865,12 @@ void GameState::RenderSingularityShop(Renderer* renderer) {
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(15.0f, 15.0f));
 
     // 3. Begin the main shop window
-    if (ImGui::Begin("##SingularityShopPanel", nullptr,
+    if (ImGui::Begin("⭐ Singularity Shop - Cosmic Upgrades", &m_ShowSingularityShop,
                      ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
-                     ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoTitleBar)) {
+                     ImGuiWindowFlags_NoCollapse)) {
 
-        // --- Header (Title, Close Button, Hint) ---
-
-        // Title
-        ImGui::TextColored(ToImVec4(Color(0.8f, 0.0f, 1.0f, 1.0f)), "⭐ SINGULARITY SHOP - COSMIC UPGRADES");
-
-        // Close button (X) in top right
-        f32 closeBtnSize = 30.0f;
-        ImGui::SameLine(panelWidth - closeBtnSize - 15.0f); // Move cursor right
-        ImGui::SetCursorPosY(ImGui::GetCursorPosY() - 15.0f); // Move up to align with title
-
-        ImGui::PushStyleColor(ImGuiCol_Button, ToImVec4(Color(0.3f, 0.1f, 0.1f, 0.8f)));
-        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ToImVec4(Color(0.5f, 0.2f, 0.2f, 1.0f)));
-        ImGui::PushStyleColor(ImGuiCol_Border, ToImVec4(mainBorderColor));
-
-        if (ImGui::Button("X##CloseShop", ImVec2(closeBtnSize, closeBtnSize))) {
-            m_ShowSingularityShop = false;
-        }
-        ImGui::PopStyleColor(3);
-
-        // Hint text
-        ImGui::SetCursorPos(ImVec2(panelWidth - 200.0f, 45.0f)); // Fixed position relative to window
-        ImGui::TextColored(ToImVec4(Color(0.6f, 0.6f, 0.6f, 1.0f)), "(Click X or press ESC)");
-
+        // --- Header (ImGui provides built-in close button) ---
+        ImGui::TextColored(ToImVec4(Color(0.6f, 0.6f, 0.6f, 1.0f)), "(Press ESC to close)");
         ImGui::Separator();
 
         // Current Singularities display
@@ -4085,37 +3989,12 @@ void GameState::RenderSpaceship(Renderer* renderer) {
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(10.0f, 10.0f));
 
     // 3. Begin the main spaceship window
-    if (ImGui::Begin("##SpaceshipPanel", nullptr,
+    if (ImGui::Begin("🚀 Spaceship - Repair and Upgrade", &m_ShowSpaceship,
                      ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
-                     ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoTitleBar)) {
+                     ImGuiWindowFlags_NoCollapse)) {
 
-        // --- Title and Close Button ---
-
-        ImVec2 titlePos = ImGui::GetCursorPos(); // Save position after padding
-
-        // Title
-        ImGui::TextColored(ToImVec4(Color(1.0f, 0.7f, 0.0f, 1.0f)), "SPACESHIP - REPAIR AND UPGRADE");
-
-        // Close button (X) in top right
-        f32 closeBtnSize = 30.0f;
-        // Move cursor to the top right corner of the window
-        ImGui::SetCursorPos(ImVec2(panelWidth - closeBtnSize - 10.0f, titlePos.y));
-
-        // Close button style
-        ImGui::PushStyleColor(ImGuiCol_Button, ToImVec4(Color(0.3f, 0.1f, 0.1f, 0.8f)));
-        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ToImVec4(Color(0.5f, 0.2f, 0.2f, 1.0f)));
-        ImGui::PushStyleColor(ImGuiCol_Text, ToImVec4(Color::White()));
-
-        if (ImGui::Button("X", ImVec2(closeBtnSize, closeBtnSize))) {
-            m_ShowSpaceship = false; // Action to close the panel
-        }
-        ImGui::PopStyleColor(3); // Pop button styles
-
-        // Hint text
-        ImGui::SameLine(panelWidth - 250.0f);
-        ImGui::SetCursorPosY(titlePos.y + 30.0f); // Move down a bit
+        // --- Header (ImGui provides built-in close button) ---
         ImGui::TextColored(ToImVec4(Color(0.6f, 0.6f, 0.6f, 1.0f)), "(Press H or ESC to close)");
-
         ImGui::Separator();
 
         // --- Split Panel Layout ---
