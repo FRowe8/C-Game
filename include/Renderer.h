@@ -22,13 +22,9 @@ public:
     void Clear(const Color& color);
     void SetViewport(int x, int y, int width, int height);
 
-    // Legacy 2D rendering primitives (DEPRECATED - use ImGui instead)
-    // These will be removed once UI migration to ImGui is complete
-    void DrawRect(const Rect& rect, const Color& color, bool filled = true);
-    void DrawCircle(const Vec2& center, f32 radius, const Color& color, bool filled = true);
-    void DrawLine(const Vec2& start, const Vec2& end, const Color& color, f32 thickness = 1.0f);
+    // --- DEPRECATED LEGACY DRAWING FUNCTIONS REMOVED ---
 
-    // Particle system (will be migrated to ImGui custom rendering later)
+    // Particle system (keeping signatures, implementation moves to GameState/ImGui)
     struct Particle {
         Vec2 position;
         Vec2 velocity;
@@ -40,12 +36,11 @@ public:
 
     void AddParticle(const Particle& particle);
     void UpdateParticles(f64 deltaTime);
-    void RenderParticles();
+    void RenderParticles(); // This will now use ImGui::GetBackgroundDrawList
 
     int GetWidth() const { return m_Width; }
     int GetHeight() const { return m_Height; }
 
-    // Access to SDL/GL context for ImGui
     SDL_Window* GetWindow() const { return m_Window; }
     SDL_GLContext GetGLContext() const { return m_GLContext; }
 
@@ -61,7 +56,7 @@ private:
 
     std::vector<Particle> m_Particles;
 
-    // Legacy projection matrix for immediate mode rendering (DEPRECATED)
-    f32 m_ProjectionMatrix[16];
-    void UpdateProjectionMatrix();
+    // Legacy projection matrix removed
+    // f32 m_ProjectionMatrix[16];
+    void UpdateProjectionMatrix(); // Implementation removed below
 };

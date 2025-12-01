@@ -491,6 +491,8 @@ void GatchaSystem::RenderSummonAnimation(Renderer* renderer, GameState* state) {
 
 // In src/game/GatchaSystem.cpp
 
+// In src/game/GatchaSystem.cpp
+
 void GatchaSystem::RenderSummonUI(Renderer* renderer, GameState* state) {
     (void)renderer;
 
@@ -504,39 +506,58 @@ void GatchaSystem::RenderSummonUI(Renderer* renderer, GameState* state) {
 
     bool showGatcha = state->IsGatchaUIVisible();
 
-    if (ImGui::Begin("Summon System (Gatcha)", &showGatcha, ImGuiWindowFlags_NoCollapse)) {
+    // Use ImGuiWindowFlags_NoTitleBar to enable custom close button logic
+    if (ImGui::Begin("Summon System (Gatcha)", &showGatcha, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoTitleBar)) {
 
-        // Update GameState visibility if the user closes the window with 'x'
+        // Update GameState visibility if the user closes the window using the ImGui 'x' (if enabled)
         if (!showGatcha) {
             state->SetGatchaUIVisible(false);
         }
 
-        f32 panelX = 0.0f; // Dummy
-        f32 panelY = 0.0f; // Dummy
-        f32 panelWidth = ImGui::GetContentRegionAvail().x; // Usable width
+        // Add Manual Close Button (to replicate the fixed X button behavior)
+        f32 closeBtnSize = 30.0f;
+        f32 panelWidth = ImGui::GetWindowWidth();
+        ImGui::SetCursorPos(ImVec2(panelWidth - closeBtnSize - 15.0f, 15.0f));
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.3f, 0.1f, 0.1f, 0.8f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.5f, 0.2f, 0.2f, 1.0f));
+
+        if (ImGui::Button("X##CloseGatcha", ImVec2(closeBtnSize, closeBtnSize))) {
+            state->SetGatchaUIVisible(false);
+        }
+        ImGui::PopStyleColor(2);
+
+        // Reset cursor back below the title/close button area
+        ImGui::SetCursorPosY(50.0f);
+        ImGui::TextColored(ToImVec4(Color::NeonPink()), "SUMMON SYSTEM (GALACTIC PARTS EXCHANGE)");
+        ImGui::Separator();
+
+        f32 panelX = 0.0f;
+        f32 panelY = 0.0f;
+        f32 panelContentWidth = ImGui::GetContentRegionAvail().x; // Usable width
 
         if (m_IsAnimating) {
-            // Pass state for inventory add in the final button
             RenderSummonAnimation(renderer, state);
         } else {
-            // Render the interactive UI elements
-
-            RenderBannerSelection(renderer, panelX, panelY, panelWidth);
+            RenderBannerSelection(renderer, panelX, panelY, panelContentWidth);
             ImGui::Spacing();
             ImGui::Separator();
 
-            RenderSummonButtons(renderer, state, panelX, panelY, panelWidth);
+            RenderSummonButtons(renderer, state, panelX, panelY, panelContentWidth);
             ImGui::Spacing();
             ImGui::Separator();
 
-            RenderRateInfo(renderer, panelX, panelY, panelWidth);
+            RenderRateInfo(renderer, panelX, panelY, panelContentWidth);
             ImGui::Spacing();
             ImGui::Separator();
 
-            RenderPityCounters(renderer, panelX, panelY, panelWidth);
+            RenderPityCounters(renderer, panelX, panelY, panelContentWidth);
         }
 
         ImGui::End();
+    } else {
+        // If ImGui::Begin returns false (e.g., due to outside click on some configurations),
+        // we must still update the state flag.
+        state->SetGatchaUIVisible(false);
     }
 }
 

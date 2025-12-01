@@ -28,7 +28,6 @@ Renderer::Renderer() {
 Renderer::~Renderer() {
     Shutdown();
 }
-
 bool Renderer::Initialize(SDL_Window* window, SDL_GLContext glContext, int width, int height) {
     m_Window = window;
     m_GLContext = glContext;
@@ -39,13 +38,15 @@ bool Renderer::Initialize(SDL_Window* window, SDL_GLContext glContext, int width
     Log::Infof("OpenGL Version: ", glGetString(GL_VERSION));
     Log::Infof("GLSL Version: ", glGetString(GL_SHADING_LANGUAGE_VERSION));
 
-    // Set up OpenGL state (still needed for legacy rendering and ImGui)
+    // Set up OpenGL state (no longer relying on legacy features)
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glDisable(GL_DEPTH_TEST);
     glDisable(GL_CULL_FACE);
 
-    UpdateProjectionMatrix();
+    // UpdateProjectionMatrix() is no longer strictly needed for this backend,
+    // but the call is benign if the function is empty.
+    // We remove its implementation for cleanliness.
 
     // Initialize ImGui
     InitializeImGui();
@@ -57,6 +58,7 @@ bool Renderer::Initialize(SDL_Window* window, SDL_GLContext glContext, int width
 void Renderer::Shutdown() {
     ShutdownImGui();
     // Legacy bitmap font needs no cleanup
+    // Add any necessary OpenGL/SDL cleanup here if needed later
 }
 
 void Renderer::InitializeImGui() {
@@ -113,25 +115,6 @@ void Renderer::ShutdownImGui() {
     ImGui::DestroyContext();
 }
 
-void Renderer::UpdateProjectionMatrix() {
-    // Simple orthographic projection matrix
-    f32 left = 0.0f;
-    f32 right = static_cast<f32>(m_Width);
-    f32 bottom = static_cast<f32>(m_Height);
-    f32 top = 0.0f;
-    f32 near = -1.0f;
-    f32 far = 1.0f;
-
-    memset(m_ProjectionMatrix, 0, sizeof(m_ProjectionMatrix));
-    m_ProjectionMatrix[0] = 2.0f / (right - left);
-    m_ProjectionMatrix[5] = 2.0f / (top - bottom);
-    m_ProjectionMatrix[10] = -2.0f / (far - near);
-    m_ProjectionMatrix[12] = -(right + left) / (right - left);
-    m_ProjectionMatrix[13] = -(top + bottom) / (top - bottom);
-    m_ProjectionMatrix[14] = -(far + near) / (far - near);
-    m_ProjectionMatrix[15] = 1.0f;
-}
-
 void Renderer::BeginFrame() {
     glViewport(0, 0, m_Width, m_Height);
 
@@ -158,80 +141,6 @@ void Renderer::SetViewport(int x, int y, int width, int height) {
     glViewport(x, y, width, height);
 }
 
-void Renderer::DrawRect(const Rect& rect, const Color& color, bool filled) {
-    // Use immediate mode for simplicity (can optimize later with batching)
-    glMatrixMode(GL_PROJECTION);
-    glLoadMatrixf(m_ProjectionMatrix);
-    glMatrixMode(GL_MODELVIEW);
-    glLoadIdentity();
-
-    glColor4f(color.r, color.g, color.b, color.a);
-
-    if (filled) {
-        glBegin(GL_QUADS);
-        glVertex2f(rect.x, rect.y);
-        glVertex2f(rect.x + rect.width, rect.y);
-        glVertex2f(rect.x + rect.width, rect.y + rect.height);
-        glVertex2f(rect.x, rect.y + rect.height);
-        glEnd();
-    } else {
-        glBegin(GL_LINE_LOOP);
-        glVertex2f(rect.x, rect.y);
-        glVertex2f(rect.x + rect.width, rect.y);
-        glVertex2f(rect.x + rect.width, rect.y + rect.height);
-        glVertex2f(rect.x, rect.y + rect.height);
-        glEnd();
-    }
-}
-
-void Renderer::DrawCircle(const Vec2& center, f32 radius, const Color& color, bool filled) {
-    glMatrixMode(GL_PROJECTION);
-    glLoadMatrixf(m_ProjectionMatrix);
-    glMatrixMode(GL_MODELVIEW);
-    glLoadIdentity();
-
-    glColor4f(color.r, color.g, color.b, color.a);
-
-    int segments = 32;
-    if (filled) {
-        glBegin(GL_TRIANGLE_FAN);
-        glVertex2f(center.x, center.y);
-        for (int i = 0; i <= segments; i++) {
-            f32 angle = 2.0f * M_PI * i / segments;
-            f32 x = center.x + radius * cosf(angle);
-            f32 y = center.y + radius * sinf(angle);
-            glVertex2f(x, y);
-        }
-        glEnd();
-    } else {
-        glBegin(GL_LINE_LOOP);
-        for (int i = 0; i < segments; i++) {
-            f32 angle = 2.0f * M_PI * i / segments;
-            f32 x = center.x + radius * cosf(angle);
-            f32 y = center.y + radius * sinf(angle);
-            glVertex2f(x, y);
-        }
-        glEnd();
-    }
-}
-
-void Renderer::DrawLine(const Vec2& start, const Vec2& end, const Color& color, f32 thickness) {
-    glMatrixMode(GL_PROJECTION);
-    glLoadMatrixf(m_ProjectionMatrix);
-    glMatrixMode(GL_MODELVIEW);
-    glLoadIdentity();
-
-    glColor4f(color.r, color.g, color.b, color.a);
-    glLineWidth(thickness);
-
-    glBegin(GL_LINES);
-    glVertex2f(start.x, start.y);
-    glVertex2f(end.x, end.y);
-    glEnd();
-
-    glLineWidth(1.0f);
-}
-
 void Renderer::AddParticle(const Particle& particle) {
     m_Particles.push_back(particle);
 }
@@ -246,15 +155,5 @@ void Renderer::UpdateParticles(f64 deltaTime) {
             it->velocity = it->velocity * 0.98f; // Damping
             ++it;
         }
-    }
-}
-
-void Renderer::RenderParticles() {
-    for (const auto& particle : m_Particles) {
-        f32 alpha = particle.life / particle.maxLife;
-        Color color = particle.color;
-        color.a *= alpha;
-
-        DrawCircle(particle.position, particle.size, color, true);
     }
 }

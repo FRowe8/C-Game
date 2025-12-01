@@ -63,6 +63,9 @@ set(IMGUI_SOURCES
         ${IMGUI_DIR}/backends/imgui_impl_sdl2.cpp
         ${IMGUI_DIR}/backends/imgui_impl_opengl3.cpp
         include/ImGuiUtils.h
+        src/game/ui/UITheme.h
+        include/UIManager.h
+        src/game/UIManager.cpp
 )
 
 add_library(ImGui STATIC ${IMGUI_SOURCES})
@@ -156,6 +159,7 @@ endif()
 target_include_directories(${PROJECT_NAME} PRIVATE
         ${CMAKE_SOURCE_DIR}/include
         ${CMAKE_SOURCE_DIR}/src
+        ${CMAKE_SOURCE_DIR}/src/game/ui
 )
 
 # Linking

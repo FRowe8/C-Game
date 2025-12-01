@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Types.h"
+#include "../src/game/ui/UITheme.h"
 #include "Milestones.h"
 #include "Buyables.h"
 #include "Challenges.h"
@@ -19,6 +20,7 @@
 #include <functional>
 
 // Forward declarations
+class UIManager; // Forward declare
 class Renderer;
 class Input;
 class ResearchTree;
@@ -296,6 +298,13 @@ public:
 
     void SetGatchaUIVisible(bool visible);
 
+    // NEW: Expose render logic content only (no window creation)
+    void RenderStationsContent();
+
+    // NEW: Friend the manager so it can access private members
+    friend class UIManager;
+
+
 private:
     void InitializeStations();
     void InitializeUI();
@@ -482,8 +491,7 @@ private:
     Color GetStationTierColor(i32 level) const;
     void SpawnResourceParticles(const Vec2& start, const Vec2& end, const Color& color, i32 count);
 
-
-
+    std::unique_ptr<UIManager> m_UIManager; // Add this
 
 
 };

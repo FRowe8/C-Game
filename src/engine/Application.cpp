@@ -235,9 +235,6 @@ void Application::Render() {
     // Render game
     m_GameState->Render(m_Renderer.get());
 
-    // Render particles
-    m_Renderer->RenderParticles();
-
     m_Renderer->EndFrame();
 
     // Swap buffers
