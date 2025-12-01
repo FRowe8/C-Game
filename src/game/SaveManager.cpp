@@ -1,6 +1,6 @@
 #include "SaveManager.h"
 #include "GameState.h"
-#include "Log.h"
+#include "Logger.h"
 #include "Platform.h"
 #include <fstream>
 
