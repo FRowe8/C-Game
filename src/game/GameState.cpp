@@ -1201,40 +1201,14 @@ void GameState::Render(Renderer* renderer) {
     }
 
     // --- RENDER IMGUI WINDOWS ---
-    // The UIManager is now the central authority for the main layout.
+    // The UIManager is now the central authority for the main layout and all overlays
     if (m_UIManager) {
-        m_UIManager->Render();
+        m_UIManager->Render(renderer);
     } else {
         // Fallback or legacy calls
         RenderResources(renderer);
         RenderUI(renderer);
     }
-
-    // Render panels/popups (on top of gameplay)
-    // These must remain here until their implementation is moved into UIManager::RenderOverlays()
-    RenderActiveEvent(renderer);
-    RenderAchievements(renderer);
-    RenderStatistics(renderer);
-    RenderResearchTree(renderer);
-    RenderMilestones(renderer);
-    RenderBuyables(renderer);
-    RenderChallenges(renderer);
-    RenderEssenceShop(renderer);
-    RenderSingularityShop(renderer);
-    RenderSpaceship(renderer);
-    RenderCombat(renderer); // Combat overlay renders on top
-    RenderGatcha(renderer); // Gatcha overlay renders on top
-    RenderSkillTree(renderer); // Skill tree overlay renders on top
-
-    // Render enhancement UI
-    if (m_ShowEnhancement) {
-        m_EnhancementSystem.RenderEnhancementUI(renderer, this);
-    }
-
-    // Render notifications
-    RenderAchievementNotifications(renderer);
-    RenderMilestoneNotifications(renderer);
-    m_UnlockManager.RenderNotifications(renderer);
 
     // Prestige flash effect (screen overlay, on top of everything)
     if (m_PrestigeFlashActive) {

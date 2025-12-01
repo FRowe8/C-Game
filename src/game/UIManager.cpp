@@ -14,7 +14,7 @@ void UIManager::Initialize() {
     UITheme::SetupStyle();
 }
 
-void UIManager::Render() {
+void UIManager::Render(Renderer* renderer) {
     // 1. Setup Main Layout Window (Invisible container covering the entire viewport)
     ImGuiViewport* viewport = ImGui::GetMainViewport();
     ImGui::SetNextWindowPos(viewport->Pos);
@@ -36,7 +36,7 @@ void UIManager::Render() {
         RenderTopBar();
         RenderMainContent();
         RenderBottomNavigation();
-        RenderOverlays();
+        RenderOverlays(renderer);
 
         ImGui::End();
     } else {
@@ -185,9 +185,9 @@ void UIManager::RenderMainContent() {
     ImGui::PopStyleColor();
 }
 
-void UIManager::RenderOverlays() {
+void UIManager::RenderOverlays(Renderer* renderer) {
     // Render popups on top of everything
-    // NOTE: For simplicity, overlays are still rendered by GameState's original functions.
+    // All modal/overlay windows are now handled here instead of in GameState::Render()
 
     // Handle "More" menu as a proper modal or popup
     if (m_GameState->m_ShowMoreMenu) {
@@ -210,6 +210,31 @@ void UIManager::RenderOverlays() {
         if (ImGui::MenuItem("Close")) m_GameState->SetActiveModal(ActiveModal::None);
         ImGui::EndPopup();
     }
+
+    // Render all overlay/modal windows
+    RenderActiveEvent(renderer);
+    RenderAchievements(renderer);
+    RenderStatistics(renderer);
+    RenderResearchTree(renderer);
+    RenderMilestones(renderer);
+    RenderBuyables(renderer);
+    RenderChallenges(renderer);
+    RenderEssenceShop(renderer);
+    RenderSingularityShop(renderer);
+    RenderSpaceship(renderer);
+    RenderCombat(renderer);
+    RenderGatcha(renderer);
+    RenderSkillTree(renderer);
+
+    // Render enhancement UI if showing
+    if (m_GameState->m_ShowEnhancement) {
+        m_GameState->m_EnhancementSystem.RenderEnhancementUI(renderer, m_GameState);
+    }
+
+    // Render notifications
+    RenderAchievementNotifications(renderer);
+    RenderMilestoneNotifications(renderer);
+    m_GameState->m_UnlockManager.RenderNotifications(renderer);
 }
 
 // --- Helpers ---
@@ -246,4 +271,65 @@ bool UIManager::DrawNavButton(const char* label, bool isActive, const ImVec4& ac
     }
     
     return clicked;
+}
+// --- Overlay/Modal Windows (Delegates to GameState for now) ---
+
+void UIManager::RenderActiveEvent(Renderer* renderer) {
+    m_GameState->RenderActiveEvent(renderer);
+}
+
+void UIManager::RenderAchievements(Renderer* renderer) {
+    m_GameState->RenderAchievements(renderer);
+}
+
+void UIManager::RenderStatistics(Renderer* renderer) {
+    m_GameState->RenderStatistics(renderer);
+}
+
+void UIManager::RenderResearchTree(Renderer* renderer) {
+    m_GameState->RenderResearchTree(renderer);
+}
+
+void UIManager::RenderMilestones(Renderer* renderer) {
+    m_GameState->RenderMilestones(renderer);
+}
+
+void UIManager::RenderBuyables(Renderer* renderer) {
+    m_GameState->RenderBuyables(renderer);
+}
+
+void UIManager::RenderChallenges(Renderer* renderer) {
+    m_GameState->RenderChallenges(renderer);
+}
+
+void UIManager::RenderEssenceShop(Renderer* renderer) {
+    m_GameState->RenderEssenceShop(renderer);
+}
+
+void UIManager::RenderSingularityShop(Renderer* renderer) {
+    m_GameState->RenderSingularityShop(renderer);
+}
+
+void UIManager::RenderSpaceship(Renderer* renderer) {
+    m_GameState->RenderSpaceship(renderer);
+}
+
+void UIManager::RenderCombat(Renderer* renderer) {
+    m_GameState->RenderCombat(renderer);
+}
+
+void UIManager::RenderGatcha(Renderer* renderer) {
+    m_GameState->RenderGatcha(renderer);
+}
+
+void UIManager::RenderSkillTree(Renderer* renderer) {
+    m_GameState->RenderSkillTree(renderer);
+}
+
+void UIManager::RenderAchievementNotifications(Renderer* renderer) {
+    m_GameState->RenderAchievementNotifications(renderer);
+}
+
+void UIManager::RenderMilestoneNotifications(Renderer* renderer) {
+    m_GameState->RenderMilestoneNotifications(renderer);
 }
