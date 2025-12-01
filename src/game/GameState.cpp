@@ -1702,8 +1702,9 @@ void GameState::RenderUI(Renderer* renderer) {
         // Draw boost button
         if (ImGui::Button(boostText.c_str(), ImVec2(boostBtnWidth, btnHeight))) {
             if (boostClickable) {
-                // Placeholder for boost logic
-                // TryActivateBoost();
+                // Activate the boost
+                m_BoostActive = true;
+                m_BoostTimeRemaining = m_BoostDuration;
             }
         }
 
@@ -2940,8 +2941,8 @@ void GameState::RenderResearchTree(Renderer* renderer) {
                         ImGui::PushStyleColor(ImGuiCol_Border, ToImVec4(autoToggleColor));
 
                         if (ImGui::Button("AUTO", ImVec2(autoToggleW, autoToggleH))) {
-                            // Placeholder for toggle logic
-                            // if (mutableNode) mutableNode->autoResearch = !mutableNode->autoResearch;
+                            // Toggle auto-research
+                            if (mutableNode) mutableNode->autoResearch = !mutableNode->autoResearch;
                         }
                         ImGui::PopStyleColor(3);
 
@@ -2983,8 +2984,8 @@ void GameState::RenderResearchTree(Renderer* renderer) {
                         ImGui::PushStyleColor(ImGuiCol_Border, ToImVec4(btnHoveredColor));
 
                         if (ImGui::Button("RESEARCH", ImVec2(110.0f, 30.0f)) && canAfford) {
-                            // Placeholder for research logic
-                            // m_ResearchTree->TryResearch(node->id, this);
+                            // Purchase the research
+                            PurchaseResearch(node->id);
                         }
                         ImGui::PopStyleColor(3);
 
@@ -3467,8 +3468,8 @@ void GameState::RenderBuyables(Renderer* renderer) {
                         ImGui::PushStyleColor(ImGuiCol_Border, ToImVec4(btnHoveredColor));
 
                         if (ImGui::Button(btnText.c_str(), ImVec2(110.0f, 35.0f)) && interactive) {
-                            // Placeholder for actual purchase logic
-                            // m_BuyableManager.Buy(i);
+                            // Purchase the buyable
+                            m_BuyableManager.Purchase(buyable.id, this);
                         }
                         ImGui::PopStyleColor(3);
 
@@ -3680,7 +3681,8 @@ void GameState::RenderChallenges(Renderer* renderer) {
                             ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ToImVec4(Color::Red() * 0.5f));
                             ImGui::PushStyleColor(ImGuiCol_Border, ToImVec4(Color::Red()));
                             if (ImGui::Button("EXIT##ChallengeBtn", ImVec2(110.0f, 30.0f))) {
-                                // m_ChallengeManager.ExitChallenge(); // Placeholder logic
+                                // Exit the current challenge
+                                m_ChallengeManager.ExitChallenge(this);
                             }
                             ImGui::PopStyleColor(3);
                         } else {
@@ -3693,7 +3695,8 @@ void GameState::RenderChallenges(Renderer* renderer) {
                             ImGui::PushStyleColor(ImGuiCol_Border, ToImVec4(btnHoveredColor));
 
                             if (ImGui::Button("ENTER##ChallengeBtn", ImVec2(110.0f, 30.0f)) && canEnter) {
-                                // m_ChallengeManager.EnterChallenge(i); // Placeholder logic
+                                // Enter the challenge
+                                m_ChallengeManager.EnterChallenge(challenge.id, this);
                             }
                             ImGui::PopStyleColor(3);
                         }
