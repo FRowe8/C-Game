@@ -369,7 +369,6 @@ void GatchaSystem::RenderRateInfo(Renderer* renderer, f32 panelX, f32 panelY, f3
 
     auto DisplayRate = [this](PartRarity rarity) -> f32 {
         // Placeholder rates to match RollRarity logic (needs refactoring to share rate data)
-        i32 roll = rand() % 10000; // Fake roll just to show logic, actual rates are fixed
         float rate = 0.0f;
 
         switch (m_SelectedBanner) {
@@ -432,7 +431,7 @@ void GatchaSystem::RenderSummonAnimation(Renderer* renderer, GameState* state) {
         ImGui::BeginChild(reinterpret_cast<const char*>(i), ImVec2(columnWidth, 120.0f), true);
 
         // Only reveal results up to the current animation index
-        if (i < m_CurrentRevealIndex) {
+        if (i < static_cast<size_t>(m_CurrentRevealIndex)) {
 
             ImVec4 rarityColor = GetRarityColorImVec4(result.part.rarity);
             const char* rarityText = result.part.GetRarityName();
@@ -471,7 +470,7 @@ void GatchaSystem::RenderSummonAnimation(Renderer* renderer, GameState* state) {
     ImGui::Separator();
 
     // Add a button to skip or dismiss the animation
-    if (m_CurrentRevealIndex >= m_CurrentResults.size()) {
+    if (static_cast<size_t>(m_CurrentRevealIndex) >= m_CurrentResults.size()) {
         if (ImGui::Button("Add to Inventory and Continue", ImVec2(-1, 50.0f))) {
             // Finalize results and clear animation
             if (state) {
@@ -597,6 +596,6 @@ void GatchaSystem::SaveToJson(std::ofstream& file) const {
 }
 
 void GatchaSystem::LoadFromJson(const std::string& line) {
-    // TODO: Implement JSON loading (parsing would go here)
+    (void)line; // Unused parameter - TODO: Implement JSON loading (parsing would go here)
     Log::Info("GatchaSystem::LoadFromJson called");
 }
