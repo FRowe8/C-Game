@@ -5,16 +5,17 @@
 #include "Logger.h"
 #include "Platform.h"
 #include "GameUtils.h"
-#include "imgui.h" // <--- ADD THIS LINE
+#include "imgui.h"
 #include <fstream>
-#include <cstring>  // <-- ADD THIS for strlen
-#include <cstdio>   // <-- ADD THIS for snprintf
+#include <cstring>
+#include <cstdio>
 #include <sstream>
 #include <cmath>
 #include <algorithm>
 
 #include "Research.h"
 #include "UIManager.h"
+#include "GuiLayer.h" // Phase 1.1: Decoupled UI layer
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
@@ -1097,11 +1098,14 @@ void GameState::Render(Renderer* renderer) {
     }
 
     // --- RENDER IMGUI WINDOWS ---
-    // The UIManager is now the central authority for the main layout and all overlays
-    if (m_UIManager) {
+    // Phase 1.1: GuiLayer now handles all UI rendering (decoupled from GameState logic)
+    if (m_GuiLayer) {
+        m_GuiLayer->Render(this, renderer);
+    } else if (m_UIManager) {
+        // Fallback to UIManager if GuiLayer not initialized
         m_UIManager->Render(renderer);
     } else {
-        // Fallback or legacy calls
+        // Legacy fallback
         RenderResources(renderer);
         RenderUI(renderer);
     }
