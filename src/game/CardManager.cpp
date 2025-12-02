@@ -1,7 +1,7 @@
 #include "CardManager.h"
 #include "GameState.h"
 #include "Enemy.h"
-#include "logger.h"
+#include "Logger.h"
 #include <algorithm>
 #include <random>
 #include <fstream>

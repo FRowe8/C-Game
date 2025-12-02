@@ -1,6 +1,6 @@
 #include "OfflineUpgrades.h"
 #include "TimeManager.h"
-#include "logger.h"
+#include "Logger.h"
 #include <fstream>
 #include <cmath>
 

@@ -1,5 +1,5 @@
 #include "SoundManager.h"
-#include "logger.h"
+#include "Logger.h"
 
 // Uncomment when SDL_mixer is available:
 // #include <SDL_mixer.h>
