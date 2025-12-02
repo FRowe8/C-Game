@@ -205,6 +205,7 @@ enum class ActiveModal {
     Gatcha,
     Skills,
     Enhancement,
+    SpecializedSkills,  // Activity-based progression system
     MoreMenu
 };
 
@@ -361,6 +362,7 @@ private:
     void RenderCombat(Renderer* renderer);
     void RenderGatcha(Renderer* renderer);
     void RenderSkillTree(Renderer* renderer);
+    void RenderSpecializedSkills(Renderer* renderer);
 
     // Particle system helpers
     void SpawnParticle(const Vec2& position, const Color& color, f64 lifetime = 1.0);

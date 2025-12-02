@@ -256,6 +256,11 @@ void UIManager::RenderMainContent() {
                     m_GameState->m_EnhancementSystem.RenderEnhancementUI(nullptr, m_GameState);
                     break;
 
+                case ActiveModal::SpecializedSkills:
+                    // Specialized skills progression (full screen in content area)
+                    m_GameState->RenderSpecializedSkills(nullptr);
+                    break;
+
                 case ActiveModal::MoreMenu:
                     // More menu is handled as a popup, show stations as fallback
                     m_GameState->RenderStationsContent();
@@ -320,6 +325,10 @@ void UIManager::RenderOverlays(Renderer* renderer) {
         }
         if (ImGui::MenuItem("Skills")) {
             m_GameState->SetActiveModal(ActiveModal::Skills);
+            m_GameState->m_ShowMoreMenu = false;
+        }
+        if (ImGui::MenuItem("Specialized Skills")) {
+            m_GameState->SetActiveModal(ActiveModal::SpecializedSkills);
             m_GameState->m_ShowMoreMenu = false;
         }
         if (ImGui::MenuItem("Enhancement")) {
