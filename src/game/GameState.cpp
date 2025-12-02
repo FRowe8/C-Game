@@ -661,7 +661,12 @@ void GameState::UpdateUI(Input* input) {
 
     // --- REMOVED: Custom scrolling logic (m_ScrollOffset) is removed as RenderStations now uses native ImGui scrolling. ---
 
+    // Phase 1.3: Get ImGui input capture state early
+    ImGuiIO& io = ImGui::GetIO();
+    bool uiCapturingMouse = io.WantCaptureMouse;
+
     // Handle unlock notification clicks (click to dismiss)
+    // Note: These are rendered as ImGui windows, so this check is redundant but kept for clarity
     if (mousePressed && m_UnlockManager.HasActiveNotification()) {
         f32 screenWidth = static_cast<f32>(input->GetWindowWidth());
         f32 notifWidth = 400.0f;
@@ -726,14 +731,17 @@ void GameState::UpdateUI(Input* input) {
     */
     // --- REMOVED: Manual close button checks for popups (handled by ImGui) ---
 
-    // Handle Quantum Anomaly clicks (active gameplay - high priority)
-    ClickQuantumAnomaly(mousePos);
+    // Handle Quantum Anomaly clicks (active gameplay)
+    // ONLY if UI is not capturing the mouse (prevents click-through on modals)
+    if (mousePressed && !uiCapturingMouse) {
+        ClickQuantumAnomaly(mousePos);
+    }
 
     // Handle navigation bar button clicks (only if no popup consumed the click)
     // The following logic is left as it handles the non-ImGui button click areas
     // that determine which popup to open.
 
-    if (mousePressed) {
+    if (mousePressed && !uiCapturingMouse) {
         f32 navY = 100.0f;
         f32 navHeight = 80.0f;
         f32 btnWidth = 180.0f;
@@ -4100,6 +4108,10 @@ void GameState::RenderQuantumAnomalies(Renderer* renderer) {
 }
 
 void GameState::ClickQuantumAnomaly(const Vec2& clickPos) {
+    // Phase 1.3: This function is now only called when ImGui is NOT capturing mouse
+    // (see UpdateUI for the WantCaptureMouse check)
+    // This prevents clicking anomalies through UI windows
+
     for (auto& anomaly : m_Anomalies) {
         if (anomaly.clicked) continue;
 
