@@ -1,6 +1,6 @@
 #include "TutorialManager.h"
 #include "Renderer.h"
-#include "logger.h"
+#include "Logger.h"
 #include "imgui.h"
 #include <cmath>
 #include <fstream>

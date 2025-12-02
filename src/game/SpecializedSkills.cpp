@@ -1,5 +1,5 @@
 #include "SpecializedSkills.h"
-#include "logger.h"
+#include "Logger.h"
 #include <cmath>
 
 SpecializedSkillsSystem::SpecializedSkillsSystem() {
