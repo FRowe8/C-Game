@@ -172,6 +172,27 @@ public:
     // Get toast notifications (for rendering)
     const std::vector<ToastNotification>& GetToasts() const { return m_Toasts; }
 
+    // === Resource Tick Animations ===
+
+    struct ResourceTickDisplay {
+        f64 qubitRate;       // Qubits per second
+        f64 coherenceRate;   // Coherence per second
+        f64 entanglementRate; // Entanglement per second
+        bool enabled;
+        f32 tickTimer;
+        f32 tickInterval;    // How often to show tick (default 2.0s)
+    };
+
+    // Set resource generation rates (called by game logic)
+    void SetResourceTickRates(f64 qubits, f64 coherence, f64 entanglement);
+
+    // Enable/disable resource tick display
+    void EnableResourceTicks(bool enabled) { m_ResourceTicks.enabled = enabled; }
+    void SetResourceTickInterval(f32 interval) { m_ResourceTicks.tickInterval = interval; }
+
+    // Get resource tick display data
+    const ResourceTickDisplay& GetResourceTickDisplay() const { return m_ResourceTicks; }
+
     // === Visual Settings ===
 
     void SetParticleScale(f32 scale) { m_ParticleScale = scale; }
@@ -211,12 +232,16 @@ private:
     std::vector<ToastNotification> m_Toasts;
     const i32 m_MaxToasts = 5;  // Maximum visible toasts at once
 
+    // Resource tick display
+    ResourceTickDisplay m_ResourceTicks;
+
     // Helper methods
     void UpdateParticles(f64 deltaTime);
     void UpdateAnomalies(f64 deltaTime);
     void UpdateScreenEffects(f64 deltaTime);
     void UpdateFloatingTexts(f64 deltaTime);
     void UpdateToasts(f64 deltaTime);
+    void UpdateResourceTicks(f64 deltaTime);
 
     void RenderParticles(Renderer* renderer);
     void RenderAnomalies(Renderer* renderer);

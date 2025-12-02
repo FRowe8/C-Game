@@ -31,6 +31,14 @@ void VisualFXManager::Initialize() {
     m_ComboCount = 0;
     m_PrestigeFlashActive = false;
     m_ScreenShakeActive = false;
+
+    // Initialize resource tick display
+    m_ResourceTicks.qubitRate = 0.0;
+    m_ResourceTicks.coherenceRate = 0.0;
+    m_ResourceTicks.entanglementRate = 0.0;
+    m_ResourceTicks.enabled = true;
+    m_ResourceTicks.tickTimer = 0.0f;
+    m_ResourceTicks.tickInterval = 2.0f; // Show every 2 seconds
 }
 
 void VisualFXManager::Update(f64 deltaTime) {
@@ -39,6 +47,7 @@ void VisualFXManager::Update(f64 deltaTime) {
     UpdateScreenEffects(deltaTime);
     UpdateFloatingTexts(deltaTime);
     UpdateToasts(deltaTime);
+    UpdateResourceTicks(deltaTime);
 }
 
 void VisualFXManager::Render(Renderer* renderer) {
@@ -778,5 +787,89 @@ const char* VisualFXManager::GetLootTypeIcon(LootType type) const {
         case LootType::Achievement: return "[A]";
         case LootType::Milestone:   return "[M]";
         default:                    return "[?]";
+    }
+}
+
+// === Resource Tick Animation System ===
+
+void VisualFXManager::SetResourceTickRates(f64 qubits, f64 coherence, f64 entanglement) {
+    m_ResourceTicks.qubitRate = qubits;
+    m_ResourceTicks.coherenceRate = coherence;
+    m_ResourceTicks.entanglementRate = entanglement;
+}
+
+void VisualFXManager::UpdateResourceTicks(f64 deltaTime) {
+    if (!m_ResourceTicks.enabled) return;
+
+    m_ResourceTicks.tickTimer += static_cast<f32>(deltaTime);
+
+    // Check if it's time to show a tick
+    if (m_ResourceTicks.tickTimer >= m_ResourceTicks.tickInterval) {
+        m_ResourceTicks.tickTimer = 0.0f;
+
+        // Get screen dimensions for positioning
+        ImGuiIO& io = ImGui::GetIO();
+        f32 screenWidth = io.DisplaySize.x;
+        f32 screenHeight = io.DisplaySize.y;
+
+        // Position ticks in the top-left area (near resource display)
+        // Offset slightly so they don't overlap with UI
+        f32 baseX = 150.0f;
+        f32 baseY = 50.0f;
+        f32 yOffset = 25.0f;
+
+        // Spawn Qubit tick if generating
+        if (m_ResourceTicks.qubitRate > 0.01) {
+            char buffer[128];
+            snprintf(buffer, sizeof(buffer), "+%.1f/s", m_ResourceTicks.qubitRate);
+
+            FloatingText ft;
+            ft.text = buffer;
+            ft.position = Vec2(baseX, baseY);
+            ft.velocity = Vec2(0.0f, -30.0f); // Float upward slowly
+            ft.color = Color(0.5f, 0.9f, 1.0f, 1.0f); // Cyan (qubit color)
+            ft.size = 0.8f; // Smaller than combat text
+            ft.lifetime = 0.0f;
+            ft.maxLifetime = 1.8f;
+            ft.type = FloatingTextType::ResourceGain;
+
+            m_FloatingTexts.push_back(ft);
+        }
+
+        // Spawn Coherence tick if generating
+        if (m_ResourceTicks.coherenceRate > 0.01) {
+            char buffer[128];
+            snprintf(buffer, sizeof(buffer), "+%.1f/s", m_ResourceTicks.coherenceRate);
+
+            FloatingText ft;
+            ft.text = buffer;
+            ft.position = Vec2(baseX, baseY + yOffset);
+            ft.velocity = Vec2(0.0f, -30.0f);
+            ft.color = Color(1.0f, 0.6f, 0.3f, 1.0f); // Orange (coherence color)
+            ft.size = 0.8f;
+            ft.lifetime = 0.0f;
+            ft.maxLifetime = 1.8f;
+            ft.type = FloatingTextType::ResourceGain;
+
+            m_FloatingTexts.push_back(ft);
+        }
+
+        // Spawn Entanglement tick if generating
+        if (m_ResourceTicks.entanglementRate > 0.01) {
+            char buffer[128];
+            snprintf(buffer, sizeof(buffer), "+%.2f/s", m_ResourceTicks.entanglementRate);
+
+            FloatingText ft;
+            ft.text = buffer;
+            ft.position = Vec2(baseX, baseY + yOffset * 2);
+            ft.velocity = Vec2(0.0f, -30.0f);
+            ft.color = Color(0.9f, 0.3f, 1.0f, 1.0f); // Purple (entanglement color)
+            ft.size = 0.8f;
+            ft.lifetime = 0.0f;
+            ft.maxLifetime = 1.8f;
+            ft.type = FloatingTextType::ResourceGain;
+
+            m_FloatingTexts.push_back(ft);
+        }
     }
 }
