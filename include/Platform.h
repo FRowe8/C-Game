@@ -30,4 +30,7 @@ struct DisplayInfo {
 };
 DisplayInfo GetDisplayInfo();
 
+// File system sync (Critical for Web/Emscripten to persist to IndexedDB)
+void SyncFileSystem();
+
 } // namespace Platform

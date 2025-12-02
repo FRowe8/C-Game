@@ -4,6 +4,10 @@
 #include <cstring>
 #include <cerrno>  // For errno and EEXIST
 
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#endif
+
 #ifdef PLATFORM_WINDOWS
 #include <windows.h>
 #include <shlobj.h>
@@ -115,6 +119,24 @@ DisplayInfo GetDisplayInfo() {
     }
 
     return info;
+}
+
+void SyncFileSystem() {
+#ifdef __EMSCRIPTEN__
+    // Sync MEMFS to IDBFS (false = persist data FROM memory TO IndexedDB)
+    EM_ASM(
+        FS.syncfs(false, function(err) {
+            if (err) {
+                console.error('Error syncing to IndexedDB:', err);
+            } else {
+                console.log('Successfully synced to IndexedDB');
+            }
+        });
+    );
+#else
+    // Desktop platforms write to disk immediately via std::ofstream
+    // No additional sync needed, but could use fsync() here for strict safety
+#endif
 }
 
 } // namespace Platform

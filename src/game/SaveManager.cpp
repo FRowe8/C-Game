@@ -36,6 +36,7 @@ bool SaveManager::Save(const std::string& filepath) {
         return false;
     }
 
+    // 1. Write the file to the virtual filesystem (Memory)
     // Delegate to GameState's existing Save implementation for now
     // TODO: Implement proper JSON serialization using nlohmann/json
     bool success = m_GameState->Save(filepath);
@@ -43,6 +44,11 @@ bool SaveManager::Save(const std::string& filepath) {
     if (success) {
         m_LastSaveFilepath = filepath;
         m_LastSaveTimestamp = static_cast<i64>(Platform::GetTime());
+
+        // 2. CRITICAL: Push the change to persistent browser storage (IndexedDB)
+        // This ensures saves persist even if the user closes the tab immediately
+        Platform::SyncFileSystem();
+
         Log::Infof("Game saved successfully to: ", filepath);
     }
 
