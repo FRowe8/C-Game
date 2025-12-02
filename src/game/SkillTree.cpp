@@ -266,8 +266,36 @@ bool SkillTreeSystem::LearnSkill(SkillID id, GameState* state) {
     return true;
 }
 
-bool SkillTreeSystem::ResetSkills() {
-    // TODO: Add credit cost for reset
+bool SkillTreeSystem::CanResetSkills(GameState* state) const {
+    // Check if player has any skills to reset
+    if (m_TotalSpent == 0) {
+        return false;
+    }
+
+    // Check if player can afford reset cost (10 Photons base + 5 per skill point spent)
+    i32 resetCost = 10 + (m_TotalSpent * 5);
+    return state->GetPhotons() >= resetCost;
+}
+
+bool SkillTreeSystem::ResetSkills(GameState* state) {
+    // Check if any skills are learned
+    if (m_TotalSpent == 0) {
+        Log::Warn("No skills to reset!");
+        return false;
+    }
+
+    // Calculate reset cost (10 Photons base + 5 per skill point spent)
+    i32 resetCost = 10 + (m_TotalSpent * 5);
+
+    // Check if player can afford
+    if (state->GetPhotons() < resetCost) {
+        Log::Warnf("Not enough Photons! Need ", resetCost, " Photons to reset skills.");
+        return false;
+    }
+
+    // Spend Photons
+    state->AddPhotons(-resetCost);
+
     // Refund all spent points
     m_SkillPoints += m_TotalSpent;
     m_TotalSpent = 0;
@@ -277,7 +305,7 @@ bool SkillTreeSystem::ResetSkills() {
         pair.second.level = 0;
     }
 
-    Log::Info("All skills reset!");
+    Log::Infof("All skills reset! Cost: ", resetCost, " Photons. ", m_SkillPoints, " skill points refunded.");
     return true;
 }
 
@@ -581,17 +609,68 @@ void SkillTreeSystem::RenderSkillInfo(Renderer* renderer, f32 panelX, f32 panelY
     // 3. Pass the ImVec4 to ImGui::TextColored
     ImGui::TextColored(imSkillColor,
         "%d available | %d spent", m_SkillPoints, m_TotalSpent);
+
     // Reset button (Right side)
     ImGui::SameLine(ImGui::GetWindowWidth() - 160.0f);
 
-    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.8f, 0.3f, 0.3f, 0.8f));
-    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(1.0f, 0.5f, 0.5f, 1.0f));
+    // Calculate reset cost
+    i32 resetCost = 10 + (m_TotalSpent * 5);
+    bool canReset = CanResetSkills(state);
 
-    if (ImGui::Button("RESET SKILLS", ImVec2(150.0f, 40.0f))) {
-        ResetSkills();
+    // Button styling
+    if (!canReset) {
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.3f, 0.3f, 0.3f, 0.5f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.3f, 0.3f, 0.3f, 0.5f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.3f, 0.3f, 0.3f, 0.5f));
+    } else {
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.8f, 0.3f, 0.3f, 0.8f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(1.0f, 0.5f, 0.5f, 1.0f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.6f, 0.2f, 0.2f, 1.0f));
     }
 
-    ImGui::PopStyleColor(2);
+    if (ImGui::Button("RESET SKILLS", ImVec2(150.0f, 40.0f)) && canReset) {
+        // Open confirmation popup
+        ImGui::OpenPopup("Confirm Reset");
+    }
+
+    ImGui::PopStyleColor(3);
+
+    // Tooltip
+    if (ImGui::IsItemHovered()) {
+        if (m_TotalSpent == 0) {
+            ImGui::SetTooltip("No skills to reset");
+        } else if (!canReset) {
+            ImGui::SetTooltip("Need %d Photons to reset (have %d)", resetCost, static_cast<i32>(state->GetPhotons()));
+        } else {
+            ImGui::SetTooltip("Reset all skills for %d Photons\nRefunds %d skill points", resetCost, m_TotalSpent);
+        }
+    }
+
+    // Confirmation modal
+    if (ImGui::BeginPopupModal("Confirm Reset", NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImGui::Text("Are you sure you want to reset all skills?");
+        ImGui::Spacing();
+        ImGui::TextColored(ImVec4(1.0f, 0.9f, 0.3f, 1.0f), "Cost: %d Photons", resetCost);
+        ImGui::TextColored(ImVec4(0.3f, 1.0f, 0.3f, 1.0f), "Refund: %d skill points", m_TotalSpent);
+        ImGui::Spacing();
+        ImGui::Separator();
+        ImGui::Spacing();
+
+        // Confirm button
+        if (ImGui::Button("YES, RESET", ImVec2(120, 0))) {
+            ResetSkills(state);
+            ImGui::CloseCurrentPopup();
+        }
+
+        ImGui::SameLine();
+
+        // Cancel button
+        if (ImGui::Button("CANCEL", ImVec2(120, 0))) {
+            ImGui::CloseCurrentPopup();
+        }
+
+        ImGui::EndPopup();
+    }
 
     // Hint text
     ImGui::Spacing();
@@ -637,7 +716,7 @@ void SkillTreeSystem::RenderSkillTree(Renderer* renderer, GameState* state) {
         ImGui::Separator();
 
         // --- INFO AND RESET PANEL ---
-        RenderSkillInfo(renderer, 0.0f, 0.0f, 0.0f, 0.0f); // Parameters now ignored
+        RenderSkillInfo(renderer, state, 0.0f, 0.0f, 0.0f, 0.0f); // Parameters now ignored
 
         ImGui::End();
     }

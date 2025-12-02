@@ -99,6 +99,100 @@ public:
     void IncrementCombo();
     void ResetCombo() { m_ComboCount = 0; }
 
+    // === Floating Combat Text ===
+
+    enum class FloatingTextType {
+        Damage,         // Normal damage (white/yellow)
+        CriticalHit,    // Critical damage (orange/red, larger)
+        Healing,        // HP restored (green)
+        Miss,           // Attack missed (gray)
+        Blocked,        // Damage blocked (blue)
+        ResourceGain,   // Resources gained (cyan)
+        XPGain,         // Experience gained (purple)
+        LevelUp         // Level up notification (gold, large)
+    };
+
+    struct FloatingText {
+        std::string text;
+        Vec2 position;
+        Vec2 velocity;
+        Color color;
+        f32 size;           // Text size multiplier (1.0 = normal, 2.0 = double)
+        f32 lifetime;
+        f32 maxLifetime;
+        FloatingTextType type;
+    };
+
+    // Spawn floating text at position
+    void SpawnFloatingText(const std::string& text, const Vec2& position, FloatingTextType type = FloatingTextType::Damage);
+
+    // Convenience methods for common combat events
+    void SpawnDamageText(f64 damage, const Vec2& position, bool isCritical = false);
+    void SpawnHealText(f64 healing, const Vec2& position);
+    void SpawnMissText(const Vec2& position);
+    void SpawnBlockedText(const Vec2& position);
+    void SpawnResourceText(f64 amount, const std::string& resourceName, const Vec2& position);
+    void SpawnXPText(i32 xp, const Vec2& position);
+    void SpawnLevelUpText(i32 newLevel, const Vec2& position);
+
+    // Get floating texts (for rendering)
+    const std::vector<FloatingText>& GetFloatingTexts() const { return m_FloatingTexts; }
+
+    // === Toast Notifications ===
+
+    enum class LootType {
+        Card,
+        Crew,
+        ShipPart,
+        Resource,
+        Achievement,
+        Milestone
+    };
+
+    struct ToastNotification {
+        std::string title;
+        std::string subtitle;
+        LootType type;
+        i32 rarity;             // 0=Common, 4=Legendary
+        f32 lifetime;
+        f32 maxLifetime;
+        f32 slideProgress;      // 0.0 = off-screen, 1.0 = fully visible
+        bool fadingOut;
+    };
+
+    // Spawn a loot toast notification
+    void SpawnLootToast(LootType type, const std::string& itemName, i32 rarity);
+
+    // Spawn achievement toast
+    void SpawnAchievementToast(const std::string& achievementName, const std::string& description);
+
+    // Spawn milestone toast
+    void SpawnMilestoneToast(const std::string& milestone, const std::string& description);
+
+    // Get toast notifications (for rendering)
+    const std::vector<ToastNotification>& GetToasts() const { return m_Toasts; }
+
+    // === Resource Tick Animations ===
+
+    struct ResourceTickDisplay {
+        f64 qubitRate;       // Qubits per second
+        f64 coherenceRate;   // Coherence per second
+        f64 entanglementRate; // Entanglement per second
+        bool enabled;
+        f32 tickTimer;
+        f32 tickInterval;    // How often to show tick (default 2.0s)
+    };
+
+    // Set resource generation rates (called by game logic)
+    void SetResourceTickRates(f64 qubits, f64 coherence, f64 entanglement);
+
+    // Enable/disable resource tick display
+    void EnableResourceTicks(bool enabled) { m_ResourceTicks.enabled = enabled; }
+    void SetResourceTickInterval(f32 interval) { m_ResourceTicks.tickInterval = interval; }
+
+    // Get resource tick display data
+    const ResourceTickDisplay& GetResourceTickDisplay() const { return m_ResourceTicks; }
+
     // === Visual Settings ===
 
     void SetParticleScale(f32 scale) { m_ParticleScale = scale; }
@@ -131,10 +225,23 @@ private:
     // Combo system
     i32 m_ComboCount;
 
+    // Floating combat text
+    std::vector<FloatingText> m_FloatingTexts;
+
+    // Toast notifications
+    std::vector<ToastNotification> m_Toasts;
+    const i32 m_MaxToasts = 5;  // Maximum visible toasts at once
+
+    // Resource tick display
+    ResourceTickDisplay m_ResourceTicks;
+
     // Helper methods
     void UpdateParticles(f64 deltaTime);
     void UpdateAnomalies(f64 deltaTime);
     void UpdateScreenEffects(f64 deltaTime);
+    void UpdateFloatingTexts(f64 deltaTime);
+    void UpdateToasts(f64 deltaTime);
+    void UpdateResourceTicks(f64 deltaTime);
 
     void RenderParticles(Renderer* /*renderer*/);
     void RenderAnomalies(Renderer* /*renderer*/);

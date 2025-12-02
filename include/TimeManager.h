@@ -38,14 +38,48 @@ public:
 
     // === Offline Progress ===
 
-    struct OfflineProgressData {
-        f64 secondsOffline;
-        f64 resourcesGenerated; // For display purposes
-        bool hadProgress;
+    struct LootDrop {
+        enum class Type { Card, Crew, ShipPart, Resource };
+        Type type;
+        i32 itemID;
+        std::string itemName;
+        i32 rarity; // 0=Common, 4=Legendary
     };
 
-    // Calculate offline progress (returns data for display)
-    OfflineProgressData CalculateOfflineProgress(i64 lastSaveTimestamp);
+    struct OfflineProgressData {
+        f64 secondsOffline;
+        bool hadProgress;
+
+        // Resources generated
+        f64 qubitsGenerated;
+        f64 coherenceGenerated;
+        f64 entanglementGenerated;
+        i32 photonsEarned;
+
+        // Combat simulation
+        i32 combatsWon;
+        i32 creditsEarned;
+        i32 xpEarned;
+
+        // Loot drops
+        std::vector<LootDrop> lootDrops;
+        i32 cardsDropped;
+        i32 crewRecruited;
+        i32 partsDropped;
+
+        // Research progress
+        i32 researchCompleted;
+
+        OfflineProgressData()
+            : secondsOffline(0.0), hadProgress(false),
+              qubitsGenerated(0.0), coherenceGenerated(0.0), entanglementGenerated(0.0), photonsEarned(0),
+              combatsWon(0), creditsEarned(0), xpEarned(0),
+              cardsDropped(0), crewRecruited(0), partsDropped(0),
+              researchCompleted(0) {}
+    };
+
+    // Calculate offline progress with full simulation (returns data for display)
+    OfflineProgressData CalculateOfflineProgress(i64 lastSaveTimestamp, class GameState* gameState = nullptr);
 
     // Get offline cap (4 hours by default, can be upgraded)
     f64 GetOfflineCapHours() const { return m_OfflineCapHours; }
@@ -53,6 +87,13 @@ public:
 
     f64 GetOfflineMultiplier() const { return m_OfflineMultiplier; }
     void SetOfflineMultiplier(f64 multiplier) { m_OfflineMultiplier = multiplier; }
+
+    // Offline loot settings
+    f64 GetOfflineLootChance() const { return m_OfflineLootChance; }
+    void SetOfflineLootChance(f64 chance) { m_OfflineLootChance = chance; }
+
+    f64 GetOfflineCombatRate() const { return m_OfflineCombatRate; } // Combats per hour
+    void SetOfflineCombatRate(f64 rate) { m_OfflineCombatRate = rate; }
 
     // === Time-Based Cooldowns ===
 
@@ -114,6 +155,8 @@ private:
     // Offline progress settings
     f64 m_OfflineCapHours;       // Maximum offline time (default 4 hours)
     f64 m_OfflineMultiplier;     // Offline production multiplier (default 0.5 = 50%)
+    f64 m_OfflineLootChance;     // Base loot drop chance per combat (default 0.2 = 20%)
+    f64 m_OfflineCombatRate;     // Combats simulated per hour offline (default 10.0)
 
     // Boost system
     bool m_BoostActive;
@@ -141,4 +184,7 @@ private:
 
     // Speed multipliers
     f64 m_TimeScale;             // Global time scale (default 1.0, can be modified by events)
+
+    // Helper methods
+    i32 RollRarity(); // Roll for loot rarity (0=Common, 4=Legendary)
 };

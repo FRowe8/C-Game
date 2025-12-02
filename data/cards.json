@@ -1,0 +1,512 @@
+{
+  "cards": [
+    {
+      "id": 1,
+      "name": "Quantum Strike",
+      "description": "Deal 15 damage to target enemy",
+      "rarity": "Common",
+      "qubitCost": 0,
+      "coherenceCost": 0,
+      "energyCost": 1,
+      "minPrestigeLevel": 0,
+      "effects": [
+        {
+          "type": "Attack",
+          "value": 15,
+          "duration": 0,
+          "target": "Enemy"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "name": "Shield Matrix",
+      "description": "Gain 10 defense for 3 turns",
+      "rarity": "Common",
+      "qubitCost": 0,
+      "coherenceCost": 0,
+      "energyCost": 1,
+      "minPrestigeLevel": 0,
+      "effects": [
+        {
+          "type": "Defense",
+          "value": 10,
+          "duration": 3,
+          "target": "Self"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "name": "Observation Wave",
+      "description": "Generate 50 Qubits",
+      "rarity": "Common",
+      "qubitCost": 0,
+      "coherenceCost": 0,
+      "energyCost": 1,
+      "minPrestigeLevel": 0,
+      "effects": [
+        {
+          "type": "ResourceGen",
+          "value": 50,
+          "duration": 0,
+          "target": "Self"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "name": "Coherence Burst",
+      "description": "Draw 2 cards",
+      "rarity": "Common",
+      "qubitCost": 0,
+      "coherenceCost": 0,
+      "energyCost": 1,
+      "minPrestigeLevel": 0,
+      "effects": [
+        {
+          "type": "Utility",
+          "value": 2,
+          "duration": 0,
+          "target": "Self"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "name": "Energy Siphon",
+      "description": "Gain 2 energy",
+      "rarity": "Common",
+      "qubitCost": 0,
+      "coherenceCost": 0,
+      "energyCost": 0,
+      "minPrestigeLevel": 0,
+      "effects": [
+        {
+          "type": "Utility",
+          "value": 2,
+          "duration": 0,
+          "target": "Self"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "name": "Photon Blast",
+      "description": "Deal 25 damage to target enemy",
+      "rarity": "Uncommon",
+      "qubitCost": 100,
+      "coherenceCost": 0,
+      "energyCost": 2,
+      "minPrestigeLevel": 0,
+      "effects": [
+        {
+          "type": "Attack",
+          "value": 25,
+          "duration": 0,
+          "target": "Enemy"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "name": "Reinforced Shields",
+      "description": "Gain 20 defense for 4 turns",
+      "rarity": "Uncommon",
+      "qubitCost": 100,
+      "coherenceCost": 0,
+      "energyCost": 2,
+      "minPrestigeLevel": 0,
+      "effects": [
+        {
+          "type": "Defense",
+          "value": 20,
+          "duration": 4,
+          "target": "Self"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "name": "Quantum Entanglement",
+      "description": "Deal 15 damage and heal for 15 HP",
+      "rarity": "Uncommon",
+      "qubitCost": 150,
+      "coherenceCost": 0,
+      "energyCost": 2,
+      "minPrestigeLevel": 0,
+      "effects": [
+        {
+          "type": "Attack",
+          "value": 15,
+          "duration": 0,
+          "target": "Enemy"
+        },
+        {
+          "type": "Defense",
+          "value": 15,
+          "duration": 0,
+          "target": "Self"
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "name": "Superposition",
+      "description": "Generate 150 Qubits and 10 Coherence",
+      "rarity": "Uncommon",
+      "qubitCost": 0,
+      "coherenceCost": 0,
+      "energyCost": 2,
+      "minPrestigeLevel": 1,
+      "effects": [
+        {
+          "type": "ResourceGen",
+          "value": 150,
+          "duration": 0,
+          "target": "Self"
+        },
+        {
+          "type": "ResourceGen",
+          "value": 10,
+          "duration": 0,
+          "target": "Self"
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "name": "Tactical Analysis",
+      "description": "Draw 3 cards and gain 1 energy",
+      "rarity": "Uncommon",
+      "qubitCost": 0,
+      "coherenceCost": 0,
+      "energyCost": 1,
+      "minPrestigeLevel": 0,
+      "effects": [
+        {
+          "type": "Utility",
+          "value": 3,
+          "duration": 0,
+          "target": "Self"
+        },
+        {
+          "type": "Utility",
+          "value": 1,
+          "duration": 0,
+          "target": "Self"
+        }
+      ]
+    },
+    {
+      "id": 11,
+      "name": "Particle Cannon",
+      "description": "Deal 40 damage to target enemy",
+      "rarity": "Rare",
+      "qubitCost": 300,
+      "coherenceCost": 0,
+      "energyCost": 3,
+      "minPrestigeLevel": 1,
+      "effects": [
+        {
+          "type": "Attack",
+          "value": 40,
+          "duration": 0,
+          "target": "Enemy"
+        }
+      ]
+    },
+    {
+      "id": 12,
+      "name": "Quantum Armor",
+      "description": "Gain 40 defense for 5 turns",
+      "rarity": "Rare",
+      "qubitCost": 300,
+      "coherenceCost": 50,
+      "energyCost": 3,
+      "minPrestigeLevel": 1,
+      "effects": [
+        {
+          "type": "Defense",
+          "value": 40,
+          "duration": 5,
+          "target": "Self"
+        }
+      ]
+    },
+    {
+      "id": 13,
+      "name": "Warp Strike",
+      "description": "Deal 30 damage and stun enemy for 1 turn",
+      "rarity": "Rare",
+      "qubitCost": 400,
+      "coherenceCost": 0,
+      "energyCost": 3,
+      "minPrestigeLevel": 1,
+      "effects": [
+        {
+          "type": "Attack",
+          "value": 30,
+          "duration": 0,
+          "target": "Enemy"
+        },
+        {
+          "type": "Debuff",
+          "value": 1,
+          "duration": 1,
+          "target": "Enemy"
+        }
+      ]
+    },
+    {
+      "id": 14,
+      "name": "Temporal Flux",
+      "description": "Deal 25 damage to all enemies",
+      "rarity": "Rare",
+      "qubitCost": 500,
+      "coherenceCost": 100,
+      "energyCost": 4,
+      "minPrestigeLevel": 2,
+      "effects": [
+        {
+          "type": "Attack",
+          "value": 25,
+          "duration": 0,
+          "target": "AllEnemies"
+        }
+      ]
+    },
+    {
+      "id": 15,
+      "name": "Photonic Resonance",
+      "description": "Generate 500 Qubits and 50 Coherence",
+      "rarity": "Rare",
+      "qubitCost": 0,
+      "coherenceCost": 0,
+      "energyCost": 3,
+      "minPrestigeLevel": 2,
+      "effects": [
+        {
+          "type": "ResourceGen",
+          "value": 500,
+          "duration": 0,
+          "target": "Self"
+        },
+        {
+          "type": "ResourceGen",
+          "value": 50,
+          "duration": 0,
+          "target": "Self"
+        }
+      ]
+    },
+    {
+      "id": 16,
+      "name": "Singularity Beam",
+      "description": "Deal 60 damage to target enemy",
+      "rarity": "Epic",
+      "qubitCost": 800,
+      "coherenceCost": 200,
+      "energyCost": 4,
+      "minPrestigeLevel": 3,
+      "effects": [
+        {
+          "type": "Attack",
+          "value": 60,
+          "duration": 0,
+          "target": "Enemy"
+        }
+      ]
+    },
+    {
+      "id": 17,
+      "name": "Event Horizon",
+      "description": "Gain 60 defense and reflect 20% damage for 6 turns",
+      "rarity": "Epic",
+      "qubitCost": 800,
+      "coherenceCost": 200,
+      "energyCost": 4,
+      "minPrestigeLevel": 3,
+      "effects": [
+        {
+          "type": "Defense",
+          "value": 60,
+          "duration": 6,
+          "target": "Self"
+        },
+        {
+          "type": "Buff",
+          "value": 20,
+          "duration": 6,
+          "target": "Self"
+        }
+      ]
+    },
+    {
+      "id": 18,
+      "name": "Quantum Overload",
+      "description": "Deal 45 damage and gain 3 energy",
+      "rarity": "Epic",
+      "qubitCost": 1000,
+      "coherenceCost": 150,
+      "energyCost": 3,
+      "minPrestigeLevel": 3,
+      "effects": [
+        {
+          "type": "Attack",
+          "value": 45,
+          "duration": 0,
+          "target": "Enemy"
+        },
+        {
+          "type": "Utility",
+          "value": 3,
+          "duration": 0,
+          "target": "Self"
+        }
+      ]
+    },
+    {
+      "id": 19,
+      "name": "Dimensional Rift",
+      "description": "Deal 40 damage to all enemies and draw 2 cards",
+      "rarity": "Epic",
+      "qubitCost": 1200,
+      "coherenceCost": 250,
+      "energyCost": 5,
+      "minPrestigeLevel": 4,
+      "effects": [
+        {
+          "type": "Attack",
+          "value": 40,
+          "duration": 0,
+          "target": "AllEnemies"
+        },
+        {
+          "type": "Utility",
+          "value": 2,
+          "duration": 0,
+          "target": "Self"
+        }
+      ]
+    },
+    {
+      "id": 20,
+      "name": "Crew Synergy Protocol",
+      "description": "Boost all crew stats by 50% for 5 turns",
+      "rarity": "Epic",
+      "qubitCost": 1000,
+      "coherenceCost": 300,
+      "energyCost": 4,
+      "minPrestigeLevel": 3,
+      "effects": [
+        {
+          "type": "Synergy",
+          "value": 50,
+          "duration": 5,
+          "target": "Self"
+        }
+      ]
+    },
+    {
+      "id": 21,
+      "name": "Omega Annihilation",
+      "description": "Deal 100 damage to target enemy",
+      "rarity": "Legendary",
+      "qubitCost": 2000,
+      "coherenceCost": 500,
+      "energyCost": 5,
+      "minPrestigeLevel": 5,
+      "effects": [
+        {
+          "type": "Attack",
+          "value": 100,
+          "duration": 0,
+          "target": "Enemy"
+        }
+      ]
+    },
+    {
+      "id": 22,
+      "name": "Absolute Zero Shield",
+      "description": "Become immune to damage for 3 turns",
+      "rarity": "Legendary",
+      "qubitCost": 2000,
+      "coherenceCost": 500,
+      "energyCost": 5,
+      "minPrestigeLevel": 5,
+      "effects": [
+        {
+          "type": "Defense",
+          "value": 9999,
+          "duration": 3,
+          "target": "Self"
+        }
+      ]
+    },
+    {
+      "id": 23,
+      "name": "Infinite Recursion",
+      "description": "Play any card from your discard pile without cost",
+      "rarity": "Legendary",
+      "qubitCost": 0,
+      "coherenceCost": 0,
+      "energyCost": 4,
+      "minPrestigeLevel": 6,
+      "effects": [
+        {
+          "type": "Utility",
+          "value": 1,
+          "duration": 0,
+          "target": "Self"
+        }
+      ]
+    },
+    {
+      "id": 24,
+      "name": "Cosmic Cascade",
+      "description": "Deal 50 damage to all enemies and generate 1000 Qubits",
+      "rarity": "Legendary",
+      "qubitCost": 0,
+      "coherenceCost": 0,
+      "energyCost": 6,
+      "minPrestigeLevel": 7,
+      "effects": [
+        {
+          "type": "Attack",
+          "value": 50,
+          "duration": 0,
+          "target": "AllEnemies"
+        },
+        {
+          "type": "ResourceGen",
+          "value": 1000,
+          "duration": 0,
+          "target": "Self"
+        }
+      ]
+    },
+    {
+      "id": 25,
+      "name": "Ascension Protocol",
+      "description": "Boost all stats by 100% for 10 turns",
+      "rarity": "Legendary",
+      "qubitCost": 3000,
+      "coherenceCost": 1000,
+      "energyCost": 7,
+      "minPrestigeLevel": 8,
+      "effects": [
+        {
+          "type": "Buff",
+          "value": 100,
+          "duration": 10,
+          "target": "Self"
+        }
+      ]
+    }
+  ],
+  "starterDeck": {
+    "description": "Basic starter cards for new players",
+    "cardIDs": [1, 1, 1, 2, 2, 3, 3, 3, 4, 5]
+  }
+}

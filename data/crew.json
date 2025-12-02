@@ -1,0 +1,330 @@
+{
+  "crew": [
+    {
+      "id": 1,
+      "name": "Alex Chen",
+      "rarity": "Common",
+      "role": "Engineer",
+      "minPrestigeLevel": 0,
+      "tags": ["Human", "Rookie"]
+    },
+    {
+      "id": 2,
+      "name": "Maria Rodriguez",
+      "rarity": "Common",
+      "role": "Scientist",
+      "minPrestigeLevel": 0,
+      "tags": ["Human", "Team_Player"]
+    },
+    {
+      "id": 3,
+      "name": "James Walker",
+      "rarity": "Common",
+      "role": "Soldier",
+      "minPrestigeLevel": 0,
+      "tags": ["Human", "Rookie"]
+    },
+    {
+      "id": 4,
+      "name": "Sarah Kim",
+      "rarity": "Common",
+      "role": "Pilot",
+      "minPrestigeLevel": 0,
+      "tags": ["Human", "Team_Player"]
+    },
+    {
+      "id": 5,
+      "name": "Dr. Ahmed Hassan",
+      "rarity": "Common",
+      "role": "Medic",
+      "minPrestigeLevel": 0,
+      "tags": ["Human", "Rookie"]
+    },
+    {
+      "id": 6,
+      "name": "Zyx-7",
+      "rarity": "Uncommon",
+      "role": "Engineer",
+      "minPrestigeLevel": 0,
+      "tags": ["Synthetic", "Team_Player"]
+    },
+    {
+      "id": 7,
+      "name": "Dr. Keiko Tanaka",
+      "rarity": "Uncommon",
+      "role": "Scientist",
+      "minPrestigeLevel": 0,
+      "tags": ["Human", "Veteran", "Team_Player"]
+    },
+    {
+      "id": 8,
+      "name": "Sgt. Marcus Stone",
+      "rarity": "Uncommon",
+      "role": "Soldier",
+      "minPrestigeLevel": 0,
+      "tags": ["Human", "Veteran"]
+    },
+    {
+      "id": 9,
+      "name": "Aria Voss",
+      "rarity": "Uncommon",
+      "role": "Pilot",
+      "minPrestigeLevel": 1,
+      "tags": ["Human", "Elite"]
+    },
+    {
+      "id": 10,
+      "name": "Dr. Elara Moon",
+      "rarity": "Uncommon",
+      "role": "Medic",
+      "minPrestigeLevel": 0,
+      "tags": ["Human", "Veteran", "Team_Player"]
+    },
+    {
+      "id": 11,
+      "name": "Kael'thas",
+      "rarity": "Rare",
+      "role": "Commander",
+      "minPrestigeLevel": 1,
+      "tags": ["Alien", "Leader", "Veteran"]
+    },
+    {
+      "id": 12,
+      "name": "Cipher-9",
+      "rarity": "Rare",
+      "role": "Engineer",
+      "minPrestigeLevel": 1,
+      "tags": ["Synthetic", "Elite", "Experimental"]
+    },
+    {
+      "id": 13,
+      "name": "Dr. Quantum Zhao",
+      "rarity": "Rare",
+      "role": "Scientist",
+      "minPrestigeLevel": 2,
+      "tags": ["Human", "Quantum", "Experimental"]
+    },
+    {
+      "id": 14,
+      "name": "Col. Viktor Volkov",
+      "rarity": "Rare",
+      "role": "Soldier",
+      "minPrestigeLevel": 1,
+      "tags": ["Human", "Elite", "Leader"]
+    },
+    {
+      "id": 15,
+      "name": "Zara 'Ghost' Novak",
+      "rarity": "Rare",
+      "role": "Pilot",
+      "minPrestigeLevel": 2,
+      "tags": ["Human", "Elite", "Lone_Wolf"]
+    },
+    {
+      "id": 16,
+      "name": "Thex'ron",
+      "rarity": "Rare",
+      "role": "Medic",
+      "minPrestigeLevel": 2,
+      "tags": ["Alien", "Veteran", "Team_Player"]
+    },
+    {
+      "id": 17,
+      "name": "Cmdr. Isabella Reyes",
+      "rarity": "Epic",
+      "role": "Commander",
+      "minPrestigeLevel": 3,
+      "tags": ["Human", "Leader", "Elite", "Veteran"]
+    },
+    {
+      "id": 18,
+      "name": "Nexus Prime",
+      "rarity": "Epic",
+      "role": "Engineer",
+      "minPrestigeLevel": 3,
+      "tags": ["Synthetic", "Elite", "Experimental", "Quantum"]
+    },
+    {
+      "id": 19,
+      "name": "Dr. Lyra Blackwell",
+      "rarity": "Epic",
+      "role": "Scientist",
+      "minPrestigeLevel": 3,
+      "tags": ["Human", "Quantum", "Elite", "Experimental"]
+    },
+    {
+      "id": 20,
+      "name": "Gen. Khor'vax",
+      "rarity": "Epic",
+      "role": "Soldier",
+      "minPrestigeLevel": 4,
+      "tags": ["Alien", "Elite", "Leader", "Veteran"]
+    },
+    {
+      "id": 21,
+      "name": "Ace 'Comet' Rivera",
+      "rarity": "Epic",
+      "role": "Pilot",
+      "minPrestigeLevel": 3,
+      "tags": ["Human", "Elite", "Veteran"]
+    },
+    {
+      "id": 22,
+      "name": "Oracle-3",
+      "rarity": "Epic",
+      "role": "Medic",
+      "minPrestigeLevel": 3,
+      "tags": ["Synthetic", "Quantum", "Elite"]
+    },
+    {
+      "id": 23,
+      "name": "Admiral Kaida Sato",
+      "rarity": "Legendary",
+      "role": "Commander",
+      "minPrestigeLevel": 5,
+      "tags": ["Human", "Leader", "Elite", "Veteran"]
+    },
+    {
+      "id": 24,
+      "name": "Chronos Alpha",
+      "rarity": "Legendary",
+      "role": "Engineer",
+      "minPrestigeLevel": 5,
+      "tags": ["Synthetic", "Quantum", "Elite", "Experimental"]
+    },
+    {
+      "id": 25,
+      "name": "Prof. Erwin Schrodinger-VII",
+      "rarity": "Legendary",
+      "role": "Scientist",
+      "minPrestigeLevel": 6,
+      "tags": ["Human", "Quantum", "Elite", "Experimental"]
+    },
+    {
+      "id": 26,
+      "name": "Warlord Zyx'kar",
+      "rarity": "Legendary",
+      "role": "Soldier",
+      "minPrestigeLevel": 6,
+      "tags": ["Alien", "Elite", "Leader", "Unstable"]
+    },
+    {
+      "id": 27,
+      "name": "Ghost 'Phantom' Akira",
+      "rarity": "Legendary",
+      "role": "Pilot",
+      "minPrestigeLevel": 5,
+      "tags": ["Human", "Elite", "Lone_Wolf", "Quantum"]
+    },
+    {
+      "id": 28,
+      "name": "Seraph-Ω",
+      "rarity": "Legendary",
+      "role": "Medic",
+      "minPrestigeLevel": 7,
+      "tags": ["Synthetic", "Quantum", "Elite", "Experimental"]
+    },
+    {
+      "id": 29,
+      "name": "The Arbiter",
+      "rarity": "Legendary",
+      "role": "Commander",
+      "minPrestigeLevel": 8,
+      "tags": ["Alien", "Quantum", "Leader", "Elite"]
+    },
+    {
+      "id": 30,
+      "name": "Entity-X",
+      "rarity": "Legendary",
+      "role": "Scientist",
+      "minPrestigeLevel": 8,
+      "tags": ["Quantum", "Experimental", "Elite", "Unstable"]
+    }
+  ],
+  "starterCrew": {
+    "description": "Basic crew members for new players",
+    "crewIDs": [1, 2, 3]
+  },
+  "synergies": [
+    {
+      "tag1": "Leader",
+      "tag2": "Team_Player",
+      "damageBonus": 0.2,
+      "defenseBonus": 0.1,
+      "resourceBonus": 0.0,
+      "description": "Leader + Team Player: +20% damage, +10% defense"
+    },
+    {
+      "tag1": "Veteran",
+      "tag2": "Rookie",
+      "damageBonus": 0.15,
+      "defenseBonus": 0.15,
+      "resourceBonus": 0.0,
+      "description": "Veteran + Rookie: +15% damage and defense (mentorship)"
+    },
+    {
+      "tag1": "Elite",
+      "tag2": "Elite",
+      "damageBonus": 0.25,
+      "defenseBonus": 0.0,
+      "resourceBonus": 0.0,
+      "description": "Elite + Elite: +25% damage (synchronized)"
+    },
+    {
+      "tag1": "Human",
+      "tag2": "Synthetic",
+      "damageBonus": 0.0,
+      "defenseBonus": 0.0,
+      "resourceBonus": 0.15,
+      "description": "Human + Synthetic: +15% resources (efficiency)"
+    },
+    {
+      "tag1": "Quantum",
+      "tag2": "Experimental",
+      "damageBonus": 0.0,
+      "defenseBonus": 0.0,
+      "resourceBonus": 0.25,
+      "description": "Quantum + Experimental: +25% resources (breakthrough)"
+    },
+    {
+      "tag1": "Alien",
+      "tag2": "Alien",
+      "damageBonus": 0.1,
+      "defenseBonus": 0.1,
+      "resourceBonus": 0.1,
+      "description": "Alien + Alien: +10% all stats (kinship)"
+    },
+    {
+      "tag1": "Lone_Wolf",
+      "tag2": "Lone_Wolf",
+      "damageBonus": 0.3,
+      "defenseBonus": -0.1,
+      "resourceBonus": 0.0,
+      "description": "Lone Wolf + Lone Wolf: +30% damage, -10% defense (rivalry)"
+    },
+    {
+      "tag1": "Leader",
+      "tag2": "Leader",
+      "damageBonus": 0.0,
+      "defenseBonus": 0.2,
+      "resourceBonus": 0.15,
+      "description": "Leader + Leader: +20% defense, +15% resources (council)"
+    },
+    {
+      "tag1": "Unstable",
+      "tag2": "Quantum",
+      "damageBonus": 0.4,
+      "defenseBonus": -0.2,
+      "resourceBonus": 0.2,
+      "description": "Unstable + Quantum: +40% damage, -20% defense, +20% resources (chaos)"
+    },
+    {
+      "tag1": "Veteran",
+      "tag2": "Elite",
+      "damageBonus": 0.2,
+      "defenseBonus": 0.2,
+      "resourceBonus": 0.0,
+      "description": "Veteran + Elite: +20% damage and defense (mastery)"
+    }
+  ]
+}

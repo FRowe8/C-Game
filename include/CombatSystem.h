@@ -9,6 +9,7 @@
 // Forward declarations
 class Renderer;
 class GameState;
+class EnergyGrid;
 
 // Combat state
 enum class CombatState {
@@ -35,7 +36,7 @@ public:
     CombatSystem();
 
     // Combat flow
-    void StartCombat(Enemy* enemy, i32 playerLevel, const Spaceship* ship, class GameState* state = nullptr);
+    void StartCombat(Enemy* enemy, i32 playerLevel, const Spaceship* ship, EnergyGrid* energyGrid = nullptr, class GameState* state = nullptr);
     void EndCombat();
     void Update(f64 deltaTime);
 
@@ -97,6 +98,12 @@ private:
     // Combat bonuses from ship
     f64 m_ShipPowerBonus;
     f64 m_ShipCombatBonus;
+
+    // Energy Grid integration (bridges quantum layer to combat)
+    EnergyGrid* m_EnergyGrid;
+    f64 m_WeaponMultiplier;
+    f64 m_ShieldMultiplier;
+    f64 m_EngineMultiplier;
 
     // Turn system
     f64 m_TurnTimer;
