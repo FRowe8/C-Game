@@ -180,9 +180,9 @@ void ResearchStation::Update(f64 deltaTime) {
 GameState::GameState()
     : m_CurrentEvent(nullptr), m_TimeSinceLastEvent(0), m_EventCooldown(120.0),
       m_QuantumEssence(0),
+      m_PlayerCredits(0),
       m_PlayerLevel(1),
       m_PlayerXP(0.0),
-      m_PlayerCredits(0),
       m_LastSaveTimestamp(0),
       m_ActiveModal(ActiveModal::None),
       m_ShowAchievements(false), m_ShowStats(false), m_ShowResearch(false), m_ShowMilestones(false), m_ShowBuyables(false), m_ShowChallenges(false), m_ShowEssenceShop(false), m_ShowSingularityShop(false), m_ShowSpaceship(false), m_ShowCombat(false), m_ShowGatcha(false), m_ShowSkills(false), m_ShowEnhancement(false), m_ShowMoreMenu(false),
@@ -4225,7 +4225,7 @@ void GameState::StartRandomCombat() {
     m_CurrentEnemy = EnemyGenerator::GenerateEnemy(m_PlayerLevel);
 
     // Start combat with current enemy (pass this to apply skill bonuses)
-    m_CombatSystem.StartCombat(&m_CurrentEnemy, m_PlayerLevel, &m_Spaceship, this);
+    m_CombatSystem.StartCombat(&m_CurrentEnemy, m_PlayerLevel, &m_Spaceship, nullptr, this);
     
     Log::Infof("Starting combat with ", m_CurrentEnemy.GetName());
 }

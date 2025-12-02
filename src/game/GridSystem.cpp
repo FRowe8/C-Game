@@ -277,11 +277,12 @@ bool GridSystem::HasFormation(FormationType type) const {
             }
             return false;
 
-        case FormationType::DiagonalLine:
+        case FormationType::DiagonalLine: {
             // Check both diagonals
             bool diagonal1 = (GetCrewAt(0, 0) != -1 && GetCrewAt(1, 1) != -1 && GetCrewAt(2, 2) != -1);
             bool diagonal2 = (GetCrewAt(0, 2) != -1 && GetCrewAt(1, 1) != -1 && GetCrewAt(2, 0) != -1);
             return diagonal1 || diagonal2;
+        }
 
         case FormationType::Cross:
             // Center + 4 cardinal adjacent
