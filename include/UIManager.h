@@ -23,22 +23,10 @@ private:
 
     // --- Sub-Panels ---
     void RenderStationsPanel();
-    void RenderOverlays(Renderer* renderer); // Handles modal popups (Research, Achievements, etc)
+    void RenderOverlays(Renderer* renderer); // Handles popups and notifications
 
-    // --- Overlay/Modal Windows (moved from GameState) ---
+    // --- Notification Overlays ---
     void RenderActiveEvent(Renderer* renderer);
-    void RenderAchievements(Renderer* renderer);
-    void RenderStatistics(Renderer* renderer);
-    void RenderResearchTree(Renderer* renderer);
-    void RenderMilestones(Renderer* renderer);
-    void RenderBuyables(Renderer* renderer);
-    void RenderChallenges(Renderer* renderer);
-    void RenderEssenceShop(Renderer* renderer);
-    void RenderSingularityShop(Renderer* renderer);
-    void RenderSpaceship(Renderer* renderer);
-    void RenderCombat(Renderer* renderer);
-    void RenderGatcha(Renderer* renderer);
-    void RenderSkillTree(Renderer* renderer);
     void RenderAchievementNotifications(Renderer* renderer);
     void RenderMilestoneNotifications(Renderer* renderer);
 

@@ -174,9 +174,99 @@ void UIManager::RenderMainContent() {
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(20, 20));
 
     if (ImGui::Begin("MainContent", nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove)) {
-        // Render the actual station content inside this scrollable panel
+        // Render content based on active modal (tab-based navigation)
+        ActiveModal activeModal = m_GameState->GetActiveModal();
+
         if (ImGui::BeginChild("ScrollContent", ImVec2(0, 0), false, ImGuiWindowFlags_AlwaysVerticalScrollbar)) {
-            m_GameState->RenderStationsContent();
+            switch(activeModal) {
+                case ActiveModal::None:
+                    // Default: Stations view
+                    m_GameState->RenderStationsContent();
+                    break;
+
+                case ActiveModal::Research:
+                    // Research Tree (full screen in content area)
+                    m_GameState->m_ResearchTree->RenderResearchTree(nullptr, m_GameState);
+                    break;
+
+                case ActiveModal::Buyables:
+                    // Upgrades/Buyables (full screen in content area)
+                    m_GameState->m_BuyableManager.RenderBuyables(nullptr, m_GameState);
+                    break;
+
+                case ActiveModal::Combat:
+                    // Combat view (full screen in content area)
+                    if (m_GameState->m_CombatSystem.IsInCombat()) {
+                        m_GameState->m_CombatSystem.RenderCombat(nullptr, m_GameState);
+                    } else {
+                        ImGui::TextColored(ImVec4(1, 1, 0, 1), "No active combat");
+                        ImGui::Text("Click COMBAT button to start a random encounter");
+                    }
+                    break;
+
+                case ActiveModal::Spaceship:
+                    // Ship panel (full screen in content area)
+                    m_GameState->m_Ship.RenderShipPanel();
+                    ImGui::Separator();
+                    m_GameState->m_Ship.RenderInventoryPanel();
+                    break;
+
+                case ActiveModal::Skills:
+                    // Skill Tree (full screen in content area)
+                    m_GameState->m_SkillTree.RenderSkillTree(nullptr, m_GameState);
+                    break;
+
+                case ActiveModal::Gatcha:
+                    // Gatcha system (full screen in content area)
+                    m_GameState->m_GatchaSystem.RenderGatcha(nullptr, m_GameState);
+                    break;
+
+                case ActiveModal::Achievements:
+                    // Achievements (full screen in content area)
+                    m_GameState->RenderAchievements(nullptr);
+                    break;
+
+                case ActiveModal::Statistics:
+                    // Statistics (full screen in content area)
+                    m_GameState->RenderStatistics(nullptr);
+                    break;
+
+                case ActiveModal::Milestones:
+                    // Milestones (full screen in content area)
+                    m_GameState->RenderMilestones(nullptr);
+                    break;
+
+                case ActiveModal::Challenges:
+                    // Challenges (full screen in content area)
+                    m_GameState->m_ChallengeManager.RenderChallenges(nullptr, m_GameState);
+                    break;
+
+                case ActiveModal::EssenceShop:
+                    // Essence Shop (full screen in content area)
+                    m_GameState->RenderEssenceShop(nullptr);
+                    break;
+
+                case ActiveModal::SingularityShop:
+                    // Singularity Shop (full screen in content area)
+                    m_GameState->RenderSingularityShop(nullptr);
+                    break;
+
+                case ActiveModal::Enhancement:
+                    // Enhancement system (full screen in content area)
+                    m_GameState->m_EnhancementSystem.RenderEnhancementUI(nullptr, m_GameState);
+                    break;
+
+                case ActiveModal::MoreMenu:
+                    // More menu is handled as a popup, show stations as fallback
+                    m_GameState->RenderStationsContent();
+                    break;
+
+                default:
+                    // Fallback: show stations
+                    m_GameState->RenderStationsContent();
+                    break;
+            }
+
             ImGui::EndChild();
         }
     }
@@ -186,52 +276,67 @@ void UIManager::RenderMainContent() {
 }
 
 void UIManager::RenderOverlays(Renderer* renderer) {
-    // Render popups on top of everything
-    // All modal/overlay windows are now handled here instead of in GameState::Render()
+    // Render popups and notifications on top of everything
+    // Main modal windows are now rendered in the content area (tab-based navigation)
 
-    // Handle "More" menu as a proper modal or popup
+    // Handle "More" menu as a popup
     if (m_GameState->m_ShowMoreMenu) {
         ImGui::OpenPopup("MoreMenuPopup");
     }
 
     if (ImGui::BeginPopup("MoreMenuPopup")) {
-        // Render button items from GameState logic
-        if (ImGui::MenuItem("Achievements")) { m_GameState->SetActiveModal(ActiveModal::Achievements); }
-        if (ImGui::MenuItem("Statistics")) { m_GameState->SetActiveModal(ActiveModal::Statistics); }
-        if (ImGui::MenuItem("Milestones")) { m_GameState->SetActiveModal(ActiveModal::Milestones); }
-        if (ImGui::MenuItem("Challenges")) { m_GameState->SetActiveModal(ActiveModal::Challenges); }
-        if (ImGui::MenuItem("Essence Shop")) { m_GameState->SetActiveModal(ActiveModal::EssenceShop); }
-        if (ImGui::MenuItem("Singularity Shop")) { m_GameState->SetActiveModal(ActiveModal::SingularityShop); }
-        if (ImGui::MenuItem("Spaceship")) { m_GameState->SetActiveModal(ActiveModal::Spaceship); }
-        if (ImGui::MenuItem("Gatcha")) { m_GameState->SetActiveModal(ActiveModal::Gatcha); }
-        if (ImGui::MenuItem("Skills")) { m_GameState->SetActiveModal(ActiveModal::Skills); }
-        if (ImGui::MenuItem("Enhancement")) { m_GameState->SetActiveModal(ActiveModal::Enhancement); }
+        // Menu items switch to different tabs
+        if (ImGui::MenuItem("Achievements")) {
+            m_GameState->SetActiveModal(ActiveModal::Achievements);
+            m_GameState->m_ShowMoreMenu = false;
+        }
+        if (ImGui::MenuItem("Statistics")) {
+            m_GameState->SetActiveModal(ActiveModal::Statistics);
+            m_GameState->m_ShowMoreMenu = false;
+        }
+        if (ImGui::MenuItem("Milestones")) {
+            m_GameState->SetActiveModal(ActiveModal::Milestones);
+            m_GameState->m_ShowMoreMenu = false;
+        }
+        if (ImGui::MenuItem("Challenges")) {
+            m_GameState->SetActiveModal(ActiveModal::Challenges);
+            m_GameState->m_ShowMoreMenu = false;
+        }
+        if (ImGui::MenuItem("Essence Shop")) {
+            m_GameState->SetActiveModal(ActiveModal::EssenceShop);
+            m_GameState->m_ShowMoreMenu = false;
+        }
+        if (ImGui::MenuItem("Singularity Shop")) {
+            m_GameState->SetActiveModal(ActiveModal::SingularityShop);
+            m_GameState->m_ShowMoreMenu = false;
+        }
+        if (ImGui::MenuItem("Spaceship")) {
+            m_GameState->SetActiveModal(ActiveModal::Spaceship);
+            m_GameState->m_ShowMoreMenu = false;
+        }
+        if (ImGui::MenuItem("Gatcha")) {
+            m_GameState->SetActiveModal(ActiveModal::Gatcha);
+            m_GameState->m_ShowMoreMenu = false;
+        }
+        if (ImGui::MenuItem("Skills")) {
+            m_GameState->SetActiveModal(ActiveModal::Skills);
+            m_GameState->m_ShowMoreMenu = false;
+        }
+        if (ImGui::MenuItem("Enhancement")) {
+            m_GameState->SetActiveModal(ActiveModal::Enhancement);
+            m_GameState->m_ShowMoreMenu = false;
+        }
         ImGui::Separator();
-        if (ImGui::MenuItem("Close")) m_GameState->SetActiveModal(ActiveModal::None);
+        if (ImGui::MenuItem("Close")) {
+            m_GameState->m_ShowMoreMenu = false;
+        }
         ImGui::EndPopup();
     }
 
-    // Render all overlay/modal windows
+    // Render active event (if any) - this can stay as an overlay
     RenderActiveEvent(renderer);
-    RenderAchievements(renderer);
-    RenderStatistics(renderer);
-    RenderResearchTree(renderer);
-    RenderMilestones(renderer);
-    RenderBuyables(renderer);
-    RenderChallenges(renderer);
-    RenderEssenceShop(renderer);
-    RenderSingularityShop(renderer);
-    RenderSpaceship(renderer);
-    RenderCombat(renderer);
-    RenderGatcha(renderer);
-    RenderSkillTree(renderer);
 
-    // Render enhancement UI if showing
-    if (m_GameState->m_ShowEnhancement) {
-        m_GameState->m_EnhancementSystem.RenderEnhancementUI(renderer, m_GameState);
-    }
-
-    // Render notifications
+    // Render notifications (always on top)
     RenderAchievementNotifications(renderer);
     RenderMilestoneNotifications(renderer);
     m_GameState->m_UnlockManager.RenderNotifications(renderer);
@@ -272,58 +377,10 @@ bool UIManager::DrawNavButton(const char* label, bool isActive, const ImVec4& ac
     
     return clicked;
 }
-// --- Overlay/Modal Windows (Delegates to GameState for now) ---
+// --- Notification Overlays ---
 
 void UIManager::RenderActiveEvent(Renderer* renderer) {
     m_GameState->RenderActiveEvent(renderer);
-}
-
-void UIManager::RenderAchievements(Renderer* renderer) {
-    m_GameState->RenderAchievements(renderer);
-}
-
-void UIManager::RenderStatistics(Renderer* renderer) {
-    m_GameState->RenderStatistics(renderer);
-}
-
-void UIManager::RenderResearchTree(Renderer* renderer) {
-    m_GameState->RenderResearchTree(renderer);
-}
-
-void UIManager::RenderMilestones(Renderer* renderer) {
-    m_GameState->RenderMilestones(renderer);
-}
-
-void UIManager::RenderBuyables(Renderer* renderer) {
-    m_GameState->RenderBuyables(renderer);
-}
-
-void UIManager::RenderChallenges(Renderer* renderer) {
-    m_GameState->RenderChallenges(renderer);
-}
-
-void UIManager::RenderEssenceShop(Renderer* renderer) {
-    m_GameState->RenderEssenceShop(renderer);
-}
-
-void UIManager::RenderSingularityShop(Renderer* renderer) {
-    m_GameState->RenderSingularityShop(renderer);
-}
-
-void UIManager::RenderSpaceship(Renderer* renderer) {
-    m_GameState->RenderSpaceship(renderer);
-}
-
-void UIManager::RenderCombat(Renderer* renderer) {
-    m_GameState->RenderCombat(renderer);
-}
-
-void UIManager::RenderGatcha(Renderer* renderer) {
-    m_GameState->RenderGatcha(renderer);
-}
-
-void UIManager::RenderSkillTree(Renderer* renderer) {
-    m_GameState->RenderSkillTree(renderer);
 }
 
 void UIManager::RenderAchievementNotifications(Renderer* renderer) {
