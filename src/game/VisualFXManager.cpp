@@ -26,6 +26,7 @@ VisualFXManager::VisualFXManager()
 void VisualFXManager::Initialize() {
     m_Particles.clear();
     m_Anomalies.clear();
+    m_FloatingTexts.clear();
     m_ComboCount = 0;
     m_PrestigeFlashActive = false;
     m_ScreenShakeActive = false;
@@ -35,11 +36,13 @@ void VisualFXManager::Update(f64 deltaTime) {
     UpdateParticles(deltaTime);
     UpdateAnomalies(deltaTime);
     UpdateScreenEffects(deltaTime);
+    UpdateFloatingTexts(deltaTime);
 }
 
 void VisualFXManager::Render(Renderer* renderer) {
     RenderParticles(renderer);
     RenderAnomalies(renderer);
+    RenderFloatingTexts(renderer);
 }
 
 // === Particle System ===
@@ -339,4 +342,179 @@ f32 VisualFXManager::GetComboAlpha() const {
     // Combo fades based on TimeManager's combo time remaining
     // For now, just return full alpha if combo is active
     return m_ComboCount > 0 ? 1.0f : 0.0f;
+}
+
+// === Floating Combat Text ===
+
+void VisualFXManager::SpawnFloatingText(const std::string& text, const Vec2& position, FloatingTextType type) {
+    FloatingText ft;
+    ft.text = text;
+    ft.position = position;
+    ft.type = type;
+    ft.lifetime = 0.0f;
+    ft.maxLifetime = 1.5f; // Default 1.5 seconds
+
+    // Set properties based on type
+    switch (type) {
+        case FloatingTextType::Damage:
+            ft.color = Color(1.0f, 1.0f, 0.8f, 1.0f); // Light yellow
+            ft.size = 1.0f;
+            ft.velocity = Vec2(0.0f, -50.0f); // Float upward
+            break;
+
+        case FloatingTextType::CriticalHit:
+            ft.color = Color(1.0f, 0.3f, 0.0f, 1.0f); // Orange-red
+            ft.size = 1.5f; // 50% larger
+            ft.velocity = Vec2(0.0f, -80.0f); // Float faster
+            ft.maxLifetime = 2.0f; // Last longer
+            break;
+
+        case FloatingTextType::Healing:
+            ft.color = Color(0.2f, 1.0f, 0.3f, 1.0f); // Bright green
+            ft.size = 1.2f;
+            ft.velocity = Vec2(0.0f, -60.0f);
+            break;
+
+        case FloatingTextType::Miss:
+            ft.color = Color(0.6f, 0.6f, 0.6f, 1.0f); // Gray
+            ft.size = 0.8f; // Smaller
+            ft.velocity = Vec2(0.0f, -30.0f); // Float slower
+            ft.maxLifetime = 1.0f; // Shorter
+            break;
+
+        case FloatingTextType::Blocked:
+            ft.color = Color(0.3f, 0.6f, 1.0f, 1.0f); // Blue
+            ft.size = 1.0f;
+            ft.velocity = Vec2(0.0f, -40.0f);
+            break;
+
+        case FloatingTextType::ResourceGain:
+            ft.color = Color(0.2f, 1.0f, 1.0f, 1.0f); // Cyan
+            ft.size = 1.0f;
+            ft.velocity = Vec2(0.0f, -70.0f);
+            break;
+
+        case FloatingTextType::XPGain:
+            ft.color = Color(0.8f, 0.4f, 1.0f, 1.0f); // Purple
+            ft.size = 1.1f;
+            ft.velocity = Vec2(0.0f, -55.0f);
+            break;
+
+        case FloatingTextType::LevelUp:
+            ft.color = Color(1.0f, 0.9f, 0.2f, 1.0f); // Gold
+            ft.size = 2.0f; // Double size
+            ft.velocity = Vec2(0.0f, -100.0f);
+            ft.maxLifetime = 2.5f; // Last longest
+            break;
+    }
+
+    m_FloatingTexts.push_back(ft);
+}
+
+void VisualFXManager::SpawnDamageText(f64 damage, const Vec2& position, bool isCritical) {
+    char buffer[64];
+    snprintf(buffer, sizeof(buffer), "%.0f", damage);
+
+    if (isCritical) {
+        std::string critText = std::string(buffer) + "!";
+        SpawnFloatingText(critText, position, FloatingTextType::CriticalHit);
+    } else {
+        SpawnFloatingText(buffer, position, FloatingTextType::Damage);
+    }
+}
+
+void VisualFXManager::SpawnHealText(f64 healing, const Vec2& position) {
+    char buffer[64];
+    snprintf(buffer, sizeof(buffer), "+%.0f HP", healing);
+    SpawnFloatingText(buffer, position, FloatingTextType::Healing);
+}
+
+void VisualFXManager::SpawnMissText(const Vec2& position) {
+    SpawnFloatingText("MISS", position, FloatingTextType::Miss);
+}
+
+void VisualFXManager::SpawnBlockedText(const Vec2& position) {
+    SpawnFloatingText("BLOCKED", position, FloatingTextType::Blocked);
+}
+
+void VisualFXManager::SpawnResourceText(f64 amount, const std::string& resourceName, const Vec2& position) {
+    char buffer[128];
+    snprintf(buffer, sizeof(buffer), "+%.0f %s", amount, resourceName.c_str());
+    SpawnFloatingText(buffer, position, FloatingTextType::ResourceGain);
+}
+
+void VisualFXManager::SpawnXPText(i32 xp, const Vec2& position) {
+    char buffer[64];
+    snprintf(buffer, sizeof(buffer), "+%d XP", xp);
+    SpawnFloatingText(buffer, position, FloatingTextType::XPGain);
+}
+
+void VisualFXManager::SpawnLevelUpText(i32 newLevel, const Vec2& position) {
+    char buffer[64];
+    snprintf(buffer, sizeof(buffer), "LEVEL %d!", newLevel);
+    SpawnFloatingText(buffer, position, FloatingTextType::LevelUp);
+}
+
+void VisualFXManager::UpdateFloatingTexts(f64 deltaTime) {
+    for (auto& text : m_FloatingTexts) {
+        text.lifetime += static_cast<f32>(deltaTime);
+
+        // Move text upward
+        text.position.x += text.velocity.x * static_cast<f32>(deltaTime);
+        text.position.y += text.velocity.y * static_cast<f32>(deltaTime);
+
+        // Fade out near end of lifetime
+        f32 alpha = 1.0f;
+        if (text.lifetime > text.maxLifetime * 0.7f) {
+            f32 fadeProgress = (text.lifetime - text.maxLifetime * 0.7f) / (text.maxLifetime * 0.3f);
+            alpha = 1.0f - fadeProgress;
+        }
+        text.color.a = alpha;
+    }
+
+    // Remove expired texts
+    m_FloatingTexts.erase(
+        std::remove_if(m_FloatingTexts.begin(), m_FloatingTexts.end(),
+            [](const FloatingText& text) {
+                return text.lifetime >= text.maxLifetime;
+            }),
+        m_FloatingTexts.end()
+    );
+}
+
+void VisualFXManager::RenderFloatingTexts(Renderer* renderer) {
+    ImDrawList* draw_list = ImGui::GetForegroundDrawList();
+
+    for (const auto& text : m_FloatingTexts) {
+        ImVec2 textPos(text.position.x, text.position.y);
+
+        // Calculate text size
+        f32 fontSize = 20.0f * text.size;
+        ImFont* font = ImGui::GetFont();
+        ImVec2 textSize = font->CalcTextSizeA(fontSize, FLT_MAX, 0.0f, text.text.c_str());
+
+        // Center text horizontally
+        textPos.x -= textSize.x * 0.5f;
+
+        // Draw text with outline for better visibility
+        ImU32 outlineColor = IM_COL32(0, 0, 0, static_cast<int>(text.color.a * 255));
+        ImU32 textColor = IM_COL32(
+            static_cast<int>(text.color.r * 255),
+            static_cast<int>(text.color.g * 255),
+            static_cast<int>(text.color.b * 255),
+            static_cast<int>(text.color.a * 255)
+        );
+
+        // Draw outline (4 directions)
+        for (int dx = -1; dx <= 1; dx++) {
+            for (int dy = -1; dy <= 1; dy++) {
+                if (dx == 0 && dy == 0) continue;
+                ImVec2 outlinePos(textPos.x + dx, textPos.y + dy);
+                draw_list->AddText(font, fontSize, outlinePos, outlineColor, text.text.c_str());
+            }
+        }
+
+        // Draw main text
+        draw_list->AddText(font, fontSize, textPos, textColor, text.text.c_str());
+    }
 }
