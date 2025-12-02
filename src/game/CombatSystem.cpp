@@ -4,6 +4,7 @@
 #include "ImGuiUtils.h"
 #include "Spaceship.h"
 #include "GameState.h"
+#include "EnergyGrid.h"
 #include "imgui.h" // ADDED: Necessary for ImGui integration
 #include <cstdlib>
 #include <cmath>
@@ -15,13 +16,14 @@ CombatSystem::CombatSystem()
       m_PlayerLevel(1), m_PlayerMaxHP(100.0), m_PlayerCurrentHP(100.0),
       m_PlayerAttack(20.0), m_PlayerDefense(10.0), m_PlayerSpeed(15.0),
       m_ShipPowerBonus(0.0), m_ShipCombatBonus(0.0),
+      m_EnergyGrid(nullptr), m_WeaponMultiplier(1.0), m_ShieldMultiplier(1.0), m_EngineMultiplier(1.0),
       m_TurnTimer(0.0), m_TurnDelay(1.5), m_PlayerDefending(false),
       m_AutoBattle(false), m_BattleSpeed(1.0f),
       m_CreditsEarned(0), m_XPEarned(0), m_PartDropped(false),
       m_CombatTime(0.0) {
 }
 
-void CombatSystem::StartCombat(Enemy* enemy, i32 playerLevel, const Spaceship* ship, GameState* state) {
+void CombatSystem::StartCombat(Enemy* enemy, i32 playerLevel, const Spaceship* ship, EnergyGrid* energyGrid, GameState* state) {
     if (!enemy) {
         Log::Error("Cannot start combat: null enemy");
         return;
@@ -29,6 +31,7 @@ void CombatSystem::StartCombat(Enemy* enemy, i32 playerLevel, const Spaceship* s
 
     m_CurrentEnemy = enemy;
     m_PlayerLevel = playerLevel;
+    m_EnergyGrid = energyGrid;
     m_CombatLog.clear();
     m_CombatTime = 0.0;
     m_TurnTimer = 0.0;
@@ -46,6 +49,21 @@ void CombatSystem::StartCombat(Enemy* enemy, i32 playerLevel, const Spaceship* s
         m_ShipCombatBonus = 0.0;
     }
 
+    // Get Energy Grid multipliers (bridges quantum layer to combat)
+    if (m_EnergyGrid) {
+        m_WeaponMultiplier = m_EnergyGrid->GetWeaponMultiplier();
+        m_ShieldMultiplier = m_EnergyGrid->GetShieldMultiplier();
+        m_EngineMultiplier = m_EnergyGrid->GetEngineMultiplier();
+
+        Log::Infof("Energy Grid active - Weapons: ", m_WeaponMultiplier, "x | Shields: ",
+                   m_ShieldMultiplier, "x | Engines: ", m_EngineMultiplier, "x");
+    } else {
+        // No Energy Grid = no bonuses (base 1.0x)
+        m_WeaponMultiplier = 1.0;
+        m_ShieldMultiplier = 1.0;
+        m_EngineMultiplier = 1.0;
+    }
+
     // Get skill tree bonuses
     f64 skillDamageMultiplier = 1.0;
     f64 skillHPMultiplier = 1.0;
@@ -57,11 +75,18 @@ void CombatSystem::StartCombat(Enemy* enemy, i32 playerLevel, const Spaceship* s
     // Base stats scale with level
     f64 levelScale = 1.0 + (playerLevel * 0.1); // 10% per level
 
-    m_PlayerMaxHP = 100.0 * levelScale * (1.0 + m_ShipPowerBonus / 100.0) * skillHPMultiplier;
+    // Apply Shield Multiplier to HP/Defense (more power to shields = more HP)
+    m_PlayerMaxHP = 100.0 * levelScale * (1.0 + m_ShipPowerBonus / 100.0) * skillHPMultiplier * m_ShieldMultiplier;
     m_PlayerCurrentHP = m_PlayerMaxHP;
-    m_PlayerAttack = 20.0 * levelScale * (1.0 + (m_ShipCombatBonus + m_ShipPowerBonus) / 100.0) * skillDamageMultiplier;
-    m_PlayerDefense = 10.0 * levelScale * (1.0 + m_ShipPowerBonus / 100.0);
-    m_PlayerSpeed = 15.0 + playerLevel * 0.3;
+
+    // Apply Weapon Multiplier to Attack (more power to weapons = more damage)
+    m_PlayerAttack = 20.0 * levelScale * (1.0 + (m_ShipCombatBonus + m_ShipPowerBonus) / 100.0) * skillDamageMultiplier * m_WeaponMultiplier;
+
+    // Apply Shield Multiplier to Defense (shields absorb damage)
+    m_PlayerDefense = 10.0 * levelScale * (1.0 + m_ShipPowerBonus / 100.0) * m_ShieldMultiplier;
+
+    // Apply Engine Multiplier to Speed (more power to engines = faster)
+    m_PlayerSpeed = (15.0 + playerLevel * 0.3) * m_EngineMultiplier;
 
     // Determine who goes first based on speed
     if (m_PlayerSpeed >= enemy->GetSpeed()) {
