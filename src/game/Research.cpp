@@ -11,6 +11,7 @@ ResearchNode::ResearchNode()
     , coherenceCost(0.0)
     , entanglementCost(0.0)
     , photonCost(0)
+    , exoticMaterialsCost(0)  // Phase 3.3
     , minPrestigeLevel(0)
     , productionMultiplier(1.0)
     , observationBonus(0.0)
@@ -31,6 +32,7 @@ ResearchNode::ResearchNode(
     f64 _coherenceCost,
     f64 _entanglementCost,
     i32 _photonCost,
+    i32 _exoticMaterialsCost,  // Phase 3.3
     const std::vector<ResearchID>& _prereqs,
     i32 _minPrestige,
     f64 _prodMult,
@@ -45,6 +47,7 @@ ResearchNode::ResearchNode(
   , coherenceCost(_coherenceCost)
   , entanglementCost(_entanglementCost)
   , photonCost(_photonCost)
+  , exoticMaterialsCost(_exoticMaterialsCost)  // Phase 3.3
   , prerequisites(_prereqs)
   , minPrestigeLevel(_minPrestige)
   , productionMultiplier(_prodMult)
@@ -72,7 +75,7 @@ void ResearchTree::Initialize()
         "Quantum Mechanics 101",
         "Basic understanding of quantum physics. +50% production.",
         ResearchCategory::Production,
-        1000.0, 500.0, 0.0, 0,
+        1000.0, 500.0, 0.0, 0, 0,  // Phase 3.3: 0 exotic materials for Tier 1
         {}, 0,
         1.5, 0.0, 0.0, false
     ));
@@ -82,7 +85,7 @@ void ResearchTree::Initialize()
         "Wave Function Theory",
         "Master wave functions. +25% observation bonus.",
         ResearchCategory::Observation,
-        2000.0, 1000.0, 0.0, 0,
+        2000.0, 1000.0, 0.0, 0, 0,  // Phase 3.3: 0 exotic materials for Tier 1
         {}, 0,
         1.0, 0.25, 0.0, false
     ));
@@ -92,7 +95,7 @@ void ResearchTree::Initialize()
         "Coherence Stabilization",
         "Stabilize quantum states. +100% coherence generation.",
         ResearchCategory::Coherence,
-        1500.0, 750.0, 0.0, 0,
+        1500.0, 750.0, 0.0, 0, 0,  // Phase 3.3: 0 exotic materials for Tier 1
         {}, 0,
         1.0, 0.0, 1.0, false
     ));
@@ -102,7 +105,7 @@ void ResearchTree::Initialize()
         "Entanglement Basics",
         "Learn quantum entanglement. +50% entanglement generation.",
         ResearchCategory::Entanglement,
-        2500.0, 1250.0, 500.0, 0,
+        2500.0, 1250.0, 500.0, 0, 0,  // Phase 3.3: 0 exotic materials for Tier 1
         {}, 0,
         1.0, 0.0, 0.0, false
     ));
@@ -113,7 +116,7 @@ void ResearchTree::Initialize()
         "Quantum Computing",
         "Build quantum computers. +100% production, unlocks automation.",
         ResearchCategory::Production,
-        50000.0, 25000.0, 10000.0, 1,
+        50000.0, 25000.0, 10000.0, 1, 0,  // Phase 3.3: 0 exotic materials for Tier 2
         {ResearchID::QuantumMechanics101}, 1,
         2.0, 0.0, 0.0, true
     ));
@@ -123,7 +126,7 @@ void ResearchTree::Initialize()
         "Superposition Mastery",
         "Perfect superposition control. +50% observation bonus.",
         ResearchCategory::Observation,
-        60000.0, 30000.0, 12000.0, 1,
+        60000.0, 30000.0, 12000.0, 1, 0,  // Phase 3.3: 0 exotic materials for Tier 2
         {ResearchID::WaveFunctionTheory}, 1,
         1.0, 0.5, 0.0, false
     ));
@@ -133,7 +136,7 @@ void ResearchTree::Initialize()
         "Particle Physics",
         "Study fundamental particles. +150% production.",
         ResearchCategory::Production,
-        75000.0, 37500.0, 15000.0, 1,
+        75000.0, 37500.0, 15000.0, 1, 0,  // Phase 3.3: 0 exotic materials for Tier 2
         {ResearchID::QuantumMechanics101}, 1,
         2.5, 0.0, 0.0, false
     ));
@@ -143,18 +146,19 @@ void ResearchTree::Initialize()
         "Quantum Tunneling",
         "Master quantum tunneling. +75% observation speed.",
         ResearchCategory::Observation,
-        80000.0, 40000.0, 16000.0, 1,
+        80000.0, 40000.0, 16000.0, 1, 0,  // Phase 3.3: 0 exotic materials for Tier 2
         {ResearchID::WaveFunctionTheory, ResearchID::QuantumMechanics101}, 1,
         1.0, 0.75, 0.0, false
     ));
 
     // Tier 3 - Advanced (Requires Tier 2 + More Prestiges)
+    // Phase 3.3: Tier 3 research requires Exotic Materials!
     m_Nodes.push_back(ResearchNode(
         ResearchID::QuantumFieldTheory,
         "Quantum Field Theory",
-        "Understand quantum fields. +200% production.",
+        "Understand quantum fields. +200% production. [REQUIRES EXOTIC MATERIALS]",
         ResearchCategory::Production,
-        500000.0, 250000.0, 100000.0, 5,
+        500000.0, 250000.0, 100000.0, 5, 2,  // Phase 3.3: Requires 2 Exotic Materials
         {ResearchID::ParticlePhysics, ResearchID::QuantumComputing}, 3,
         3.0, 0.0, 0.0, false
     ));
@@ -162,9 +166,9 @@ void ResearchTree::Initialize()
     m_Nodes.push_back(ResearchNode(
         ResearchID::StringTheory,
         "String Theory",
-        "Vibrating strings create reality. +100% all resources.",
+        "Vibrating strings create reality. +100% all resources. [REQUIRES EXOTIC MATERIALS]",
         ResearchCategory::Special,
-        750000.0, 375000.0, 150000.0, 7,
+        750000.0, 375000.0, 150000.0, 7, 3,  // Phase 3.3: Requires 3 Exotic Materials
         {ResearchID::QuantumFieldTheory}, 5,
         2.0, 1.0, 1.0, false
     ));
@@ -172,9 +176,9 @@ void ResearchTree::Initialize()
     m_Nodes.push_back(ResearchNode(
         ResearchID::QuantumGravity,
         "Quantum Gravity",
-        "Unify quantum and gravity. +250% production.",
+        "Unify quantum and gravity. +250% production. [REQUIRES EXOTIC MATERIALS]",
         ResearchCategory::Production,
-        1000000.0, 500000.0, 200000.0, 10,
+        1000000.0, 500000.0, 200000.0, 10, 4,  // Phase 3.3: Requires 4 Exotic Materials
         {ResearchID::QuantumFieldTheory}, 7,
         3.5, 0.0, 0.0, false
     ));
@@ -182,20 +186,21 @@ void ResearchTree::Initialize()
     m_Nodes.push_back(ResearchNode(
         ResearchID::TimeDialation,
         "Time Dilation",
-        "Manipulate spacetime. +100% offline progress rate.",
+        "Manipulate spacetime. +100% offline progress rate. [REQUIRES EXOTIC MATERIALS]",
         ResearchCategory::Special,
-        900000.0, 450000.0, 180000.0, 8,
+        900000.0, 450000.0, 180000.0, 8, 3,  // Phase 3.3: Requires 3 Exotic Materials
         {ResearchID::StringTheory}, 5,
         1.0, 0.0, 0.0, true
     ));
 
     // Tier 4 - Exotic (Requires Tier 3 + Many Prestiges)
+    // Phase 3.3: Tier 4 research requires even more Exotic Materials!
     m_Nodes.push_back(ResearchNode(
         ResearchID::MultiverseTheory,
         "Multiverse Theory",
-        "Access parallel universes. +500% production.",
+        "Access parallel universes. +500% production. [REQUIRES EXOTIC MATERIALS]",
         ResearchCategory::Production,
-        5000000.0, 2500000.0, 1000000.0, 20,
+        5000000.0, 2500000.0, 1000000.0, 20, 5,  // Phase 3.3: Requires 5 Exotic Materials
         {ResearchID::StringTheory, ResearchID::QuantumGravity}, 10,
         6.0, 0.0, 0.0, false
     ));
@@ -203,9 +208,9 @@ void ResearchTree::Initialize()
     m_Nodes.push_back(ResearchNode(
         ResearchID::QuantumImmortality,
         "Quantum Immortality",
-        "Consciousness spans universes. +200% all bonuses.",
+        "Consciousness spans universes. +200% all bonuses. [REQUIRES EXOTIC MATERIALS]",
         ResearchCategory::Special,
-        10000000.0, 5000000.0, 2000000.0, 50,
+        10000000.0, 5000000.0, 2000000.0, 50, 10,  // Phase 3.3: Requires 10 Exotic Materials
         {ResearchID::MultiverseTheory}, 20,
         3.0, 2.0, 2.0, true
     ));
@@ -213,9 +218,9 @@ void ResearchTree::Initialize()
     m_Nodes.push_back(ResearchNode(
         ResearchID::ZeroPointEnergy,
         "Zero Point Energy",
-        "Tap vacuum energy. +1000% production.",
+        "Tap vacuum energy. +1000% production. [REQUIRES EXOTIC MATERIALS]",
         ResearchCategory::Production,
-        25000000.0, 12500000.0, 5000000.0, 100,
+        25000000.0, 12500000.0, 5000000.0, 100, 15,  // Phase 3.3: Requires 15 Exotic Materials
         {ResearchID::QuantumGravity}, 25,
         11.0, 0.0, 0.0, false
     ));
@@ -223,9 +228,9 @@ void ResearchTree::Initialize()
     m_Nodes.push_back(ResearchNode(
         ResearchID::QuantumSingularity,
         "Quantum Singularity",
-        "Create quantum singularity. +10000% ALL bonuses. THE TRUE ENDING.",
+        "Create quantum singularity. +10000% ALL bonuses. THE TRUE ENDING. [REQUIRES EXOTIC MATERIALS]",
         ResearchCategory::Special,
-        100000000.0, 50000000.0, 20000000.0, 500,
+        100000000.0, 50000000.0, 20000000.0, 500, 20,  // Phase 3.3: Requires 20 Exotic Materials
         {ResearchID::ZeroPointEnergy, ResearchID::QuantumImmortality, ResearchID::MultiverseTheory}, 50,
         101.0, 100.0, 100.0, true
     ));
@@ -236,7 +241,7 @@ void ResearchTree::Initialize()
         "Auto Observer",
         "Automatically observe when superposition is full.",
         ResearchCategory::Automation,
-        100000.0, 50000.0, 20000.0, 3,
+        100000.0, 50000.0, 20000.0, 3, 0,  // Phase 3.3: 0 exotic materials (not Tier 3)
         {ResearchID::QuantumComputing}, 2,
         1.0, 0.0, 0.0, true
     ));
@@ -246,7 +251,7 @@ void ResearchTree::Initialize()
         "Auto Upgrade",
         "Automatically upgrade stations when possible.",
         ResearchCategory::Automation,
-        250000.0, 125000.0, 50000.0, 5,
+        250000.0, 125000.0, 50000.0, 5, 0,  // Phase 3.3: 0 exotic materials (not Tier 3)
         {ResearchID::AutoObserver}, 3,
         1.0, 0.0, 0.0, true
     ));
@@ -256,7 +261,7 @@ void ResearchTree::Initialize()
         "Auto Prestige",
         "Automatically prestige when photon threshold is reached.",
         ResearchCategory::Automation,
-        350000.0, 175000.0, 75000.0, 7,
+        350000.0, 175000.0, 75000.0, 7, 0,  // Phase 3.3: 0 exotic materials (not Tier 3)
         {ResearchID::AutoUpgrade}, 4,
         1.0, 0.0, 0.0, true
     ));
@@ -266,7 +271,7 @@ void ResearchTree::Initialize()
         "Smart Investor",
         "AI optimizes resource investment automatically.",
         ResearchCategory::Automation,
-        500000.0, 250000.0, 100000.0, 10,
+        500000.0, 250000.0, 100000.0, 10, 0,  // Phase 3.3: 0 exotic materials (not Tier 3)
         {ResearchID::AutoPrestige}, 5,
         1.0, 0.0, 0.0, true
     ));
@@ -277,7 +282,7 @@ void ResearchTree::Initialize()
         "Quantum Luck",
         "Bend probability in your favor. +50% event frequency, +25% event bonuses.",
         ResearchCategory::Special,
-        150000.0, 75000.0, 30000.0, 3,
+        150000.0, 75000.0, 30000.0, 3, 0,  // Phase 3.3: 0 exotic materials (Tier 2 prereq)
         {ResearchID::SuperpositionMastery}, 2,
         1.0, 0.0, 0.0, true
     ));
@@ -287,7 +292,7 @@ void ResearchTree::Initialize()
         "Photon Multiplier",
         "Generate more photons on prestige. +50% photon gain.",
         ResearchCategory::Special,
-        200000.0, 100000.0, 40000.0, 5,
+        200000.0, 100000.0, 40000.0, 5, 0,  // Phase 3.3: 0 exotic materials (Tier 2 prereq)
         {ResearchID::QuantumComputing}, 2,
         1.0, 0.0, 0.0, true
     ));
@@ -295,9 +300,9 @@ void ResearchTree::Initialize()
     m_Nodes.push_back(ResearchNode(
         ResearchID::OfflineBoost,
         "Offline Boost",
-        "Better offline progress. Increases offline cap to 8 hours, 75% efficiency.",
+        "Better offline progress. Increases offline cap to 8 hours, 75% efficiency. [REQUIRES EXOTIC MATERIALS]",
         ResearchCategory::Special,
-        300000.0, 150000.0, 60000.0, 7,
+        300000.0, 150000.0, 60000.0, 7, 1,  // Phase 3.3: 1 exotic material (requires Tier 3 TimeDialation)
         {ResearchID::TimeDialation}, 4,
         1.0, 0.0, 0.0, true
     ));

@@ -202,6 +202,7 @@ GameState::GameState()
       m_PlayerCredits(0),
       m_CreditProductionMultiplier(1.0),  // Phase 3.2: No bonus by default
       m_CreditConversionRate(100.0),      // Phase 3.2: 100 credits = 1% production
+      m_ExoticMaterials(0),               // Phase 3.3: Start with 0 exotic materials
       m_PlayerLevel(1),
       m_PlayerXP(0.0),
       m_LastSaveTimestamp(0),
@@ -2043,6 +2044,9 @@ bool GameState::Save(const std::string& filepath) {
     file << "  \"photons\": " << m_Timeline.photons << ",\n";
     file << "  \"resets\": " << m_Timeline.completedResets << ",\n";
 
+    // Phase 3.3: Exotic Materials
+    file << "  \"exoticMaterials\": " << m_ExoticMaterials << ",\n";
+
     // Time
     file << "  \"timePlayed\": " << m_TotalTimePlayed << ",\n";
 
@@ -2222,6 +2226,9 @@ bool GameState::Load(const std::string& filepath) {
                     m_Timeline.photonBonus = 1.0 + (m_Timeline.photons * 0.1);
                 } else if (line.find("\"resets\"") != std::string::npos) {
                     m_Timeline.completedResets = static_cast<i32>(GameUtils::ParseJsonNumber(line, "resets"));
+                } else if (line.find("\"exoticMaterials\"") != std::string::npos) {
+                    // Phase 3.3: Load Exotic Materials
+                    m_ExoticMaterials = static_cast<i32>(GameUtils::ParseJsonNumber(line, "exoticMaterials"));
                 } else if (line.find("\"timePlayed\"") != std::string::npos) {
                     m_TotalTimePlayed = GameUtils::ParseJsonNumber(line, "timePlayed");
                 }
@@ -3088,6 +3095,9 @@ bool GameState::CanAffordResearch(ResearchID id) const {
     // Check photon cost
     if (m_Timeline.photons < node->photonCost * costMultiplier) return false;
 
+    // Phase 3.3: Check exotic materials cost (not affected by discount)
+    if (m_ExoticMaterials < node->exoticMaterialsCost) return false;
+
     // Check if can be researched
     if (!m_ResearchTree->CanResearch(id, m_Timeline.completedResets)) return false;
 
@@ -3108,6 +3118,9 @@ bool GameState::PurchaseResearch(ResearchID id) {
     SpendResource(QuantumResource::Coherence, node->coherenceCost * costMultiplier);
     SpendResource(QuantumResource::Entanglement, node->entanglementCost * costMultiplier);
     m_Timeline.photons -= node->photonCost * costMultiplier;
+
+    // Phase 3.3: Spend exotic materials (not affected by discount)
+    SpendExoticMaterials(node->exoticMaterialsCost);
 
     // Research it
     m_ResearchTree->Research(id);
@@ -4353,6 +4366,12 @@ void GameState::EndCombat() {
         i32 nanoAlloy = (m_PlayerLevel >= 10) ? (1 + m_PlayerLevel / 10) : 0; // 0-11 alloy
         i32 quantumCore = (m_PlayerLevel >= 30) ? (m_PlayerLevel / 30) : 0; // 0-3 cores
 
+        // Phase 3.3: Award Exotic Materials for Tier 3+ enemies (level 41+)
+        if (m_PlayerLevel >= 41) {
+            i32 exoticMaterials = 1 + ((m_PlayerLevel - 41) / 10); // 1 at level 41, 2 at 51, etc.
+            AddExoticMaterials(exoticMaterials);
+        }
+
         m_EnhancementSystem.AddMaterial(MaterialType::TechScraps, techScraps);
         if (nanoAlloy > 0) m_EnhancementSystem.AddMaterial(MaterialType::NanoAlloy, nanoAlloy);
         if (quantumCore > 0) m_EnhancementSystem.AddMaterial(MaterialType::QuantumCore, quantumCore);
@@ -4513,6 +4532,32 @@ void GameState::DeductPlayerCredits(i32 amount) { // <-- FIX IS HERE
         // Ensure Log::Infof is also available
         // Log::Infof("Deducted %d credits. Remaining: %d", amount, m_PlayerCredits);
     }
+}
+
+// Phase 3.3: Exotic Materials Management
+void GameState::AddExoticMaterials(i32 amount) {
+    if (amount > 0) {
+        m_ExoticMaterials += amount;
+        Log::Infof("Gained ", amount, " Exotic Materials! Total: ", m_ExoticMaterials);
+
+        // Spawn floating text for visual feedback
+        if (m_GuiLayer && m_GuiLayer->GetFloatingTextManager()) {
+            ImGuiIO& io = ImGui::GetIO();
+            Vec2 position(io.DisplaySize.x * 0.5f, io.DisplaySize.y * 0.3f);
+            ImVec4 color(1.0f, 0.5f, 1.0f, 1.0f); // Purple/magenta for exotic materials
+            std::string text = "+" + std::to_string(amount) + " Exotic Materials";
+            m_GuiLayer->GetFloatingTextManager()->SpawnText(text, position, color, 2.5f);
+        }
+    }
+}
+
+bool GameState::SpendExoticMaterials(i32 amount) {
+    if (amount <= 0) return true;
+    if (m_ExoticMaterials >= amount) {
+        m_ExoticMaterials -= amount;
+        return true;
+    }
+    return false;
 }
 
 // Phase 3.2: Credit Conversion System Implementation

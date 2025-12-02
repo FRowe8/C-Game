@@ -336,6 +336,11 @@ public:
     f64 GetCreditProductionMultiplier() const { return m_CreditProductionMultiplier; }
     f64 CalculateProductionBonusFromCredits(i32 credits) const;
 
+    // Phase 3.3: Exotic Materials Management
+    i32 GetExoticMaterials() const { return m_ExoticMaterials; }
+    void AddExoticMaterials(i32 amount);
+    bool SpendExoticMaterials(i32 amount);
+
     bool IsGatchaUIVisible() const {
         return m_ShowGatcha;
     }
@@ -411,6 +416,9 @@ private:
     // Phase 3.2: Combat Integration - Credit Conversion
     f64 m_CreditProductionMultiplier; // Production bonus from converted credits (1.0 = no bonus)
     f64 m_CreditConversionRate;       // Credits per 1% production bonus (default: 100 credits = 1%)
+
+    // Phase 3.3: Mid-Game Gatekeeping - Exotic Materials
+    i32 m_ExoticMaterials;            // Special materials required for Tier 3+ research (from Spaceship/Combat)
 
     // Game objects
     std::vector<ResearchStation> m_Stations;

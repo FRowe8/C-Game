@@ -18,6 +18,7 @@ struct ResearchNode {
     f64 coherenceCost;
     f64 entanglementCost;
     i32 photonCost;
+    i32 exoticMaterialsCost;  // Phase 3.3: Required for Tier 3+ research
 
     // Requirements
     std::vector<ResearchID> prerequisites;
@@ -37,7 +38,7 @@ struct ResearchNode {
     ResearchNode();
     ResearchNode(ResearchID _id, const std::string& _name, const std::string& _desc,
                  ResearchCategory _category, f64 _qubitCost, f64 _coherenceCost,
-                 f64 _entanglementCost, i32 _photonCost,
+                 f64 _entanglementCost, i32 _photonCost, i32 _exoticMaterialsCost,
                  const std::vector<ResearchID>& _prereqs, i32 _minPrestige,
                  f64 _prodMult, f64 _obsMult, f64 _cohMult, bool _unlocksFeature);
 };
