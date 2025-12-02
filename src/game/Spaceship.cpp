@@ -1,7 +1,9 @@
 #include "Spaceship.h"
+#include "GameState.h"
+#include "SpecializedSkills.h"
 #include "Renderer.h"
 #include "Logger.h"
-#include "imgui.h" // <--- ADD THIS LINE
+#include "imgui.h"
 #include <cstdlib>
 #include <cmath>
 

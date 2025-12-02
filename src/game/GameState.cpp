@@ -3121,6 +3121,10 @@ void GameState::AddPhotons(f64 amount) {
     }
 }
 
+f64 GameState::GetPhotons() const {
+    return m_Timeline.photons;
+}
+
 void GameState::CheckMilestones() {
     // This is a simplified version - full implementation would be in Milestones.cpp
     // But we need to update progress here since we have access to GameState data

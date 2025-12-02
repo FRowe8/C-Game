@@ -251,6 +251,7 @@ public:
     MilestoneSystem& GetMilestoneSystem() { return m_MilestoneSystem; }
     void CheckMilestones();
     void AddPhotons(f64 amount);
+    f64 GetPhotons() const;
 
     // Buyables System
     BuyableManager& GetBuyableManager() { return m_BuyableManager; }

@@ -280,7 +280,7 @@ bool SkillTreeSystem::CanResetSkills(GameState* state) const {
 bool SkillTreeSystem::ResetSkills(GameState* state) {
     // Check if any skills are learned
     if (m_TotalSpent == 0) {
-        Log::Warn("No skills to reset!");
+        Log::Warning("No skills to reset!");
         return false;
     }
 
@@ -289,7 +289,7 @@ bool SkillTreeSystem::ResetSkills(GameState* state) {
 
     // Check if player can afford
     if (state->GetPhotons() < resetCost) {
-        Log::Warnf("Not enough Photons! Need ", resetCost, " Photons to reset skills.");
+        Log::Warningf("Not enough Photons! Need ", resetCost, " Photons to reset skills.");
         return false;
     }
 
@@ -591,8 +591,8 @@ void SkillTreeSystem::RenderSkillNodes(Renderer* renderer, GameState* state, f32
 }
 
 
-void SkillTreeSystem::RenderSkillInfo(Renderer* renderer, f32 panelX, f32 panelY, f32 panelWidth, f32 panelHeight) {
-    (void)renderer; (void)panelX; (void)panelY; (void)panelWidth; (void)panelHeight;
+void SkillTreeSystem::RenderSkillInfo(Renderer* renderer, GameState* state, f32 panelX, f32 panelY, f32 panelWidth, f32 panelHeight) {
+    (void)renderer; (void)state; (void)panelX; (void)panelY; (void)panelWidth; (void)panelHeight;
 
     // Skill Points Info (Left side)
     ImGui::TextColored(ImVec4(0.0f, 0.8f, 1.0f, 1.0f), "SKILL POINTS:");
@@ -740,6 +740,6 @@ void SkillTreeSystem::SaveToJson(std::ofstream& file) const {
 }
 
 void SkillTreeSystem::LoadFromJson(const std::string& line) {
-    // TODO: Implement JSON parsing
+    (void)line; // Unused parameter - TODO: Implement JSON parsing
     Log::Info("SkillTreeSystem::LoadFromJson called");
 }
