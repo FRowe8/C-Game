@@ -374,9 +374,37 @@ void Spaceship::RenderShipPanel() {
                         installedPart->enhancementLevel, installedPart->repairContribution);
                 }
 
+                // === DRAG SOURCE: Drag installed part to uninstall ===
+                if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_None)) {
+                    // Set payload (slot index)
+                    ImGui::SetDragDropPayload("SHIP_PART_INSTALLED", &slotIndex, sizeof(i32));
+                    // Preview
+                    ImGui::TextColored(rarityColor, "%s", installedPart->name.c_str());
+                    ImGui::Text("(Drag to remove)");
+                    ImGui::EndDragDropSource();
+                }
+
             } else {
                 ImGui::Spacing();
                 ImGui::TextDisabled("EMPTY");
+                ImGui::Spacing();
+                ImGui::TextDisabled("Drag part here");
+            }
+
+            // === DROP TARGET: Drop inventory part to install ===
+            if (ImGui::BeginDragDropTarget()) {
+                // Accept parts from inventory
+                if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("SHIP_PART_INVENTORY")) {
+                    i32 inventoryIndex = *static_cast<const i32*>(payload->Data);
+                    // Check if part matches this slot
+                    if (inventoryIndex >= 0 && inventoryIndex < static_cast<i32>(m_Inventory.size())) {
+                        ShipPart& draggedPart = m_Inventory[inventoryIndex];
+                        if (draggedPart.slot == static_cast<PartSlot>(slotIndex)) {
+                            InstallPart(inventoryIndex);
+                        }
+                    }
+                }
+                ImGui::EndDragDropTarget();
             }
 
             ImGui::EndChild();
@@ -401,6 +429,18 @@ void Spaceship::RenderInventoryPanel() {
     ImGui::TextColored(ImVec4(0.0f, 0.8f, 1.0f, 1.0f), "INVENTORY (%zu parts)", m_Inventory.size());
     ImGui::Separator();
 
+    // === DROP TARGET: Drop installed part here to uninstall ===
+    ImGui::TextDisabled("Drag installed parts here to uninstall");
+    if (ImGui::BeginDragDropTarget()) {
+        if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("SHIP_PART_INSTALLED")) {
+            i32 slotIndex = *static_cast<const i32*>(payload->Data);
+            UninstallPart(static_cast<PartSlot>(slotIndex));
+            Log::Info("Part uninstalled via drag-and-drop");
+        }
+        ImGui::EndDragDropTarget();
+    }
+    ImGui::Separator();
+
     // Use BeginChild for a fixed-size, scrollable inventory area
     ImGui::BeginChild("InventoryScrollRegion", ImVec2(0, 0), false, ImGuiWindowFlags_AlwaysVerticalScrollbar);
 
@@ -414,33 +454,62 @@ void Spaceship::RenderInventoryPanel() {
             // Apply rarity color to the current ImGui element
             Color c = part.GetRarityColor();
             ImVec4 rarityColor(c.r, c.g, c.b, c.a);
+
+            // === Create selectable region for drag-and-drop ===
+            ImGui::PushID(i);
+            bool isSelected = (m_SelectedInventoryIndex == i);
+
+            // Use Selectable to make the whole item clickable/draggable
+            ImGui::PushStyleColor(ImGuiCol_Header, ImVec4(rarityColor.x * 0.3f, rarityColor.y * 0.3f, rarityColor.z * 0.3f, 0.5f));
+            ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(rarityColor.x * 0.5f, rarityColor.y * 0.5f, rarityColor.z * 0.5f, 0.7f));
+            ImGui::PushStyleColor(ImGuiCol_HeaderActive, ImVec4(rarityColor.x * 0.7f, rarityColor.y * 0.7f, rarityColor.z * 0.7f, 0.9f));
+
+            if (ImGui::Selectable("##item", isSelected, ImGuiSelectableFlags_None, ImVec2(0, 60))) {
+                m_SelectedInventoryIndex = i;
+            }
+
+            ImGui::PopStyleColor(3);
+
+            // === DRAG SOURCE: Drag inventory item ===
+            if (!part.installed && ImGui::BeginDragDropSource(ImGuiDragDropFlags_None)) {
+                // Set payload (inventory index)
+                ImGui::SetDragDropPayload("SHIP_PART_INVENTORY", &i, sizeof(i32));
+                // Preview
+                ImGui::TextColored(rarityColor, "%s", part.name.c_str());
+                ImGui::Text("(%s slot)", part.GetSlotName());
+                ImGui::EndDragDropSource();
+            }
+
+            // Draw item content on top of selectable
+            ImGui::SameLine();
+            ImVec2 itemPos = ImGui::GetCursorPos();
+            itemPos.x = ImGui::GetStyle().ItemSpacing.x;
+            ImGui::SetCursorPos(itemPos);
+
+            ImGui::BeginGroup();
+
+            // Item Header
             ImGui::PushStyleColor(ImGuiCol_Text, rarityColor);
-
-            // Item Header and Status
             ImGui::Text("%s - %s", part.name.c_str(), part.GetSlotName());
-            ImGui::PopStyleColor(); // End rarity color for the header
+            ImGui::PopStyleColor();
 
-            // Item Details
-            ImGui::SameLine(ImGui::GetContentRegionAvail().x - 100.0f); // Move status to the right
-
+            // Status and buttons
             if (part.installed) {
+                ImGui::SameLine(ImGui::GetContentRegionAvail().x - 180.0f);
                 ImGui::TextColored(ImVec4(0.2f, 1.0f, 0.2f, 1.0f), "INSTALLED");
-                // Uninstall button
                 ImGui::SameLine();
-                ImGui::PushID(i); // Unique ID for the button
-                if (ImGui::Button("Uninstall", ImVec2(80.0f, 0))) {
+                if (ImGui::SmallButton("Uninstall")) {
                     UninstallPart(part.slot);
                 }
-                ImGui::PopID();
             } else {
+                ImGui::SameLine(ImGui::GetContentRegionAvail().x - 180.0f);
                 ImGui::TextDisabled("Available");
-                // Install button
                 ImGui::SameLine();
-                ImGui::PushID(i); // Unique ID for the button
-                if (ImGui::Button("Install", ImVec2(80.0f, 0))) {
-                    InstallPart(i); // Assuming 'i' is the index in m_Inventory
+                if (ImGui::SmallButton("Install")) {
+                    InstallPart(i);
                 }
-                ImGui::PopID();
+                ImGui::SameLine();
+                ImGui::TextDisabled("[Drag]");
             }
 
             // Stats line
@@ -451,12 +520,15 @@ void Spaceship::RenderInventoryPanel() {
                                part.dropRateBonus * part.GetTotalMultiplier(),
                                part.enhancementLevel);
 
+            ImGui::EndGroup();
+
             // Tooltip for full description
             if (ImGui::IsItemHovered()) {
-                ImGui::SetTooltip("%s\nTier %d | Rarity: %s",
+                ImGui::SetTooltip("%s\nTier %d | Rarity: %s\n\nDrag to ship slot to install",
                     part.description.c_str(), part.tier, part.GetRarityName());
             }
 
+            ImGui::PopID();
             ImGui::Separator(); // Visual separator between parts
         }
     }
