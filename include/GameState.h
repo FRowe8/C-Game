@@ -16,6 +16,7 @@
 #include "EnhancementSystem.h"
 #include "FeatureUnlockManager.h"
 #include "SpecializedSkills.h"
+#include "SoundManager.h"
 #include <vector>
 #include <string>
 #include <functional>
@@ -303,6 +304,9 @@ public:
     // Specialized Skills System
     SpecializedSkillsSystem& GetSpecializedSkills() { return m_SpecializedSkills; }
 
+    // Sound Manager
+    SoundManager& GetSoundManager() { return m_SoundManager; }
+
     // Feature Unlock Manager
     FeatureUnlockManager& GetUnlockManager() { return m_UnlockManager; }
     const FeatureUnlockManager& GetUnlockManager() const { return m_UnlockManager; }
@@ -430,6 +434,9 @@ private:
 
     // Specialized Skills System
     SpecializedSkillsSystem m_SpecializedSkills;
+
+    // Sound Manager
+    SoundManager m_SoundManager;
 
     // Offline progress
     i64 m_LastSaveTimestamp;

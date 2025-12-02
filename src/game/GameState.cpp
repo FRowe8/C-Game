@@ -113,6 +113,9 @@ void ResearchStation::Observe(GameState* state) {
         f64 critMultiplier = 2.0 + (static_cast<f64>(rand() % 4)); // 2, 3, 4, or 5x
         collapsedValue *= critMultiplier;
         Log::Infof("CRITICAL OBSERVATION! ", critMultiplier, "x reward!");
+        state->GetSoundManager().PlaySound(SoundEffect::ObserveCritical);
+    } else {
+        state->GetSoundManager().PlaySound(SoundEffect::ObserveSuccess);
     }
 
     state->AddResource(resourceType, collapsedValue);
@@ -332,6 +335,12 @@ void GameState::Initialize() {
     // Initialize specialized skills system
     m_SpecializedSkills.Initialize();
 
+    // Initialize sound manager
+    m_SoundManager.Initialize();
+    if (m_SoundManager.IsAudioAvailable()) {
+        m_SoundManager.PlayMusic(MusicTrack::MainTheme, true);
+    }
+
     // Initialize feature unlock manager
     m_UnlockManager.Initialize();
     m_UnlockManager.CheckUnlocks(m_PlayerLevel);
@@ -461,6 +470,7 @@ void GameState::InitializeUI() {
                 m_Stations[i].Upgrade();
                 UpdateResearchBonuses(); // Recalculate production
                 m_SpecializedSkills.AddExperience(SkillCategory::Engineering, SkillXP::UPGRADE_STATION);
+                m_SoundManager.PlaySound(SoundEffect::UpgradeComplete);
                 Log::Infof("Upgraded ", m_Stations[i].name, " to level ", m_Stations[i].level);
             }
         };
@@ -3115,6 +3125,9 @@ bool GameState::PurchaseResearch(ResearchID id) {
     // Award Engineering skill XP
     m_SpecializedSkills.AddExperience(SkillCategory::Engineering, SkillXP::PURCHASE_RESEARCH);
 
+    // Play research complete sound
+    m_SoundManager.PlaySound(SoundEffect::ResearchComplete);
+
     Log::Info("Researched: " + node->name);
 
     return true;
@@ -4325,6 +4338,9 @@ void GameState::EndCombat() {
         // Award Command skill XP for combat victory
         m_SpecializedSkills.AddExperience(SkillCategory::Command, SkillXP::WIN_COMBAT);
 
+        // Play victory sound
+        m_SoundManager.PlaySound(SoundEffect::Victory);
+
         // Award enhancement materials based on enemy level
         i32 techScraps = 2 + (m_PlayerLevel / 5); // 2-22 scraps
         i32 nanoAlloy = (m_PlayerLevel >= 10) ? (1 + m_PlayerLevel / 10) : 0; // 0-11 alloy
@@ -4348,7 +4364,23 @@ void GameState::EndCombat() {
             
             ShipPart droppedPart = ShipPartGenerator::GeneratePart(rarity);
             m_Spaceship.AddPart(droppedPart);
-            
+
+            // Play loot sound based on rarity
+            switch (rarity) {
+                case PartRarity::Legendary:
+                    m_SoundManager.PlaySound(SoundEffect::LootLegendary);
+                    break;
+                case PartRarity::Epic:
+                    m_SoundManager.PlaySound(SoundEffect::LootEpic);
+                    break;
+                case PartRarity::Rare:
+                    m_SoundManager.PlaySound(SoundEffect::LootRare);
+                    break;
+                default:
+                    m_SoundManager.PlaySound(SoundEffect::LootDrop);
+                    break;
+            }
+
             Log::Infof("Combat reward: ", droppedPart.GetRarityName(), " ", droppedPart.name);
         }
     }
@@ -4375,6 +4407,9 @@ void GameState::AddXP(f64 amount) {
         m_PlayerLevel++;
 
         Log::Infof("LEVEL UP! You are now level ", m_PlayerLevel);
+
+        // Play level up sound
+        m_SoundManager.PlaySound(SoundEffect::LevelUp);
 
         // Check for unlocked features
         m_UnlockManager.OnLevelUp(m_PlayerLevel);
