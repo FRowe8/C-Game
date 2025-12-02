@@ -200,6 +200,8 @@ GameState::GameState()
     : m_CurrentEvent(nullptr), m_TimeSinceLastEvent(0), m_EventCooldown(120.0),
       m_QuantumEssence(0),
       m_PlayerCredits(0),
+      m_CreditProductionMultiplier(1.0),  // Phase 3.2: No bonus by default
+      m_CreditConversionRate(100.0),      // Phase 3.2: 100 credits = 1% production
       m_PlayerLevel(1),
       m_PlayerXP(0.0),
       m_LastSaveTimestamp(0),
@@ -427,6 +429,21 @@ void GameState::InitializeStations() {
     station5.unlocked = false;
     station5.unlockCost = 15000.0; // Increased from 1000
     m_Stations.push_back(station5);
+
+    // Phase 3.2: Station 6: Matter Converter (Combat Integration)
+    // Special station that converts Combat Credits into production bonuses
+    ResearchStation station6;
+    station6.name = "Matter Converter";
+    station6.description = "Converts combat spoils into quantum energy";
+    station6.resourceType = QuantumResource::Qubits;  // Produces qubits from credits
+    station6.baseProduction = 0.0;  // No automatic production
+    station6.level = 0;
+    station6.upgradeCost = 5000.0;
+    station6.upgradeCostMultiplier = 2.2;
+    station6.superpositionProbability = 1.0;  // Always succeeds
+    station6.unlocked = false;
+    station6.unlockCost = 7500.0;  // Unlocks at Tier 2
+    m_Stations.push_back(station6);
 }
 
 void GameState::InitializeUI() {
@@ -612,6 +629,9 @@ void GameState::UpdateStations(f64 deltaTime) {
 
     // Apply skill tree production bonus
     globalMultiplier *= m_SkillTree.GetProductionMultiplier();
+
+    // Phase 3.2: Apply credit conversion production bonus
+    globalMultiplier *= m_CreditProductionMultiplier;
 
     // Check if Auto-Observer research is unlocked
     bool hasAutoObserver = m_ResearchTree->IsResearched(ResearchID::AutoObserver);
@@ -4493,6 +4513,34 @@ void GameState::DeductPlayerCredits(i32 amount) { // <-- FIX IS HERE
         // Ensure Log::Infof is also available
         // Log::Infof("Deducted %d credits. Remaining: %d", amount, m_PlayerCredits);
     }
+}
+
+// Phase 3.2: Credit Conversion System Implementation
+void GameState::ConvertCreditsToProduction(i32 credits) {
+    if (credits <= 0 || m_PlayerCredits < credits) {
+        return; // Not enough credits
+    }
+
+    // Calculate bonus (100 credits = 1% = 0.01 multiplier)
+    f64 bonusGained = static_cast<f64>(credits) / m_CreditConversionRate * 0.01;
+
+    // Deduct credits
+    DeductPlayerCredits(credits);
+
+    // Add to production multiplier (permanent bonus)
+    m_CreditProductionMultiplier += bonusGained;
+
+    Log::Infof("Converted ", credits, " credits to +",
+               static_cast<i32>(bonusGained * 100.0), "% production! Total: +",
+               static_cast<i32>((m_CreditProductionMultiplier - 1.0) * 100.0), "%");
+
+    // Spawn particle effect
+    SpawnParticleBurst(Vec2(640.0f, 360.0f), Color::EntanglementOrange(), 20);
+}
+
+f64 GameState::CalculateProductionBonusFromCredits(i32 credits) const {
+    // Returns the % bonus that would be gained from converting X credits
+    return (static_cast<f64>(credits) / m_CreditConversionRate * 0.01) * 100.0;
 }
 
 // Implement the setter for Gatcha UI visibility

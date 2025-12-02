@@ -331,6 +331,11 @@ public:
 
     void DeductPlayerCredits(i32 amount);
 
+    // Phase 3.2: Credit Conversion System
+    void ConvertCreditsToProduction(i32 credits);
+    f64 GetCreditProductionMultiplier() const { return m_CreditProductionMultiplier; }
+    f64 CalculateProductionBonusFromCredits(i32 credits) const;
+
     bool IsGatchaUIVisible() const {
         return m_ShowGatcha;
     }
@@ -402,6 +407,10 @@ private:
     f64 m_Resources[3]; // Qubits, Coherence, Entanglement
 
     i32 m_PlayerCredits; // Currency for Gatcha/Summon system (or similar)
+
+    // Phase 3.2: Combat Integration - Credit Conversion
+    f64 m_CreditProductionMultiplier; // Production bonus from converted credits (1.0 = no bonus)
+    f64 m_CreditConversionRate;       // Credits per 1% production bonus (default: 100 credits = 1%)
 
     // Game objects
     std::vector<ResearchStation> m_Stations;
