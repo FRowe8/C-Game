@@ -33,6 +33,20 @@ namespace UI {
     class NavigationView;
     class StationView;
     class ResourceView;
+    class AchievementView;
+    class StatisticsView;
+    class ResearchView;
+    class MilestoneView;
+    class BuyablesView;
+    class ChallengeView;
+    class EssenceShopView;
+    class SingularityShopView;
+    class SpaceshipView;
+    class CombatView;
+    class GatchaView;
+    class SkillTreeView;
+    class EnhancementView;
+    class SpecializedSkillsView;
 }
 
 // Research station that generates resources

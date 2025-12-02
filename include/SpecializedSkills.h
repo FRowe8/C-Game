@@ -3,6 +3,8 @@
 #include "Types.h"
 #include <string>
 #include <fstream>
+#include <cmath>
+
 
 /**
  * SpecializedSkills - Activity-based skill progression system

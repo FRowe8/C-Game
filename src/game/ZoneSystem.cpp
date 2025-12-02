@@ -351,7 +351,8 @@ void ZoneSystem::StartZoneStage(ZoneID zoneID, i32 stageIndex, GameState* state)
 
     // Generate enemy for this stage and start combat
     Enemy enemy = zone->GenerateEnemyForStage(stageIndex);
-    state->GetCombatSystem().StartCombat(&enemy, state->GetPlayerLevel(), &state->GetSpaceship(), state);
+    // FIX: Added nullptr for EnergyGrid* (4th arg) and passed state as 5th arg
+    state->GetCombatSystem().StartCombat(&enemy, state->GetPlayerLevel(), &state->GetSpaceship(), nullptr, state);
 }
 
 void ZoneSystem::CompleteCurrentStage() {

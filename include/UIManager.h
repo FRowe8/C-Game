@@ -25,10 +25,14 @@ private:
     void RenderStationsPanel();
     void RenderOverlays(Renderer* renderer); // Handles popups and notifications
 
+    void RenderResearchTree();
+    void RenderBuyables();
+
     // --- Notification Overlays ---
     void RenderActiveEvent() const;
     void RenderAchievementNotifications() const;
     void RenderMilestoneNotifications() const;
+
 
     // --- Helpers ---
     void DrawResourceCounter(const char* label, double value, const ImVec4& color) const;
