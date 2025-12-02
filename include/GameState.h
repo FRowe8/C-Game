@@ -173,22 +173,6 @@ struct QuantumTimeline {
     QuantumTimeline();
 };
 
-// UI Button
-struct UIButton {
-    Rect bounds;
-    std::string text;
-    Color color;
-    Color hoverColor;
-    std::function<void()> onClick;
-    bool enabled = true;
-    bool hovered = false;
-    f64 affordability = 1.0; // 0.0-1.0: How close to affording (for visual feedback)
-
-    void Update(const Vec2& mousePos);
-    void Render(Renderer* renderer);
-    bool WasClicked(const Vec2& mousePos, bool mousePressed);
-};
-
 // Modal Window Management - ensures only one modal is active at a time
 enum class ActiveModal {
     None,           // Stations view (base state)
@@ -444,7 +428,6 @@ private:
     i64 m_LastSaveTimestamp;
 
     // UI
-    std::vector<UIButton> m_StationButtons; // Persistent buttons (unlock, observe, upgrade per station + prestige)
     Vec2 m_ScrollOffset;
 
     // Modal Window Management System
