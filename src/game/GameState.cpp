@@ -126,6 +126,9 @@ void ResearchStation::Observe(GameState* state) {
     // Add combo point for observation
     state->AddComboPoint();
 
+    // Award Observation skill XP
+    state->GetSpecializedSkills().AddExperience(SkillCategory::Observation, SkillXP::OBSERVE_STATION);
+
     // Ship part drop chance! (20% base chance + bonus from ship's drop rate bonus)
     f64 partDropChance = 0.20; // 20% base chance
     f64 shipDropBonus = state->GetSpaceship().GetTotalDropRateBonus() / 100.0; // Convert % to decimal
@@ -304,7 +307,7 @@ void GameState::Initialize() {
     Log::Info("Singularity shop initialized");
 
     // Initialize Spaceship System
-    m_Spaceship.Initialize();
+    m_Spaceship.Initialize(this);
     Log::Info("Spaceship system initialized");
 
     // Try to load save file
@@ -325,6 +328,9 @@ void GameState::Initialize() {
 
     // Initialize enhancement system
     m_EnhancementSystem.Initialize();
+
+    // Initialize specialized skills system
+    m_SpecializedSkills.Initialize();
 
     // Initialize feature unlock manager
     m_UnlockManager.Initialize();
@@ -454,6 +460,7 @@ void GameState::InitializeUI() {
             if (SpendResource(QuantumResource::Qubits, effectiveCost)) {
                 m_Stations[i].Upgrade();
                 UpdateResearchBonuses(); // Recalculate production
+                m_SpecializedSkills.AddExperience(SkillCategory::Engineering, SkillXP::UPGRADE_STATION);
                 Log::Infof("Upgraded ", m_Stations[i].name, " to level ", m_Stations[i].level);
             }
         };
@@ -483,6 +490,7 @@ void GameState::InitializeUI() {
                 if (currentQubits >= effectiveCost) {
                     if (SpendResource(QuantumResource::Qubits, effectiveCost)) {
                         station.Upgrade();
+                        m_SpecializedSkills.AddExperience(SkillCategory::Engineering, SkillXP::UPGRADE_STATION);
                         currentQubits = GetResource(QuantumResource::Qubits);
                         upgradesBought++;
                     } else {
@@ -718,6 +726,7 @@ void GameState::UpdateStations(f64 deltaTime) {
             if (currentQubits >= safeThreshold) {
                 if (SpendResource(QuantumResource::Qubits, effectiveCost)) {
                     station.Upgrade();
+                    m_SpecializedSkills.AddExperience(SkillCategory::Engineering, SkillXP::UPGRADE_STATION);
                     currentQubits = GetResource(QuantumResource::Qubits); // Update current amount
                 }
             }
@@ -2077,7 +2086,10 @@ bool GameState::Save(const std::string& filepath) {
         if (i < researchedNodes.size() - 1) file << ",";
         file << "\n";
     }
-    file << "  ]\n";
+    file << "  ],\n";
+
+    // Specialized Skills
+    m_SpecializedSkills.SaveToJson(file);
 
     file << "}\n";
 
@@ -2098,6 +2110,7 @@ bool GameState::Load(const std::string& filepath) {
         bool inStatistics = false;
         bool inAchievements = false;
         bool inResearch = false;
+        bool inSpecializedSkills = false;
 
         while (std::getline(file, line)) {
             // Track sections
@@ -2105,22 +2118,32 @@ bool GameState::Load(const std::string& filepath) {
                 inStatistics = true;
                 inAchievements = false;
                 inResearch = false;
+                inSpecializedSkills = false;
                 continue;
             } else if (line.find("\"achievements\"") != std::string::npos) {
                 inStatistics = false;
                 inAchievements = true;
                 inResearch = false;
+                inSpecializedSkills = false;
                 continue;
             } else if (line.find("\"research\"") != std::string::npos) {
                 inStatistics = false;
                 inAchievements = false;
                 inResearch = true;
+                inSpecializedSkills = false;
+                continue;
+            } else if (line.find("\"specializedSkills\"") != std::string::npos) {
+                inStatistics = false;
+                inAchievements = false;
+                inResearch = false;
+                inSpecializedSkills = true;
                 continue;
             } else if (line.find("}") != std::string::npos || line.find("]") != std::string::npos) {
                 if (line.find("},") == std::string::npos) {
                     inStatistics = false;
                     inAchievements = false;
                     inResearch = false;
+                    inSpecializedSkills = false;
                 }
             }
 
@@ -2163,6 +2186,9 @@ bool GameState::Load(const std::string& filepath) {
                         // Ignore parse errors
                     }
                 }
+            } else if (inSpecializedSkills) {
+                // Parse specialized skills (delegate to LoadFromJson)
+                m_SpecializedSkills.LoadFromJson(line);
             } else {
                 // Parse main game state
                 if (line.find("\"saveTimestamp\"") != std::string::npos) {
@@ -3085,6 +3111,9 @@ bool GameState::PurchaseResearch(ResearchID id) {
 
     // Spawn celebration particles
     SpawnParticleBurst(Vec2(640.0f, 360.0f), Color::QuantumPurple(), 20);
+
+    // Award Engineering skill XP
+    m_SpecializedSkills.AddExperience(SkillCategory::Engineering, SkillXP::PURCHASE_RESEARCH);
 
     Log::Info("Researched: " + node->name);
 
@@ -4292,6 +4321,9 @@ void GameState::EndCombat() {
         
         // Award XP
         AddXP(static_cast<f64>(m_CombatSystem.GetXPEarned()));
+
+        // Award Command skill XP for combat victory
+        m_SpecializedSkills.AddExperience(SkillCategory::Command, SkillXP::WIN_COMBAT);
 
         // Award enhancement materials based on enemy level
         i32 techScraps = 2 + (m_PlayerLevel / 5); // 2-22 scraps

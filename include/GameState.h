@@ -15,6 +15,7 @@
 #include "SkillTree.h"
 #include "EnhancementSystem.h"
 #include "FeatureUnlockManager.h"
+#include "SpecializedSkills.h"
 #include <vector>
 #include <string>
 #include <functional>
@@ -299,6 +300,9 @@ public:
     // Enhancement System
     EnhancementSystem& GetEnhancementSystem() { return m_EnhancementSystem; }
 
+    // Specialized Skills System
+    SpecializedSkillsSystem& GetSpecializedSkills() { return m_SpecializedSkills; }
+
     // Feature Unlock Manager
     FeatureUnlockManager& GetUnlockManager() { return m_UnlockManager; }
     const FeatureUnlockManager& GetUnlockManager() const { return m_UnlockManager; }
@@ -423,6 +427,9 @@ private:
 
     // Feature Unlock Manager
     FeatureUnlockManager m_UnlockManager;
+
+    // Specialized Skills System
+    SpecializedSkillsSystem m_SpecializedSkills;
 
     // Offline progress
     i64 m_LastSaveTimestamp;

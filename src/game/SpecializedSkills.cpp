@@ -116,11 +116,11 @@ void SpecializedSkillsSystem::LevelUpSkill(SkillCategory category) {
 }
 
 void SpecializedSkillsSystem::SaveToJson(std::ofstream& file) const {
-    file << "\"specializedSkills\":{\n";
-    file << "  \"observation\":{\"level\":" << m_Skills[0].level << ",\"xp\":" << m_Skills[0].experience << "},\n";
-    file << "  \"engineering\":{\"level\":" << m_Skills[1].level << ",\"xp\":" << m_Skills[1].experience << "},\n";
-    file << "  \"command\":{\"level\":" << m_Skills[2].level << ",\"xp\":" << m_Skills[2].experience << "}\n";
-    file << "},\n";
+    file << "  \"specializedSkills\":{\n";
+    file << "    \"observation\":{\"level\":" << m_Skills[0].level << ",\"xp\":" << m_Skills[0].experience << "},\n";
+    file << "    \"engineering\":{\"level\":" << m_Skills[1].level << ",\"xp\":" << m_Skills[1].experience << "},\n";
+    file << "    \"command\":{\"level\":" << m_Skills[2].level << ",\"xp\":" << m_Skills[2].experience << "}\n";
+    file << "  }\n";
 }
 
 void SpecializedSkillsSystem::LoadFromJson(const std::string& line) {

@@ -145,7 +145,8 @@ Spaceship::Spaceship()
     : m_RepairProgress(0.0), m_TotalPowerBonus(0.0),
       m_TotalCombatBonus(0.0), m_TotalDropRateBonus(0.0),
       m_TotalPartsCollected(0), m_LegendaryPartsCollected(0),
-      m_SelectedInventoryIndex(-1), m_ScrollOffset(0.0f) {
+      m_SelectedInventoryIndex(-1), m_ScrollOffset(0.0f),
+      m_GameState(nullptr) {
 
     // Initialize installed parts to nullptr
     for (i32 i = 0; i < static_cast<i32>(PartSlot::COUNT); i++) {
@@ -153,7 +154,8 @@ Spaceship::Spaceship()
     }
 }
 
-void Spaceship::Initialize() {
+void Spaceship::Initialize(GameState* gameState) {
+    m_GameState = gameState;
     Log::Info("Initializing spaceship system...");
 
     // Give player a starter common part for each slot
@@ -198,6 +200,11 @@ bool Spaceship::InstallPart(i32 inventoryIndex) {
 
     RecalculateBonuses();
     RecalculateRepairProgress();
+
+    // Award Command skill XP for part installation
+    if (m_GameState) {
+        m_GameState->GetSpecializedSkills().AddExperience(SkillCategory::Command, SkillXP::INSTALL_PART);
+    }
 
     Log::Infof("Installed ", part.name, " in ", part.GetSlotName(), " slot");
     return true;
