@@ -49,54 +49,75 @@ void GuiLayer::Render(GameState* state, Renderer* renderer) {
     m_ResourceView->Render(state, renderer);
     m_NavigationView->Render(state, renderer);
 
-    // Render main content view based on active modal
+    // Phase 1.2: State machine - render based on active modal
     ActiveModal activeModal = state->GetActiveModal();
 
-    if (activeModal == ActiveModal::None) {
-        // Show stations view (default/base state)
-        m_StationView->Render(state, renderer);
-    }
+    switch (activeModal) {
+        case ActiveModal::None:
+            // Show stations view (default/base state)
+            m_StationView->Render(state, renderer);
+            break;
 
-    // Render modal views based on flags (legacy support)
-    // TODO: Phase 1.2 will replace these with proper state machine
-    if (state->m_ShowAchievements) {
-        m_AchievementView->Render(state, renderer);
-    }
-    if (state->m_ShowStats) {
-        m_StatisticsView->Render(state, renderer);
-    }
-    if (state->m_ShowResearch) {
-        m_ResearchView->Render(state, renderer);
-    }
-    if (state->m_ShowMilestones) {
-        m_MilestoneView->Render(state, renderer);
-    }
-    if (state->m_ShowBuyables) {
-        m_BuyablesView->Render(state, renderer);
-    }
-    if (state->m_ShowChallenges) {
-        m_ChallengeView->Render(state, renderer);
-    }
-    if (state->m_ShowEssenceShop) {
-        m_EssenceShopView->Render(state, renderer);
-    }
-    if (state->m_ShowSingularityShop) {
-        m_SingularityShopView->Render(state, renderer);
-    }
-    if (state->m_ShowSpaceship) {
-        m_SpaceshipView->Render(state, renderer);
-    }
-    if (state->m_ShowCombat) {
-        m_CombatView->Render(state, renderer);
-    }
-    if (state->m_ShowGatcha) {
-        m_GatchaView->Render(state, renderer);
-    }
-    if (state->m_ShowSkills) {
-        m_SkillTreeView->Render(state, renderer);
-    }
-    if (state->m_ShowEnhancement) {
-        m_EnhancementView->Render(state, renderer);
+        case ActiveModal::Achievements:
+            m_AchievementView->Render(state, renderer);
+            break;
+
+        case ActiveModal::Statistics:
+            m_StatisticsView->Render(state, renderer);
+            break;
+
+        case ActiveModal::Research:
+            m_ResearchView->Render(state, renderer);
+            break;
+
+        case ActiveModal::Milestones:
+            m_MilestoneView->Render(state, renderer);
+            break;
+
+        case ActiveModal::Buyables:
+            m_BuyablesView->Render(state, renderer);
+            break;
+
+        case ActiveModal::Challenges:
+            m_ChallengeView->Render(state, renderer);
+            break;
+
+        case ActiveModal::EssenceShop:
+            m_EssenceShopView->Render(state, renderer);
+            break;
+
+        case ActiveModal::SingularityShop:
+            m_SingularityShopView->Render(state, renderer);
+            break;
+
+        case ActiveModal::Spaceship:
+            m_SpaceshipView->Render(state, renderer);
+            break;
+
+        case ActiveModal::Combat:
+            m_CombatView->Render(state, renderer);
+            break;
+
+        case ActiveModal::Gatcha:
+            m_GatchaView->Render(state, renderer);
+            break;
+
+        case ActiveModal::Skills:
+            m_SkillTreeView->Render(state, renderer);
+            break;
+
+        case ActiveModal::Enhancement:
+            m_EnhancementView->Render(state, renderer);
+            break;
+
+        case ActiveModal::SpecializedSkills:
+            m_SpecializedSkillsView->Render(state, renderer);
+            break;
+
+        case ActiveModal::MoreMenu:
+            // MoreMenu is handled in NavigationView, no separate view needed
+            m_StationView->Render(state, renderer);
+            break;
     }
 
     // Render always-visible overlays
@@ -343,22 +364,25 @@ void NavigationView::Render(GameState* state, Renderer* renderer) {
         f32 currentX = 15.0f;
         f32 btnY = (navHeight - btnHeight) * 0.5f;
 
+        // Phase 1.2: Button structure uses ActiveModal enum for state machine
         struct NavButton {
             const char* label;
-            bool* showFlag;
+            ActiveModal modal;
             Color color;
         };
 
         NavButton navButtons[] = {
-            {"BUYABLES", &state->m_ShowBuyables, Color::ElectricBlue()},
-            {"CHALLENGES", &state->m_ShowChallenges, Color::Red()},
-            {"ESSENCE", &state->m_ShowEssenceShop, Color::Magenta()},
-            {"RESEARCH", &state->m_ShowResearch, Color::QuantumPurple()},
-            {"STATS", &state->m_ShowStats, Color::EntanglementOrange()},
-            {"MILESTONES", &state->m_ShowMilestones, Color::NeonPink()},
+            {"BUYABLES", ActiveModal::Buyables, Color::ElectricBlue()},
+            {"CHALLENGES", ActiveModal::Challenges, Color::Red()},
+            {"ESSENCE", ActiveModal::EssenceShop, Color::Magenta()},
+            {"RESEARCH", ActiveModal::Research, Color::QuantumPurple()},
+            {"STATS", ActiveModal::Statistics, Color::EntanglementOrange()},
+            {"MILESTONES", ActiveModal::Milestones, Color::NeonPink()},
         };
 
         ImGui::SetCursorPos(ImVec2(currentX, btnY));
+
+        ActiveModal currentModal = state->GetActiveModal();
 
         for (int i = 0; i < 6; i++) {
             auto& btn = navButtons[i];
@@ -367,7 +391,7 @@ void NavigationView::Render(GameState* state, Renderer* renderer) {
                 break;
             }
 
-            bool active = *btn.showFlag;
+            bool active = (currentModal == btn.modal);
             Color btnColor = active ? btn.color : btn.color * 0.5f;
 
             ImGui::PushStyleColor(ImGuiCol_Button, ToImVec4(btnColor * 0.25f));
@@ -378,7 +402,12 @@ void NavigationView::Render(GameState* state, Renderer* renderer) {
             ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.0f);
 
             if (ImGui::Button(btn.label, ImVec2(btnWidth, btnHeight))) {
-                *btn.showFlag = !active;
+                // Phase 1.2: Use state machine - toggle between modal and None
+                if (active) {
+                    state->SetActiveModal(ActiveModal::None);
+                } else {
+                    state->SetActiveModal(btn.modal);
+                }
             }
 
             // Draw custom border/glow
@@ -444,25 +473,28 @@ void NavigationView::Render(GameState* state, Renderer* renderer) {
             f32 itemWidth = menuWidth - 20.0f;
             f32 itemHeight = 60.0f;
 
+            // Phase 1.2: Use ActiveModal enum for state machine
             struct MoreButton {
                 const char* label;
-                bool* showFlag;
+                ActiveModal modal;
                 Color color;
             };
 
             MoreButton moreButtons[] = {
-                {"ACHIEVEMENTS", &state->m_ShowAchievements, Color::ElectricBlue()},
-                {"SINGULARITY", &state->m_ShowSingularityShop, Color(0.5f, 0.0f, 1.0f, 1.0f)},
-                {"SPACESHIP", &state->m_ShowSpaceship, Color(1.0f, 0.7f, 0.0f, 1.0f)},
-                {"BATTLE", &state->m_ShowCombat, Color(1.0f, 0.3f, 0.3f, 1.0f)},
-                {"SUMMON", &state->m_ShowGatcha, Color(1.0f, 0.3f, 1.0f, 1.0f)},
-                {"SKILLS", &state->m_ShowSkills, Color(0.0f, 1.0f, 0.5f, 1.0f)},
-                {"ENHANCE", &state->m_ShowEnhancement, Color(0.8f, 0.6f, 0.2f, 1.0f)},
+                {"ACHIEVEMENTS", ActiveModal::Achievements, Color::ElectricBlue()},
+                {"SINGULARITY", ActiveModal::SingularityShop, Color(0.5f, 0.0f, 1.0f, 1.0f)},
+                {"SPACESHIP", ActiveModal::Spaceship, Color(1.0f, 0.7f, 0.0f, 1.0f)},
+                {"BATTLE", ActiveModal::Combat, Color(1.0f, 0.3f, 0.3f, 1.0f)},
+                {"SUMMON", ActiveModal::Gatcha, Color(1.0f, 0.3f, 1.0f, 1.0f)},
+                {"SKILLS", ActiveModal::Skills, Color(0.0f, 1.0f, 0.5f, 1.0f)},
+                {"ENHANCE", ActiveModal::Enhancement, Color(0.8f, 0.6f, 0.2f, 1.0f)},
             };
+
+            ActiveModal currentModal = state->GetActiveModal();
 
             for (size_t i = 0; i < 7; i++) {
                 auto& btn = moreButtons[i];
-                bool active = *btn.showFlag;
+                bool active = (currentModal == btn.modal);
                 Color btnColor = active ? btn.color : Color(0.3f, 0.3f, 0.3f, 1.0f);
 
                 ImGui::PushStyleColor(ImGuiCol_Button, ToImVec4(btnColor * 0.3f));
@@ -473,7 +505,12 @@ void NavigationView::Render(GameState* state, Renderer* renderer) {
                 ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 1.0f);
 
                 if (ImGui::Button(btn.label, ImVec2(itemWidth, itemHeight))) {
-                    *btn.showFlag = !active;
+                    // Phase 1.2: Use state machine - toggle between modal and None
+                    if (active) {
+                        state->SetActiveModal(ActiveModal::None);
+                    } else {
+                        state->SetActiveModal(btn.modal);
+                    }
                     state->m_ShowMoreMenu = false;
                 }
 
