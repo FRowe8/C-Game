@@ -301,36 +301,51 @@ void ResourceView::Render(GameState* state, Renderer* renderer) {
 
         auto fmt = state->m_NumberFormat;
 
-        // Qubits
+        // Qubits (Phase 2.3: with tooltip)
         ImGui::TextColored(ToImVec4(Color::QuantumBlue()), "QUBITS");
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("Primary currency - Used to upgrade stations and unlock new features");
+        }
         ImGui::SameLine();
         ImGui::Text("%s", GameUtils::FormatNumber(qubits, fmt).c_str());
 
         ImGui::SameLine(0.0f, 30.0f);
 
-        // Coherence
+        // Coherence (Phase 2.3: with tooltip)
         ImGui::TextColored(ToImVec4(Color::CoherenceGreen()), "COHERENCE");
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("Quantum stability - Affects observation success rate\nLow coherence reduces rewards from observations");
+        }
         ImGui::SameLine();
         ImGui::Text("%s", GameUtils::FormatNumber(coherence, fmt).c_str());
 
         ImGui::SameLine(0.0f, 30.0f);
 
-        // Entanglement
+        // Entanglement (Phase 2.3: with tooltip)
         ImGui::TextColored(ToImVec4(Color::EntanglementOrange()), "ENTANGLEMENT");
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("Quantum connections - Used for research and advanced upgrades");
+        }
         ImGui::SameLine();
         ImGui::Text("%s", GameUtils::FormatNumber(entanglement, fmt).c_str());
 
         ImGui::SameLine(0.0f, 30.0f);
 
-        // Photons (prestige currency)
+        // Photons (prestige currency) (Phase 2.3: with tooltip)
         ImGui::TextColored(ToImVec4(Color::Magenta()), "PHOTONS");
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("Prestige currency - Earned by performing prestige\nProvides permanent production bonuses (+10%% per photon)");
+        }
         ImGui::SameLine();
         ImGui::Text("%s", GameUtils::FormatNumber(photons, fmt).c_str());
 
-        // Singularities (if any)
+        // Singularities (if any) (Phase 2.3: with tooltip)
         if (singularities > 0) {
             ImGui::SameLine(0.0f, 30.0f);
             ImGui::TextColored(ToImVec4(Color(0.5f, 0.0f, 1.0f, 1.0f)), "SINGULARITIES");
+            if (ImGui::IsItemHovered()) {
+                ImGui::SetTooltip("Ultimate currency - Earned from singularity collapse\nUnlocks powerful permanent upgrades");
+            }
             ImGui::SameLine();
             ImGui::Text("%s", GameUtils::FormatNumber(singularities, fmt).c_str());
         }
@@ -772,6 +787,18 @@ void StationView::RenderUnlockedStation(GameState* state, ResearchStation& stati
                              Color::EntanglementOrange();
         state->SpawnParticleBurst(particlePos, particleColor, 10);
     }
+
+    // Phase 2.3: Add tooltip explaining observation mechanics
+    if (ImGui::IsItemHovered()) {
+        i32 successChance = static_cast<i32>(station.superpositionProbability * 100.0);
+        ImGui::SetTooltip(
+            "Collapse the wave function to collect resources\n"
+            "Success chance: %d%%\n"
+            "Full reward on success, partial (50-100%%) on failure",
+            successChance
+        );
+    }
+
     ImGui::PopStyleColor(2);
 
     // UPGRADE Button - Orange
