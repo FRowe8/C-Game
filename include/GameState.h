@@ -27,6 +27,14 @@ class Input;
 class ResearchTree;
 class UIManager; // Forward declare
 
+// Forward declarations for GuiLayer
+namespace UI {
+    class GuiLayer;
+    class NavigationView;
+    class StationView;
+    class ResourceView;
+}
+
 // Research station that generates resources
 struct ResearchStation {
     std::string name;
@@ -318,9 +326,26 @@ public:
     void SetActiveModal(ActiveModal modal);
     ActiveModal GetActiveModal() const { return m_ActiveModal; }
 
-    // NEW: Friend the manager so it can access private members
+    // NEW: Friend the manager and GuiLayer so they can access private members
     friend class UIManager;
-
+    friend class UI::GuiLayer;
+    friend class UI::NavigationView;
+    friend class UI::StationView;
+    friend class UI::ResourceView;
+    friend class UI::AchievementView;
+    friend class UI::StatisticsView;
+    friend class UI::ResearchView;
+    friend class UI::MilestoneView;
+    friend class UI::BuyablesView;
+    friend class UI::ChallengeView;
+    friend class UI::EssenceShopView;
+    friend class UI::SingularityShopView;
+    friend class UI::SpaceshipView;
+    friend class UI::CombatView;
+    friend class UI::GatchaView;
+    friend class UI::SkillTreeView;
+    friend class UI::EnhancementView;
+    friend class UI::SpecializedSkillsView;
 
 private:
     void InitializeStations();
@@ -519,10 +544,10 @@ private:
     Color GetStationTierColor(i32 level) const;
     void SpawnResourceParticles(const Vec2& start, const Vec2& end, const Color& color, i32 count);
 
-    std::unique_ptr<UIManager> m_UIManager; // Add this
-
-
+    std::unique_ptr<UIManager> m_UIManager;
+    std::unique_ptr<UI::GuiLayer> m_GuiLayer; // Phase 1.1: Decoupled UI layer
 };
+
 
 
 
