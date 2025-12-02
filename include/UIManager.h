@@ -10,7 +10,7 @@ public:
     UIManager(GameState* gameState);
     ~UIManager() = default;
 
-    void Initialize();
+    static void Initialize();
     void Render(Renderer* renderer);
 
 private:
@@ -26,11 +26,11 @@ private:
     void RenderOverlays(Renderer* renderer); // Handles popups and notifications
 
     // --- Notification Overlays ---
-    void RenderActiveEvent(Renderer* renderer);
-    void RenderAchievementNotifications(Renderer* renderer);
-    void RenderMilestoneNotifications(Renderer* renderer);
+    void RenderActiveEvent() const;
+    void RenderAchievementNotifications() const;
+    void RenderMilestoneNotifications() const;
 
     // --- Helpers ---
-    void DrawResourceCounter(const char* label, double value, const ImVec4& color);
-    bool DrawNavButton(const char* label, bool isActive, const ImVec4& activeColor, float width, float height);
+    void DrawResourceCounter(const char* label, double value, const ImVec4& color) const;
+    static bool DrawNavButton(const char* label, bool isActive, const ImVec4& activeColor, float width, float height);
 };

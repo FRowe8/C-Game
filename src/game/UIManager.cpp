@@ -2,6 +2,14 @@
 #include "ImGuiUtils.h"
 #include "imgui.h"
 #include "GameUtils.h"
+#include "GameState.h"
+#include "Research.h"
+#include "CombatSystem.h"
+#include "Spaceship.h"
+#include "GatchaSystem.h"
+#include "Challenges.h"
+#include "SkillTree.h"
+#include "EnhancementSystem.h"
 #include <string>
 
 // NOTE: This implementation assumes the UIManager.h DrawNavButton signature
@@ -115,7 +123,7 @@ void UIManager::RenderBottomNavigation() {
         float btnHeight = UITheme::BottomBarHeight - 20.0f; // Padding
 
         // Calculate dynamic button width, accounting for spacing
-        float btnWidth = (width - (UITheme::ItemSpacing * (btnCount - 1))) / btnCount;
+        float btnWidth = (width - (UITheme::ItemSpacing * static_cast<float>(btnCount - 1))) / static_cast<float>(btnCount);
 
         ImGui::SetCursorPosY(10.0f); // Padding top
 
@@ -186,18 +194,18 @@ void UIManager::RenderMainContent() {
 
                 case ActiveModal::Research:
                     // Research Tree (full screen in content area)
-                    m_GameState->m_ResearchTree->RenderResearchTree(nullptr, m_GameState);
+                    m_GameState->GetResearchTree().RenderResearchTree(nullptr, m_GameState);
                     break;
 
                 case ActiveModal::Buyables:
                     // Upgrades/Buyables (full screen in content area)
-                    m_GameState->m_BuyableManager.RenderBuyables(nullptr, m_GameState);
+                    m_GameState->GetBuyableManager().RenderBuyables(nullptr, m_GameState);
                     break;
 
                 case ActiveModal::Combat:
                     // Combat view (full screen in content area)
-                    if (m_GameState->m_CombatSystem.IsInCombat()) {
-                        m_GameState->m_CombatSystem.RenderCombat(nullptr, m_GameState);
+                    if (m_GameState->GetCombatSystem().IsInCombat()) {
+                        m_GameState->GetCombatSystem().RenderCombatUI(nullptr);
                     } else {
                         ImGui::TextColored(ImVec4(1, 1, 0, 1), "No active combat");
                         ImGui::Text("Click COMBAT button to start a random encounter");
@@ -206,19 +214,19 @@ void UIManager::RenderMainContent() {
 
                 case ActiveModal::Spaceship:
                     // Ship panel (full screen in content area)
-                    m_GameState->m_Ship.RenderShipPanel();
+                    m_GameState->GetSpaceship().RenderShipPanel();
                     ImGui::Separator();
-                    m_GameState->m_Ship.RenderInventoryPanel();
+                    m_GameState->GetSpaceship().RenderInventoryPanel();
                     break;
 
                 case ActiveModal::Skills:
                     // Skill Tree (full screen in content area)
-                    m_GameState->m_SkillTree.RenderSkillTree(nullptr, m_GameState);
+                    m_GameState->GetSkillTree().RenderSkillTree(nullptr, m_GameState);
                     break;
 
                 case ActiveModal::Gatcha:
                     // Gatcha system (full screen in content area)
-                    m_GameState->m_GatchaSystem.RenderGatcha(nullptr, m_GameState);
+                    m_GameState->GetGatchaSystem().RenderGatchaUI(nullptr);
                     break;
 
                 case ActiveModal::Achievements:
@@ -238,7 +246,7 @@ void UIManager::RenderMainContent() {
 
                 case ActiveModal::Challenges:
                     // Challenges (full screen in content area)
-                    m_GameState->m_ChallengeManager.RenderChallenges(nullptr, m_GameState);
+                    m_GameState->GetChallengeManager().RenderChallenges(nullptr);
                     break;
 
                 case ActiveModal::EssenceShop:
@@ -253,7 +261,7 @@ void UIManager::RenderMainContent() {
 
                 case ActiveModal::Enhancement:
                     // Enhancement system (full screen in content area)
-                    m_GameState->m_EnhancementSystem.RenderEnhancementUI(nullptr, m_GameState);
+                    m_GameState->GetEnhancementSystem().RenderEnhancementUI(nullptr, m_GameState);
                     break;
 
                 case ActiveModal::SpecializedSkills:
@@ -262,10 +270,6 @@ void UIManager::RenderMainContent() {
                     break;
 
                 case ActiveModal::MoreMenu:
-                    // More menu is handled as a popup, show stations as fallback
-                    m_GameState->RenderStationsContent();
-                    break;
-
                 default:
                     // Fallback: show stations
                     m_GameState->RenderStationsContent();
@@ -343,17 +347,17 @@ void UIManager::RenderOverlays(Renderer* renderer) {
     }
 
     // Render active event (if any) - this can stay as an overlay
-    RenderActiveEvent(renderer);
+    RenderActiveEvent();
 
     // Render notifications (always on top)
-    RenderAchievementNotifications(renderer);
-    RenderMilestoneNotifications(renderer);
-    m_GameState->m_UnlockManager.RenderNotifications(renderer);
+    RenderAchievementNotifications();
+    RenderMilestoneNotifications();
+    m_GameState->GetUnlockManager().RenderNotifications(renderer);
 }
 
 // --- Helpers ---
 
-void UIManager::DrawResourceCounter(const char* label, double value, const ImVec4& color) {
+void UIManager::DrawResourceCounter(const char* label, double value, const ImVec4& color) const {
     ImGui::PushStyleColor(ImGuiCol_Text, UITheme::ColorTextDim);
     ImGui::Text("%s", label);
     ImGui::PopStyleColor();
@@ -388,14 +392,14 @@ bool UIManager::DrawNavButton(const char* label, bool isActive, const ImVec4& ac
 }
 // --- Notification Overlays ---
 
-void UIManager::RenderActiveEvent(Renderer* renderer) {
-    m_GameState->RenderActiveEvent(renderer);
+void UIManager::RenderActiveEvent() const {
+    m_GameState->RenderActiveEvent(nullptr);
 }
 
-void UIManager::RenderAchievementNotifications(Renderer* renderer) {
-    m_GameState->RenderAchievementNotifications(renderer);
+void UIManager::RenderAchievementNotifications() const {
+    m_GameState->RenderAchievementNotifications(nullptr);
 }
 
-void UIManager::RenderMilestoneNotifications(Renderer* renderer) {
-    m_GameState->RenderMilestoneNotifications(renderer);
+void UIManager::RenderMilestoneNotifications() const {
+    m_GameState->RenderMilestoneNotifications(nullptr);
 }
