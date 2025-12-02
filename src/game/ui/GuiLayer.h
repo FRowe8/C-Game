@@ -248,6 +248,12 @@ public:
 class TutorialOverlay;
 
 /**
+ * Floating Text Manager
+ * Manages floating text animations for resource gains
+ */
+class FloatingTextManager;
+
+/**
  * GuiLayer
  *
  * Central UI orchestration layer that owns all views and delegates rendering.
@@ -286,6 +292,11 @@ public:
      */
     TutorialOverlay* GetTutorialOverlay() { return m_TutorialOverlay.get(); }
 
+    /**
+     * Get floating text manager (for spawning feedback text)
+     */
+    FloatingTextManager* GetFloatingTextManager() { return m_FloatingTextManager.get(); }
+
 private:
     // Core Views (always visible)
     std::unique_ptr<ResourceView> m_ResourceView;
@@ -310,6 +321,9 @@ private:
 
     // Tutorial System (overlays everything when active)
     std::unique_ptr<TutorialOverlay> m_TutorialOverlay;
+
+    // Floating Text System (visual feedback for resource gains)
+    std::unique_ptr<FloatingTextManager> m_FloatingTextManager;
 
     /**
      * Render achievement and milestone notifications (always check)

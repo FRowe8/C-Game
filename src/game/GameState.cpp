@@ -17,6 +17,7 @@
 #include "UIManager.h"
 #include "GuiLayer.h" // Phase 1.1: Decoupled UI layer
 #include "TutorialOverlay.h" // Phase 2.1: Tutorial system
+#include "FloatingTextManager.h" // Phase 2.2: Visual feedback
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
@@ -1758,7 +1759,7 @@ void GameState::RenderUI(Renderer* renderer) {
     }
 }
 
-void GameState::AddResource(QuantumResource type, f64 amount) {
+void GameState::AddResource(QuantumResource type, f64 amount, bool showFloatingText) {
     m_Resources[static_cast<int>(type)] += amount;
 
     // Track statistics
@@ -1776,6 +1777,16 @@ void GameState::AddResource(QuantumResource type, f64 amount) {
         case QuantumResource::Entanglement:
             m_Statistics.totalEntanglementEarned += amount;
             break;
+    }
+
+    // Spawn floating text for visual feedback
+    if (showFloatingText && m_GuiLayer && m_GuiLayer->GetFloatingTextManager()) {
+        // Get screen center as default position
+        ImGuiIO& io = ImGui::GetIO();
+        Vec2 position(io.DisplaySize.x * 0.5f, io.DisplaySize.y * 0.4f);
+
+        // Spawn the text
+        m_GuiLayer->GetFloatingTextManager()->SpawnResourceText(type, amount, position);
     }
 }
 

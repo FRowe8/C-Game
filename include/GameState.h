@@ -226,7 +226,7 @@ public:
     void Render(Renderer* renderer);
 
     // Resource management
-    void AddResource(QuantumResource type, f64 amount);
+    void AddResource(QuantumResource type, f64 amount, bool showFloatingText = true);
     bool SpendResource(QuantumResource type, f64 amount);
     f64 GetResource(QuantumResource type) const;
 

@@ -1,5 +1,6 @@
 #include "GuiLayer.h"
 #include "TutorialOverlay.h"
+#include "FloatingTextManager.h"
 #include "GameState.h"
 #include "Renderer.h"
 #include "ImGuiUtils.h"
@@ -45,6 +46,9 @@ void GuiLayer::Initialize() {
     // Tutorial System
     m_TutorialOverlay = std::make_unique<TutorialOverlay>();
 
+    // Floating Text System
+    m_FloatingTextManager = std::make_unique<FloatingTextManager>();
+
     Log::Info("GuiLayer initialized successfully");
 }
 
@@ -52,6 +56,11 @@ void GuiLayer::Update(GameState* state) {
     // Update tutorial system
     if (m_TutorialOverlay) {
         m_TutorialOverlay->Update(state);
+    }
+
+    // Update floating text
+    if (m_FloatingTextManager) {
+        m_FloatingTextManager->Update(ImGui::GetIO().DeltaTime);
     }
 }
 
@@ -134,6 +143,11 @@ void GuiLayer::Render(GameState* state, Renderer* renderer) {
     // Render always-visible overlays
     RenderActiveEvent(state, renderer);
     RenderNotifications(state, renderer);
+
+    // Render floating text (before tutorial so tutorial can overlay)
+    if (m_FloatingTextManager) {
+        m_FloatingTextManager->Render(renderer);
+    }
 
     // Render tutorial overlay (should be last so it's on top of everything)
     if (m_TutorialOverlay) {
@@ -739,13 +753,24 @@ void StationView::RenderUnlockedStation(GameState* state, ResearchStation& stati
 
     ImGui::ProgressBar(progress, ImVec2(-1, 0), barOverlay);
 
-    // OBSERVE Button - Purple
+    // OBSERVE Button - Purple (Phase 2.2: with particle burst)
     Color observeColor = Color::QuantumPurple();
     ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(observeColor.r * 0.7f, observeColor.g * 0.7f, observeColor.b * 0.7f, 0.7f));
     ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(observeColor.r, observeColor.g, observeColor.b, 1.0f));
-    if (ImGui::Button(("OBSERVE##ObserveBtn" + std::to_string(index)).c_str(), ImVec2(ImGui::GetContentRegionAvail().x * 0.30f, 40.0f))) {
+
+    ImVec2 buttonPos = ImGui::GetCursorScreenPos();
+    ImVec2 buttonSize = ImVec2(ImGui::GetContentRegionAvail().x * 0.30f, 40.0f);
+
+    if (ImGui::Button(("OBSERVE##ObserveBtn" + std::to_string(index)).c_str(), buttonSize)) {
         station.Observe(state);
         Log::Infof("Observed ", station.name);
+
+        // Phase 2.2: Spawn particle burst at button center
+        Vec2 particlePos(buttonPos.x + buttonSize.x * 0.5f, buttonPos.y + buttonSize.y * 0.5f);
+        Color particleColor = (station.resourceType == QuantumResource::Qubits) ? Color::QuantumBlue() :
+                             (station.resourceType == QuantumResource::Coherence) ? Color::CoherenceGreen() :
+                             Color::EntanglementOrange();
+        state->SpawnParticleBurst(particlePos, particleColor, 10);
     }
     ImGui::PopStyleColor(2);
 
@@ -761,7 +786,10 @@ void StationView::RenderUnlockedStation(GameState* state, ResearchStation& stati
 
     std::string upgradeText = "Upgrade (" + GameUtils::FormatNumber(effectiveUpgradeCost, state->m_NumberFormat) + ")";
 
-    if (ImGui::Button((upgradeText + "##UpgradeBtn" + std::to_string(index)).c_str(), ImVec2(ImGui::GetContentRegionAvail().x * 0.45f, 40.0f)) && canAffordUpgrade) {
+    ImVec2 upgradeBtnPos = ImGui::GetCursorScreenPos();
+    ImVec2 upgradeBtnSize = ImVec2(ImGui::GetContentRegionAvail().x * 0.45f, 40.0f);
+
+    if (ImGui::Button((upgradeText + "##UpgradeBtn" + std::to_string(index)).c_str(), upgradeBtnSize) && canAffordUpgrade) {
         f64 effectiveCost = station.upgradeCost;
         if (state->GetChallengeManager().HasModifier(ChallengeModifier::ExpensiveUpgrades)) {
             effectiveCost *= 3.0;
@@ -772,6 +800,10 @@ void StationView::RenderUnlockedStation(GameState* state, ResearchStation& stati
             state->GetSpecializedSkills().AddExperience(SkillCategory::Engineering, SkillXP::UPGRADE_STATION);
             state->GetSoundManager().PlaySound(SoundEffect::UpgradeComplete);
             Log::Infof("Upgraded ", station.name, " to level ", station.level);
+
+            // Phase 2.2: Spawn particle burst at button center
+            Vec2 particlePos(upgradeBtnPos.x + upgradeBtnSize.x * 0.5f, upgradeBtnPos.y + upgradeBtnSize.y * 0.5f);
+            state->SpawnParticleBurst(particlePos, Color::EntanglementOrange(), 15);
         }
     }
     ImGui::PopStyleColor(2);
