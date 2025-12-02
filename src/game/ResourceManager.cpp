@@ -130,6 +130,20 @@ void ResourceManager::AddSingularities(f64 amount) {
     }
 }
 
+// NEW: Added these implementations here to resolve the header error
+void ResourceManager::IncrementResets() {
+    if (m_Timeline) {
+        m_Timeline->completedResets++;
+    }
+}
+
+// NEW: Added these implementations here to resolve the header error
+void ResourceManager::IncrementCollapses() {
+    if (m_Timeline) {
+        m_Timeline->completedCollapses++;
+    }
+}
+
 // === Player Credits ===
 
 bool ResourceManager::SpendCredits(i32 amount) {

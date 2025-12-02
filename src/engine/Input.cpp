@@ -8,9 +8,6 @@ Input::Input() {
     m_MouseDelta = Vec2(0, 0);
 }
 
-Input::~Input() {
-}
-
 void Input::ProcessEvent(const SDL_Event& event) {
     switch (event.type) {
         case SDL_KEYDOWN:
@@ -71,14 +68,12 @@ void Input::ProcessEvent(const SDL_Event& event) {
                 touch.delta = Vec2(0, 0);
                 m_Touches.push_back(touch);
             } else if (event.type == SDL_FINGERUP) {
-                m_Touches.erase(
-                    std::remove_if(m_Touches.begin(), m_Touches.end(),
-                        [&](const Touch& t) { return t.id == touch.id; }),
-                    m_Touches.end()
-                );
+                std::erase_if(m_Touches, [&](const Touch& t) { return t.id == touch.id; });
             }
             break;
         }
+        default:
+            break;
     }
 }
 

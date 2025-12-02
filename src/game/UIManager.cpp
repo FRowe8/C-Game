@@ -4,25 +4,17 @@
 #include "GameUtils.h"
 #include <string>
 
-// NOTE: This implementation assumes the UIManager.h DrawNavButton signature
-// has been updated to include width and height parameters.
-
 UIManager::UIManager(GameState* state) : m_GameState(state) {}
 
 void UIManager::Initialize() {
-    // Check if the UITheme header is included in the project's include path
     UITheme::SetupStyle();
 }
 
 void UIManager::Render(Renderer* renderer) {
-    // 1. Setup Main Layout Window (Invisible container covering the entire viewport)
     ImGuiViewport* viewport = ImGui::GetMainViewport();
     ImGui::SetNextWindowPos(viewport->Pos);
     ImGui::SetNextWindowSize(viewport->Size);
 
-    // ImGui::SetNextWindowViewport(viewport->ID); <-- REMOVED (Docking feature)
-
-    // Removed ImGuiWindowFlags_NoDocking
     ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoTitleBar |
                                     ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize |
                                     ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoBringToFrontOnFocus |
@@ -30,9 +22,8 @@ void UIManager::Render(Renderer* renderer) {
 
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
     if (ImGui::Begin("MainLayout", nullptr, window_flags)) {
-        ImGui::PopStyleVar(); // Pop for MainLayout
+        ImGui::PopStyleVar();
 
-        // 2. Render Components
         RenderTopBar();
         RenderMainContent();
         RenderBottomNavigation();
@@ -40,7 +31,7 @@ void UIManager::Render(Renderer* renderer) {
 
         ImGui::End();
     } else {
-        ImGui::PopStyleVar(); // Pop if Begin fails
+        ImGui::PopStyleVar();
     }
 }
 
@@ -52,36 +43,23 @@ void UIManager::RenderTopBar() {
     ImGui::PushStyleColor(ImGuiCol_WindowBg, UITheme::ColorPanelBg);
     ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
 
-    // Removed ImGuiWindowFlags_NoDocking
     if (ImGui::Begin("TopBar", nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove)) {
-
-        // Draw Bottom Border Glow
         auto* drawList = ImGui::GetWindowDrawList();
         ImVec2 p0 = ImGui::GetWindowPos();
         p0.y += UITheme::TopBarHeight - 2.0f;
         ImVec2 p1 = ImVec2(p0.x + viewport->Size.x, p0.y + 2.0f);
         drawList->AddRectFilled(p0, p1, ImGui::GetColorU32(UITheme::ColorAccent));
 
-        // Resources Columns
         ImGui::Columns(5, "ResCols", false);
 
-        // 1. Qubits
         DrawResourceCounter("Qubits", m_GameState->GetResource(QuantumResource::Qubits), ToImVec4(Color::QuantumBlue()));
         ImGui::NextColumn();
-
-        // 2. Coherence (Use actual values)
         DrawResourceCounter("Coherence", m_GameState->m_Coherence, ToImVec4(Color::CoherenceGreen()));
         ImGui::NextColumn();
-
-        // 3. Entanglement
         DrawResourceCounter("Entanglement", m_GameState->GetResource(QuantumResource::Entanglement), ToImVec4(Color::EntanglementOrange()));
         ImGui::NextColumn();
-
-        // 4. Photons
         DrawResourceCounter("Photons", m_GameState->GetTimeline().photons, UITheme::ColorPrimary);
         ImGui::NextColumn();
-
-        // 5. Singularities
         DrawResourceCounter("Singularities", m_GameState->GetTimeline().singularities, UITheme::ColorAccent);
         ImGui::NextColumn();
 
@@ -100,7 +78,6 @@ void UIManager::RenderBottomNavigation() {
     ImGui::PushStyleColor(ImGuiCol_WindowBg, UITheme::ColorPanelBg);
     ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
 
-    // Removed ImGuiWindowFlags_NoDocking
     if (ImGui::Begin("BottomNav", nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove)) {
 
         // Draw Top Border Glow
@@ -111,37 +88,34 @@ void UIManager::RenderBottomNavigation() {
 
         // Navigation Buttons
         float width = ImGui::GetContentRegionAvail().x;
-        int btnCount = 5; // Stations, Research, Upgrades, Combat, Menu
-        float btnHeight = UITheme::BottomBarHeight - 20.0f; // Padding
+        int btnCount = 5;
+        float btnHeight = UITheme::BottomBarHeight - 20.0f;
 
-        // Calculate dynamic button width, accounting for spacing
         float btnWidth = (width - (UITheme::ItemSpacing * (btnCount - 1))) / btnCount;
 
-        ImGui::SetCursorPosY(10.0f); // Padding top
+        // === CRITICAL FIX IS HERE ===
+        ImGui::SetCursorPosY(10.0f);        // Move cursor down
+        ImGui::Dummy(ImVec2(0.0f, 0.0f));   // <--- THIS LINE PREVENTS THE CRASH
+        // ============================
 
-        // 1. Stations (Home)
         bool isBaseState = (m_GameState->GetActiveModal() == ActiveModal::None);
         if (DrawNavButton("STATIONS", isBaseState, UITheme::ColorAccent, btnWidth, btnHeight)) {
-            // Close all overlays - return to base state
             m_GameState->SetActiveModal(ActiveModal::None);
         }
         ImGui::SameLine(0.0f, UITheme::ItemSpacing);
 
-        // 2. Research
         bool showingResearch = (m_GameState->GetActiveModal() == ActiveModal::Research);
         if (DrawNavButton("RESEARCH", showingResearch, UITheme::ColorPrimary, btnWidth, btnHeight)) {
             m_GameState->SetActiveModal(showingResearch ? ActiveModal::None : ActiveModal::Research);
         }
         ImGui::SameLine(0.0f, UITheme::ItemSpacing);
 
-        // 3. Upgrades (Buyables)
         bool showingBuyables = (m_GameState->GetActiveModal() == ActiveModal::Buyables);
         if (DrawNavButton("UPGRADES", showingBuyables, UITheme::ColorSuccess, btnWidth, btnHeight)) {
             m_GameState->SetActiveModal(showingBuyables ? ActiveModal::None : ActiveModal::Buyables);
         }
         ImGui::SameLine(0.0f, UITheme::ItemSpacing);
 
-        // 4. Combat/Map
         bool showingCombat = (m_GameState->GetActiveModal() == ActiveModal::Combat);
         if (DrawNavButton("COMBAT", showingCombat, UITheme::ColorDanger, btnWidth, btnHeight)) {
             if(!showingCombat) m_GameState->StartRandomCombat();
@@ -149,7 +123,6 @@ void UIManager::RenderBottomNavigation() {
         }
         ImGui::SameLine(0.0f, UITheme::ItemSpacing);
 
-        // 5. Menu (More)
         bool showingMenu = (m_GameState->GetActiveModal() == ActiveModal::MoreMenu);
         if (DrawNavButton("MENU", showingMenu, UITheme::ColorText, btnWidth, btnHeight)) {
             m_GameState->SetActiveModal(showingMenu ? ActiveModal::None : ActiveModal::MoreMenu);
@@ -169,12 +142,10 @@ void UIManager::RenderMainContent() {
     ImGui::SetNextWindowPos(ImVec2(viewport->Pos.x, topY));
     ImGui::SetNextWindowSize(ImVec2(viewport->Size.x, height));
 
-    // Transparent background for content area to see game particles
     ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0,0,0,0));
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(20, 20));
 
     if (ImGui::Begin("MainContent", nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove)) {
-        // Render the actual station content inside this scrollable panel
         if (ImGui::BeginChild("ScrollContent", ImVec2(0, 0), false, ImGuiWindowFlags_AlwaysVerticalScrollbar)) {
             m_GameState->RenderStationsContent();
             ImGui::EndChild();
@@ -186,16 +157,11 @@ void UIManager::RenderMainContent() {
 }
 
 void UIManager::RenderOverlays(Renderer* renderer) {
-    // Render popups on top of everything
-    // All modal/overlay windows are now handled here instead of in GameState::Render()
-
-    // Handle "More" menu as a proper modal or popup
     if (m_GameState->m_ShowMoreMenu) {
         ImGui::OpenPopup("MoreMenuPopup");
     }
 
     if (ImGui::BeginPopup("MoreMenuPopup")) {
-        // Render button items from GameState logic
         if (ImGui::MenuItem("Achievements")) { m_GameState->SetActiveModal(ActiveModal::Achievements); }
         if (ImGui::MenuItem("Statistics")) { m_GameState->SetActiveModal(ActiveModal::Statistics); }
         if (ImGui::MenuItem("Milestones")) { m_GameState->SetActiveModal(ActiveModal::Milestones); }
@@ -211,7 +177,6 @@ void UIManager::RenderOverlays(Renderer* renderer) {
         ImGui::EndPopup();
     }
 
-    // Render all overlay/modal windows
     RenderActiveEvent(renderer);
     RenderAchievements(renderer);
     RenderStatistics(renderer);
@@ -226,12 +191,10 @@ void UIManager::RenderOverlays(Renderer* renderer) {
     RenderGatcha(renderer);
     RenderSkillTree(renderer);
 
-    // Render enhancement UI if showing
     if (m_GameState->m_ShowEnhancement) {
         m_GameState->m_EnhancementSystem.RenderEnhancementUI(renderer, m_GameState);
     }
 
-    // Render notifications
     RenderAchievementNotifications(renderer);
     RenderMilestoneNotifications(renderer);
     m_GameState->m_UnlockManager.RenderNotifications(renderer);
@@ -259,77 +222,29 @@ bool UIManager::DrawNavButton(const char* label, bool isActive, const ImVec4& ac
 
     ImGui::PopStyleColor();
 
-    // Active Indicator Line (Draw glow/line at the bottom of the button)
     if (isActive) {
         ImVec2 p_min = ImGui::GetItemRectMin();
         ImVec2 p_max = ImGui::GetItemRectMax();
-
         ImVec2 line_p0 = ImVec2(p_min.x, p_max.y - 2.0f);
         ImVec2 line_p1 = ImVec2(p_max.x, p_max.y);
-
         ImGui::GetWindowDrawList()->AddRectFilled(line_p0, line_p1, ImGui::GetColorU32(activeColor));
     }
-    
+
     return clicked;
 }
-// --- Overlay/Modal Windows (Delegates to GameState for now) ---
 
-void UIManager::RenderActiveEvent(Renderer* renderer) {
-    m_GameState->RenderActiveEvent(renderer);
-}
-
-void UIManager::RenderAchievements(Renderer* renderer) {
-    m_GameState->RenderAchievements(renderer);
-}
-
-void UIManager::RenderStatistics(Renderer* renderer) {
-    m_GameState->RenderStatistics(renderer);
-}
-
-void UIManager::RenderResearchTree(Renderer* renderer) {
-    m_GameState->RenderResearchTree(renderer);
-}
-
-void UIManager::RenderMilestones(Renderer* renderer) {
-    m_GameState->RenderMilestones(renderer);
-}
-
-void UIManager::RenderBuyables(Renderer* renderer) {
-    m_GameState->RenderBuyables(renderer);
-}
-
-void UIManager::RenderChallenges(Renderer* renderer) {
-    m_GameState->RenderChallenges(renderer);
-}
-
-void UIManager::RenderEssenceShop(Renderer* renderer) {
-    m_GameState->RenderEssenceShop(renderer);
-}
-
-void UIManager::RenderSingularityShop(Renderer* renderer) {
-    m_GameState->RenderSingularityShop(renderer);
-}
-
-void UIManager::RenderSpaceship(Renderer* renderer) {
-    m_GameState->RenderSpaceship(renderer);
-}
-
-void UIManager::RenderCombat(Renderer* renderer) {
-    m_GameState->RenderCombat(renderer);
-}
-
-void UIManager::RenderGatcha(Renderer* renderer) {
-    m_GameState->RenderGatcha(renderer);
-}
-
-void UIManager::RenderSkillTree(Renderer* renderer) {
-    m_GameState->RenderSkillTree(renderer);
-}
-
-void UIManager::RenderAchievementNotifications(Renderer* renderer) {
-    m_GameState->RenderAchievementNotifications(renderer);
-}
-
-void UIManager::RenderMilestoneNotifications(Renderer* renderer) {
-    m_GameState->RenderMilestoneNotifications(renderer);
-}
+void UIManager::RenderActiveEvent(Renderer* renderer) { m_GameState->RenderActiveEvent(renderer); }
+void UIManager::RenderAchievements(Renderer* renderer) { m_GameState->RenderAchievements(renderer); }
+void UIManager::RenderStatistics(Renderer* renderer) { m_GameState->RenderStatistics(renderer); }
+void UIManager::RenderResearchTree(Renderer* renderer) { m_GameState->RenderResearchTree(renderer); }
+void UIManager::RenderMilestones(Renderer* renderer) { m_GameState->RenderMilestones(renderer); }
+void UIManager::RenderBuyables(Renderer* renderer) { m_GameState->RenderBuyables(renderer); }
+void UIManager::RenderChallenges(Renderer* renderer) { m_GameState->RenderChallenges(renderer); }
+void UIManager::RenderEssenceShop(Renderer* renderer) { m_GameState->RenderEssenceShop(renderer); }
+void UIManager::RenderSingularityShop(Renderer* renderer) { m_GameState->RenderSingularityShop(renderer); }
+void UIManager::RenderSpaceship(Renderer* renderer) { m_GameState->RenderSpaceship(renderer); }
+void UIManager::RenderCombat(Renderer* renderer) { m_GameState->RenderCombat(renderer); }
+void UIManager::RenderGatcha(Renderer* renderer) { m_GameState->RenderGatcha(renderer); }
+void UIManager::RenderSkillTree(Renderer* renderer) { m_GameState->RenderSkillTree(renderer); }
+void UIManager::RenderAchievementNotifications(Renderer* renderer) { m_GameState->RenderAchievementNotifications(renderer); }
+void UIManager::RenderMilestoneNotifications(Renderer* renderer) { m_GameState->RenderMilestoneNotifications(renderer); }

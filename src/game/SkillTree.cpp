@@ -585,9 +585,13 @@ void SkillTreeSystem::RenderSkillNodes(Renderer* renderer, GameState* state, f32
 
     // Set the child window height to enable proper scrolling to the bottom-most node
     ImGui::SetCursorScreenPos(ImVec2(contentStartPos.x, contentStartPos.y + maxNodeY + rowSpacing));
+
+    // FIX: Add this line to "stamp" the layout at the new cursor position
+    ImGui::Dummy(ImVec2(0.0f, 0.0f));
 }
 
-void SkillTreeSystem::RenderSkillInfo(Renderer* renderer, GameState* state, f32 panelX, f32 panelY, f32 panelWidth, f32 panelHeight) {
+
+void SkillTreeSystem::RenderSkillInfo(Renderer* renderer, f32 panelX, f32 panelY, f32 panelWidth, f32 panelHeight) {
     (void)renderer; (void)panelX; (void)panelY; (void)panelWidth; (void)panelHeight;
 
     // Skill Points Info (Left side)
