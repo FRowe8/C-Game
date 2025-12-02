@@ -47,6 +47,7 @@ namespace UI {
     class SkillTreeView;
     class EnhancementView;
     class SpecializedSkillsView;
+    class TutorialOverlay;
 }
 
 // Research station that generates resources
@@ -225,7 +226,7 @@ public:
     void Render(Renderer* renderer);
 
     // Resource management
-    void AddResource(QuantumResource type, f64 amount);
+    void AddResource(QuantumResource type, f64 amount, bool showFloatingText = true);
     bool SpendResource(QuantumResource type, f64 amount);
     f64 GetResource(QuantumResource type) const;
 
@@ -360,6 +361,7 @@ public:
     friend class UI::SkillTreeView;
     friend class UI::EnhancementView;
     friend class UI::SpecializedSkillsView;
+    friend class UI::TutorialOverlay;
 
 private:
     void InitializeStations();
