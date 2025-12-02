@@ -243,13 +243,6 @@ private:
     void UpdateToasts(f64 deltaTime);
     void UpdateResourceTicks(f64 deltaTime);
 
-    void RenderParticles(Renderer* renderer);
-    void RenderAnomalies(Renderer* renderer);
-    void RenderFloatingTexts(Renderer* renderer);
-    void RenderToasts(Renderer* renderer);
-
-    // Toast helper methods
-    Color GetRarityColor(i32 rarity) const;
-    const char* GetRarityName(i32 rarity) const;
-    const char* GetLootTypeIcon(LootType type) const;
+    void RenderParticles(Renderer* /*renderer*/);
+    void RenderAnomalies(Renderer* /*renderer*/);
 };

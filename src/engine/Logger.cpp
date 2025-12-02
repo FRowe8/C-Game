@@ -33,8 +33,8 @@ static const char* LevelToString(Level level) {
         case Level::Info:    return "INFO";
         case Level::Warning: return "WARN";
         case Level::Error:   return "ERROR";
-        default:             return "UNKNOWN";
     }
+    return "UNKNOWN";
 }
 
 static void LogMessage(Level level, const std::string& message) {

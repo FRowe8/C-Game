@@ -1,8 +1,6 @@
 #include "TimeManager.h"
 #include "Platform.h"
-#include "Log.h"
-#include <string>
-#include <cstdlib>
+#include "Logger.h"
 
 TimeManager::TimeManager()
     : m_TotalTimePlayed(0.0)
