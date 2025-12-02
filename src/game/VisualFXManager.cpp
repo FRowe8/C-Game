@@ -491,6 +491,7 @@ void VisualFXManager::UpdateFloatingTexts(f64 deltaTime) {
 }
 
 void VisualFXManager::RenderFloatingTexts(Renderer* renderer) {
+    (void)renderer;
     ImDrawList* draw_list = ImGui::GetForegroundDrawList();
 
     for (const auto& text : m_FloatingTexts) {
@@ -640,6 +641,7 @@ void VisualFXManager::UpdateToasts(f64 deltaTime) {
 
 void VisualFXManager::RenderToasts(Renderer* renderer) {
     if (m_Toasts.empty()) return;
+    (void)renderer;
 
     ImDrawList* draw_list = ImGui::GetForegroundDrawList();
     ImGuiIO& io = ImGui::GetIO();
@@ -649,7 +651,7 @@ void VisualFXManager::RenderToasts(Renderer* renderer) {
     const f32 toastHeight = 80.0f;
     const f32 toastSpacing = 10.0f;
     const f32 padding = 10.0f;
-    const f32 iconSize = 48.0f;
+    const f32 iconSize = 48.0f; // Outer declaration (Box Width)
 
     // Start position (top-right corner with some margin)
     f32 startX = io.DisplaySize.x - toastWidth - 20.0f;
@@ -704,10 +706,13 @@ void VisualFXManager::RenderToasts(Renderer* renderer) {
         const char* icon = GetLootTypeIcon(toast.type);
         ImFont* font = ImGui::GetFont();
         f32 iconFontSize = 32.0f;
-        ImVec2 iconSize = font->CalcTextSizeA(iconFontSize, FLT_MAX, 0.0f, icon);
+
+        // FIX: Renamed inner variable to avoid shadowing the float iconSize
+        ImVec2 iconTextSize = font->CalcTextSizeA(iconFontSize, FLT_MAX, 0.0f, icon);
+
         ImVec2 iconPos(
-            x + padding + (iconSize * 0.5f - iconSize.x * 0.5f),
-            y + toastHeight * 0.5f - iconSize.y * 0.5f
+            x + padding + (iconSize * 0.5f - iconTextSize.x * 0.5f), // Center icon in 48px box
+            y + toastHeight * 0.5f - iconTextSize.y * 0.5f
         );
 
         ImU32 iconColor = IM_COL32(
@@ -720,6 +725,7 @@ void VisualFXManager::RenderToasts(Renderer* renderer) {
         draw_list->AddText(font, iconFontSize, iconPos, iconColor, icon);
 
         // Draw title (right side, top)
+        // Uses the outer float 'iconSize' correctly now
         f32 textX = x + padding + iconSize + padding;
         f32 titleY = y + padding + 5.0f;
         f32 titleFontSize = 18.0f;

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Types.h"
+#include "imgui.h" // Added to define ImVec2 and ImU32
 #include <string>
 #include <vector>
 #include <functional>

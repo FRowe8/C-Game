@@ -194,12 +194,13 @@ void UIManager::RenderMainContent() {
 
                 case ActiveModal::Research:
                     // Research Tree (full screen in content area)
-                    m_GameState->GetResearchTree().RenderResearchTree(nullptr, m_GameState);
+                    // FIX: RenderResearchTree is in GameState, not ResearchTree
+                    m_GameState->RenderResearchTree(nullptr);
                     break;
 
                 case ActiveModal::Buyables:
                     // Upgrades/Buyables (full screen in content area)
-                    m_GameState->GetBuyableManager().RenderBuyables(nullptr, m_GameState);
+                    m_GameState->RenderBuyables(nullptr);
                     break;
 
                 case ActiveModal::Combat:
@@ -226,7 +227,7 @@ void UIManager::RenderMainContent() {
 
                 case ActiveModal::Gatcha:
                     // Gatcha system (full screen in content area)
-                    m_GameState->GetGatchaSystem().RenderGatchaUI(nullptr);
+                    m_GameState->GetGatchaSystem().RenderSummonUI(nullptr, m_GameState);
                     break;
 
                 case ActiveModal::Achievements:
@@ -246,7 +247,8 @@ void UIManager::RenderMainContent() {
 
                 case ActiveModal::Challenges:
                     // Challenges (full screen in content area)
-                    m_GameState->GetChallengeManager().RenderChallenges(nullptr);
+                    // FIX: RenderChallenges is in GameState, not ChallengeManager
+                    m_GameState->RenderChallenges(nullptr);
                     break;
 
                 case ActiveModal::EssenceShop:
@@ -387,7 +389,7 @@ bool UIManager::DrawNavButton(const char* label, bool isActive, const ImVec4& ac
 
         ImGui::GetWindowDrawList()->AddRectFilled(line_p0, line_p1, ImGui::GetColorU32(activeColor));
     }
-    
+
     return clicked;
 }
 // --- Notification Overlays ---

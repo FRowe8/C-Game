@@ -245,4 +245,13 @@ private:
 
     void RenderParticles(Renderer* /*renderer*/);
     void RenderAnomalies(Renderer* /*renderer*/);
+
+    // FIX: Added missing render declarations used in cpp
+    void RenderFloatingTexts(Renderer* renderer);
+    void RenderToasts(Renderer* renderer);
+
+    // FIX: Added missing helper declarations used in cpp
+    Color GetRarityColor(i32 rarity) const;
+    const char* GetRarityName(i32 rarity) const;
+    const char* GetLootTypeIcon(LootType type) const;
 };
