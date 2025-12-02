@@ -67,6 +67,9 @@ struct ResearchStation {
     f64 superpositionValue;
     f64 superpositionProbability; // Chance of getting full value on observation
 
+    // Phase 3.1: Passive collapse for early game smoothing
+    f64 passiveCollapseRate;      // Percentage of superposition auto-collapsed per second (0.0 to 1.0)
+
     bool unlocked;
     f64 unlockCost;
 

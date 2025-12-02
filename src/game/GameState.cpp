@@ -66,6 +66,7 @@ ResearchStation::ResearchStation()
     : baseProduction(0), currentProduction(0), level(0),
       upgradeCost(0), upgradeCostMultiplier(1.15f),
       superpositionValue(0), superpositionProbability(0.5f),
+      passiveCollapseRate(0.0),  // Phase 3.1: Default to 0 (no passive income)
       unlocked(false), unlockCost(0), autoUpgrade(false) {
 }
 
@@ -177,6 +178,21 @@ void ResearchStation::Update(f64 deltaTime) {
 
     // Accumulate in superposition
     superpositionValue += currentProduction * deltaTime;
+
+    // Phase 3.1: Passive collapse for early game smoothing
+    // Automatically collapse a percentage of superposition every second
+    if (passiveCollapseRate > 0.0 && superpositionValue > 0.0) {
+        f64 amountToCollapse = superpositionValue * passiveCollapseRate * deltaTime;
+        if (amountToCollapse > 0.0) {
+            // Note: passive collapse is guaranteed (no RNG), but at reduced efficiency
+            // This provides steady income without frustrating failures
+            superpositionValue -= amountToCollapse;
+
+            // The passive collapse will be added to resources via GameState
+            // We'll need to pass this back to GameState, so we'll handle it there
+            // For now, just reduce the superposition
+        }
+    }
 }
 
 // GameState implementation
@@ -352,6 +368,7 @@ void GameState::InitializeStations() {
     station1.upgradeCost = 10.0;
     station1.upgradeCostMultiplier = 1.5; // Increased from 1.15 for better balance
     station1.superpositionProbability = 0.7;
+    station1.passiveCollapseRate = 0.05; // Phase 3.1: 5% passive income per second (smooths early game)
     station1.unlocked = true; // First one is unlocked
     m_Stations.push_back(station1);
 
@@ -607,7 +624,22 @@ void GameState::UpdateStations(f64 deltaTime) {
     bool canUpgrade = !m_ChallengeManager.HasModifier(ChallengeModifier::NoUpgrades);
 
     for (auto& station : m_Stations) {
+        // Store superposition before update for passive collapse calculation
+        f64 superpositionBefore = station.superpositionValue;
+
         station.Update(deltaTime * globalMultiplier);
+
+        // Phase 3.1: Handle passive collapse rewards
+        if (station.passiveCollapseRate > 0.0 && station.unlocked) {
+            f64 superpositionAfter = station.superpositionValue;
+            f64 collapsed = superpositionBefore - superpositionAfter;
+
+            // If superposition decreased due to passive collapse (not just normal growth)
+            if (collapsed > 0.0 && superpositionAfter < superpositionBefore) {
+                // Award resources from passive collapse (no floating text to avoid spam)
+                AddResource(station.resourceType, collapsed, false);
+            }
+        }
 
         // Auto-observe if research is unlocked and superposition is high enough
         // Auto-observe still works even in NoObserve challenge (only manual is disabled)

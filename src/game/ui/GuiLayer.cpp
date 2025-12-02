@@ -762,9 +762,18 @@ void StationView::RenderUnlockedStation(GameState* state, ResearchStation& stati
         if (progress > 1.0f) progress = 1.0f;
     }
 
-    snprintf(barOverlay, sizeof(barOverlay), "Superposition: %s (%s / sec)",
+    // Phase 3.1: Show passive collapse rate if present
+    char passiveText[32] = "";
+    if (station.passiveCollapseRate > 0.0) {
+        f64 passiveRate = station.superpositionValue * station.passiveCollapseRate;
+        snprintf(passiveText, sizeof(passiveText), " | +%s/s passive",
+                 GameUtils::FormatNumber(passiveRate, state->m_NumberFormat).c_str());
+    }
+
+    snprintf(barOverlay, sizeof(barOverlay), "Superposition: %s (%s/s%s)",
              GameUtils::FormatNumber(station.superpositionValue, state->m_NumberFormat).c_str(),
-             GameUtils::FormatNumber(productionRate, state->m_NumberFormat).c_str());
+             GameUtils::FormatNumber(productionRate, state->m_NumberFormat).c_str(),
+             passiveText);
 
     ImGui::ProgressBar(progress, ImVec2(-1, 0), barOverlay);
 
