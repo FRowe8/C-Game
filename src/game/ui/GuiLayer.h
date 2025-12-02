@@ -242,6 +242,12 @@ public:
 };
 
 /**
+ * Tutorial Overlay
+ * Renders step-based tutorial system for new players
+ */
+class TutorialOverlay;
+
+/**
  * GuiLayer
  *
  * Central UI orchestration layer that owns all views and delegates rendering.
@@ -263,11 +269,22 @@ public:
     void Initialize();
 
     /**
+     * Update tutorial logic and check for step progression
+     * @param state GameState reference to read resources and check conditions
+     */
+    void Update(GameState* state);
+
+    /**
      * Render all UI elements
      * @param state GameState reference for views to read data
      * @param renderer Renderer reference (may be unused for ImGui-only views)
      */
     void Render(GameState* state, Renderer* renderer);
+
+    /**
+     * Get tutorial overlay (for save/load)
+     */
+    TutorialOverlay* GetTutorialOverlay() { return m_TutorialOverlay.get(); }
 
 private:
     // Core Views (always visible)
@@ -290,6 +307,9 @@ private:
     std::unique_ptr<SkillTreeView> m_SkillTreeView;
     std::unique_ptr<EnhancementView> m_EnhancementView;
     std::unique_ptr<SpecializedSkillsView> m_SpecializedSkillsView;
+
+    // Tutorial System (overlays everything when active)
+    std::unique_ptr<TutorialOverlay> m_TutorialOverlay;
 
     /**
      * Render achievement and milestone notifications (always check)

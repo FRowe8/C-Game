@@ -16,6 +16,7 @@
 #include "Research.h"
 #include "UIManager.h"
 #include "GuiLayer.h" // Phase 1.1: Decoupled UI layer
+#include "TutorialOverlay.h" // Phase 2.1: Tutorial system
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
@@ -543,6 +544,11 @@ void GameState::Update(f64 deltaTime, Input* input, Renderer* renderer) {
         if (m_PrestigeFlashTimer <= 0) {
             m_PrestigeFlashActive = false;
         }
+    }
+
+    // Update GuiLayer (tutorial system, etc.)
+    if (m_GuiLayer) {
+        m_GuiLayer->Update(this);
     }
 
     // Update UI
@@ -1959,6 +1965,13 @@ bool GameState::Save(const std::string& filepath) {
     file << "  \"version\": 2,\n";
     file << "  \"saveTimestamp\": " << m_LastSaveTimestamp << ",\n";
 
+    // Tutorial progress
+    i32 tutorialStep = 0;
+    if (m_GuiLayer && m_GuiLayer->GetTutorialOverlay()) {
+        tutorialStep = static_cast<i32>(m_GuiLayer->GetTutorialOverlay()->GetCurrentStep());
+    }
+    file << "  \"tutorialStep\": " << tutorialStep << ",\n";
+
     // Resources
     file << "  \"resources\": [" << m_Resources[0] << ", " << m_Resources[1] << ", " << m_Resources[2] << "],\n";
     file << "  \"coherence\": " << m_Coherence << ",\n";
@@ -2121,6 +2134,11 @@ bool GameState::Load(const std::string& filepath) {
                 // Parse main game state
                 if (line.find("\"saveTimestamp\"") != std::string::npos) {
                     m_LastSaveTimestamp = static_cast<i64>(GameUtils::ParseJsonNumber(line, "saveTimestamp"));
+                } else if (line.find("\"tutorialStep\"") != std::string::npos) {
+                    i32 tutorialStep = static_cast<i32>(GameUtils::ParseJsonNumber(line, "tutorialStep"));
+                    if (m_GuiLayer && m_GuiLayer->GetTutorialOverlay()) {
+                        m_GuiLayer->GetTutorialOverlay()->SetCurrentStep(static_cast<UI::TutorialStep>(tutorialStep));
+                    }
                 } else if (line.find("\"resources\"") != std::string::npos) {
                     // Parse resources array
                     size_t start = line.find('[');

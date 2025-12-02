@@ -1,4 +1,5 @@
 #include "GuiLayer.h"
+#include "TutorialOverlay.h"
 #include "GameState.h"
 #include "Renderer.h"
 #include "ImGuiUtils.h"
@@ -41,7 +42,17 @@ void GuiLayer::Initialize() {
     m_EnhancementView = std::make_unique<EnhancementView>();
     m_SpecializedSkillsView = std::make_unique<SpecializedSkillsView>();
 
+    // Tutorial System
+    m_TutorialOverlay = std::make_unique<TutorialOverlay>();
+
     Log::Info("GuiLayer initialized successfully");
+}
+
+void GuiLayer::Update(GameState* state) {
+    // Update tutorial system
+    if (m_TutorialOverlay) {
+        m_TutorialOverlay->Update(state);
+    }
 }
 
 void GuiLayer::Render(GameState* state, Renderer* renderer) {
@@ -123,6 +134,11 @@ void GuiLayer::Render(GameState* state, Renderer* renderer) {
     // Render always-visible overlays
     RenderActiveEvent(state, renderer);
     RenderNotifications(state, renderer);
+
+    // Render tutorial overlay (should be last so it's on top of everything)
+    if (m_TutorialOverlay) {
+        m_TutorialOverlay->Render(state, renderer);
+    }
 }
 
 void GuiLayer::RenderNotifications(GameState* state, Renderer* renderer) {
