@@ -138,6 +138,40 @@ public:
     // Get floating texts (for rendering)
     const std::vector<FloatingText>& GetFloatingTexts() const { return m_FloatingTexts; }
 
+    // === Toast Notifications ===
+
+    enum class LootType {
+        Card,
+        Crew,
+        ShipPart,
+        Resource,
+        Achievement,
+        Milestone
+    };
+
+    struct ToastNotification {
+        std::string title;
+        std::string subtitle;
+        LootType type;
+        i32 rarity;             // 0=Common, 4=Legendary
+        f32 lifetime;
+        f32 maxLifetime;
+        f32 slideProgress;      // 0.0 = off-screen, 1.0 = fully visible
+        bool fadingOut;
+    };
+
+    // Spawn a loot toast notification
+    void SpawnLootToast(LootType type, const std::string& itemName, i32 rarity);
+
+    // Spawn achievement toast
+    void SpawnAchievementToast(const std::string& achievementName, const std::string& description);
+
+    // Spawn milestone toast
+    void SpawnMilestoneToast(const std::string& milestone, const std::string& description);
+
+    // Get toast notifications (for rendering)
+    const std::vector<ToastNotification>& GetToasts() const { return m_Toasts; }
+
     // === Visual Settings ===
 
     void SetParticleScale(f32 scale) { m_ParticleScale = scale; }
@@ -173,13 +207,24 @@ private:
     // Floating combat text
     std::vector<FloatingText> m_FloatingTexts;
 
+    // Toast notifications
+    std::vector<ToastNotification> m_Toasts;
+    const i32 m_MaxToasts = 5;  // Maximum visible toasts at once
+
     // Helper methods
     void UpdateParticles(f64 deltaTime);
     void UpdateAnomalies(f64 deltaTime);
     void UpdateScreenEffects(f64 deltaTime);
     void UpdateFloatingTexts(f64 deltaTime);
+    void UpdateToasts(f64 deltaTime);
 
     void RenderParticles(Renderer* renderer);
     void RenderAnomalies(Renderer* renderer);
     void RenderFloatingTexts(Renderer* renderer);
+    void RenderToasts(Renderer* renderer);
+
+    // Toast helper methods
+    Color GetRarityColor(i32 rarity) const;
+    const char* GetRarityName(i32 rarity) const;
+    const char* GetLootTypeIcon(LootType type) const;
 };

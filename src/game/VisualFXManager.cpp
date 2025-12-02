@@ -27,6 +27,7 @@ void VisualFXManager::Initialize() {
     m_Particles.clear();
     m_Anomalies.clear();
     m_FloatingTexts.clear();
+    m_Toasts.clear();
     m_ComboCount = 0;
     m_PrestigeFlashActive = false;
     m_ScreenShakeActive = false;
@@ -37,12 +38,14 @@ void VisualFXManager::Update(f64 deltaTime) {
     UpdateAnomalies(deltaTime);
     UpdateScreenEffects(deltaTime);
     UpdateFloatingTexts(deltaTime);
+    UpdateToasts(deltaTime);
 }
 
 void VisualFXManager::Render(Renderer* renderer) {
     RenderParticles(renderer);
     RenderAnomalies(renderer);
     RenderFloatingTexts(renderer);
+    RenderToasts(renderer);
 }
 
 // === Particle System ===
@@ -516,5 +519,264 @@ void VisualFXManager::RenderFloatingTexts(Renderer* renderer) {
 
         // Draw main text
         draw_list->AddText(font, fontSize, textPos, textColor, text.text.c_str());
+    }
+}
+
+// === Toast Notification System ===
+
+void VisualFXManager::SpawnLootToast(LootType type, const std::string& itemName, i32 rarity) {
+    // Don't spawn toasts for common/uncommon items unless it's a rare drop situation
+    if (rarity < 2) { // Only Rare (2), Epic (3), Legendary (4) get toasts
+        return;
+    }
+
+    ToastNotification toast;
+    toast.title = itemName;
+    toast.type = type;
+    toast.rarity = rarity;
+    toast.lifetime = 0.0f;
+    toast.maxLifetime = 6.0f + (rarity * 1.0f); // 8-10 seconds for legendary
+    toast.slideProgress = 0.0f;
+    toast.fadingOut = false;
+
+    // Set subtitle based on type and rarity
+    const char* rarityName = GetRarityName(rarity);
+    switch (type) {
+        case LootType::Card:
+            toast.subtitle = std::string(rarityName) + " Card Obtained!";
+            break;
+        case LootType::Crew:
+            toast.subtitle = std::string(rarityName) + " Crew Recruited!";
+            break;
+        case LootType::ShipPart:
+            toast.subtitle = std::string(rarityName) + " Ship Part!";
+            break;
+        case LootType::Resource:
+            toast.subtitle = std::string(rarityName) + " Resource Cache!";
+            break;
+        default:
+            toast.subtitle = std::string(rarityName) + " Item!";
+            break;
+    }
+
+    m_Toasts.push_back(toast);
+
+    // Limit max toasts (remove oldest if over limit)
+    if (static_cast<i32>(m_Toasts.size()) > m_MaxToasts) {
+        m_Toasts.erase(m_Toasts.begin());
+    }
+
+    Log::Infof("Toast notification: ", itemName.c_str(), " (", rarityName, ")");
+}
+
+void VisualFXManager::SpawnAchievementToast(const std::string& achievementName, const std::string& description) {
+    ToastNotification toast;
+    toast.title = achievementName;
+    toast.subtitle = description;
+    toast.type = LootType::Achievement;
+    toast.rarity = 3; // Epic color for achievements
+    toast.lifetime = 0.0f;
+    toast.maxLifetime = 8.0f;
+    toast.slideProgress = 0.0f;
+    toast.fadingOut = false;
+
+    m_Toasts.push_back(toast);
+
+    if (static_cast<i32>(m_Toasts.size()) > m_MaxToasts) {
+        m_Toasts.erase(m_Toasts.begin());
+    }
+}
+
+void VisualFXManager::SpawnMilestoneToast(const std::string& milestone, const std::string& description) {
+    ToastNotification toast;
+    toast.title = milestone;
+    toast.subtitle = description;
+    toast.type = LootType::Milestone;
+    toast.rarity = 4; // Legendary color for milestones
+    toast.lifetime = 0.0f;
+    toast.maxLifetime = 8.0f;
+    toast.slideProgress = 0.0f;
+    toast.fadingOut = false;
+
+    m_Toasts.push_back(toast);
+
+    if (static_cast<i32>(m_Toasts.size()) > m_MaxToasts) {
+        m_Toasts.erase(m_Toasts.begin());
+    }
+}
+
+void VisualFXManager::UpdateToasts(f64 deltaTime) {
+    for (auto& toast : m_Toasts) {
+        toast.lifetime += static_cast<f32>(deltaTime);
+
+        // Slide in animation (first 0.3 seconds)
+        if (toast.slideProgress < 1.0f) {
+            toast.slideProgress += static_cast<f32>(deltaTime) * 3.5f; // Slide in over ~0.3s
+            if (toast.slideProgress > 1.0f) {
+                toast.slideProgress = 1.0f;
+            }
+        }
+
+        // Start fading out in last 1.5 seconds
+        if (toast.lifetime > toast.maxLifetime - 1.5f && !toast.fadingOut) {
+            toast.fadingOut = true;
+        }
+    }
+
+    // Remove expired toasts
+    m_Toasts.erase(
+        std::remove_if(m_Toasts.begin(), m_Toasts.end(),
+            [](const ToastNotification& toast) {
+                return toast.lifetime >= toast.maxLifetime;
+            }),
+        m_Toasts.end()
+    );
+}
+
+void VisualFXManager::RenderToasts(Renderer* renderer) {
+    if (m_Toasts.empty()) return;
+
+    ImDrawList* draw_list = ImGui::GetForegroundDrawList();
+    ImGuiIO& io = ImGui::GetIO();
+
+    // Toast dimensions
+    const f32 toastWidth = 320.0f;
+    const f32 toastHeight = 80.0f;
+    const f32 toastSpacing = 10.0f;
+    const f32 padding = 10.0f;
+    const f32 iconSize = 48.0f;
+
+    // Start position (top-right corner with some margin)
+    f32 startX = io.DisplaySize.x - toastWidth - 20.0f;
+    f32 startY = 80.0f; // Below the top UI
+
+    i32 toastIndex = 0;
+    for (const auto& toast : m_Toasts) {
+        // Calculate position with slide-in effect
+        f32 slideOffset = (1.0f - toast.slideProgress) * (toastWidth + 50.0f);
+        f32 x = startX + slideOffset;
+        f32 y = startY + (toastIndex * (toastHeight + toastSpacing));
+
+        // Calculate alpha for fade out
+        f32 alpha = 1.0f;
+        if (toast.fadingOut) {
+            f32 fadeProgress = (toast.lifetime - (toast.maxLifetime - 1.5f)) / 1.5f;
+            alpha = 1.0f - fadeProgress;
+        }
+
+        // Get rarity color
+        Color rarityColor = GetRarityColor(toast.rarity);
+        rarityColor.a = alpha;
+
+        // Background panel (dark with border)
+        ImU32 bgColor = IM_COL32(20, 20, 30, static_cast<int>(alpha * 230));
+        ImU32 borderColor = IM_COL32(
+            static_cast<int>(rarityColor.r * 255),
+            static_cast<int>(rarityColor.g * 255),
+            static_cast<int>(rarityColor.b * 255),
+            static_cast<int>(alpha * 255)
+        );
+
+        // Draw background
+        draw_list->AddRectFilled(
+            ImVec2(x, y),
+            ImVec2(x + toastWidth, y + toastHeight),
+            bgColor,
+            8.0f // Rounded corners
+        );
+
+        // Draw border
+        draw_list->AddRect(
+            ImVec2(x, y),
+            ImVec2(x + toastWidth, y + toastHeight),
+            borderColor,
+            8.0f, // Rounded corners
+            0,
+            3.0f  // Border thickness
+        );
+
+        // Draw icon (left side)
+        const char* icon = GetLootTypeIcon(toast.type);
+        ImFont* font = ImGui::GetFont();
+        f32 iconFontSize = 32.0f;
+        ImVec2 iconSize = font->CalcTextSizeA(iconFontSize, FLT_MAX, 0.0f, icon);
+        ImVec2 iconPos(
+            x + padding + (iconSize * 0.5f - iconSize.x * 0.5f),
+            y + toastHeight * 0.5f - iconSize.y * 0.5f
+        );
+
+        ImU32 iconColor = IM_COL32(
+            static_cast<int>(rarityColor.r * 255),
+            static_cast<int>(rarityColor.g * 255),
+            static_cast<int>(rarityColor.b * 255),
+            static_cast<int>(alpha * 255)
+        );
+
+        draw_list->AddText(font, iconFontSize, iconPos, iconColor, icon);
+
+        // Draw title (right side, top)
+        f32 textX = x + padding + iconSize + padding;
+        f32 titleY = y + padding + 5.0f;
+        f32 titleFontSize = 18.0f;
+
+        ImU32 titleColor = IM_COL32(255, 255, 255, static_cast<int>(alpha * 255));
+        draw_list->AddText(font, titleFontSize, ImVec2(textX, titleY), titleColor, toast.title.c_str());
+
+        // Draw subtitle (right side, bottom)
+        f32 subtitleY = y + toastHeight - padding - 18.0f;
+        f32 subtitleFontSize = 14.0f;
+
+        ImU32 subtitleColor = IM_COL32(
+            static_cast<int>(rarityColor.r * 255),
+            static_cast<int>(rarityColor.g * 255),
+            static_cast<int>(rarityColor.b * 255),
+            static_cast<int>(alpha * 200)
+        );
+
+        draw_list->AddText(font, subtitleFontSize, ImVec2(textX, subtitleY), subtitleColor, toast.subtitle.c_str());
+
+        toastIndex++;
+    }
+}
+
+// === Toast Helper Methods ===
+
+Color VisualFXManager::GetRarityColor(i32 rarity) const {
+    switch (rarity) {
+        case 0: // Common
+            return Color(0.8f, 0.8f, 0.8f, 1.0f); // Gray
+        case 1: // Uncommon
+            return Color(0.3f, 1.0f, 0.3f, 1.0f); // Green
+        case 2: // Rare
+            return Color(0.3f, 0.5f, 1.0f, 1.0f); // Blue
+        case 3: // Epic
+            return Color(0.8f, 0.3f, 1.0f, 1.0f); // Purple
+        case 4: // Legendary
+            return Color(1.0f, 0.8f, 0.2f, 1.0f); // Gold
+        default:
+            return Color(1.0f, 1.0f, 1.0f, 1.0f); // White
+    }
+}
+
+const char* VisualFXManager::GetRarityName(i32 rarity) const {
+    switch (rarity) {
+        case 0: return "Common";
+        case 1: return "Uncommon";
+        case 2: return "Rare";
+        case 3: return "Epic";
+        case 4: return "Legendary";
+        default: return "Unknown";
+    }
+}
+
+const char* VisualFXManager::GetLootTypeIcon(LootType type) const {
+    switch (type) {
+        case LootType::Card:        return "[C]";
+        case LootType::Crew:        return "[P]"; // Person
+        case LootType::ShipPart:    return "[S]";
+        case LootType::Resource:    return "[R]";
+        case LootType::Achievement: return "[A]";
+        case LootType::Milestone:   return "[M]";
+        default:                    return "[?]";
     }
 }
