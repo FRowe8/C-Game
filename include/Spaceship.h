@@ -6,6 +6,7 @@
 
 // Forward declarations
 class Renderer;
+class GameState;
 
 // Ship part slot types
 enum class PartSlot {
@@ -64,7 +65,7 @@ public:
     Spaceship();
 
     // Initialization
-    void Initialize();
+    void Initialize(GameState* gameState = nullptr);
 
     // Part management
     void AddPart(const ShipPart& part);
@@ -120,6 +121,9 @@ private:
     // UI state
     i32 m_SelectedInventoryIndex;
     f32 m_ScrollOffset;
+
+    // Game state reference (for awarding skill XP)
+    GameState* m_GameState;
 
     // Helper methods
     void UpdateStatistics(const ShipPart& part);

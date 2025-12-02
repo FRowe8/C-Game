@@ -113,6 +113,9 @@ void ResearchStation::Observe(GameState* state) {
         f64 critMultiplier = 2.0 + (static_cast<f64>(rand() % 4)); // 2, 3, 4, or 5x
         collapsedValue *= critMultiplier;
         Log::Infof("CRITICAL OBSERVATION! ", critMultiplier, "x reward!");
+        state->GetSoundManager().PlaySound(SoundEffect::ObserveCritical);
+    } else {
+        state->GetSoundManager().PlaySound(SoundEffect::ObserveSuccess);
     }
 
     state->AddResource(resourceType, collapsedValue);
@@ -125,6 +128,9 @@ void ResearchStation::Observe(GameState* state) {
 
     // Add combo point for observation
     state->AddComboPoint();
+
+    // Award Observation skill XP
+    state->GetSpecializedSkills().AddExperience(SkillCategory::Observation, SkillXP::OBSERVE_STATION);
 
     // Ship part drop chance! (20% base chance + bonus from ship's drop rate bonus)
     f64 partDropChance = 0.20; // 20% base chance
@@ -168,18 +174,6 @@ void ResearchStation::Update(f64 deltaTime) {
 
     // Accumulate in superposition
     superpositionValue += currentProduction * deltaTime;
-}
-
-// UIButton implementation
-void UIButton::Update(const Vec2& mousePos) {
-    hovered = enabled && bounds.Contains(mousePos);
-}
-
-// In UIButton implementatio
-bool UIButton::WasClicked(const Vec2& mousePos, bool mousePressed) {
-    if (!enabled) return false;
-    if (!bounds.Contains(mousePos)) return false;
-    return mousePressed;
 }
 
 // GameState implementation
@@ -304,7 +298,7 @@ void GameState::Initialize() {
     Log::Info("Singularity shop initialized");
 
     // Initialize Spaceship System
-    m_Spaceship.Initialize();
+    m_Spaceship.Initialize(this);
     Log::Info("Spaceship system initialized");
 
     // Try to load save file
@@ -325,6 +319,15 @@ void GameState::Initialize() {
 
     // Initialize enhancement system
     m_EnhancementSystem.Initialize();
+
+    // Initialize specialized skills system
+    m_SpecializedSkills.Initialize();
+
+    // Initialize sound manager
+    m_SoundManager.Initialize();
+    if (m_SoundManager.IsAudioAvailable()) {
+        m_SoundManager.PlayMusic(MusicTrack::MainTheme, true);
+    }
 
     // Initialize feature unlock manager
     m_UnlockManager.Initialize();
@@ -408,108 +411,7 @@ void GameState::InitializeStations() {
 
 void GameState::InitializeUI() {
     m_ScrollOffset = Vec2(0, 0);
-    m_StationButtons.clear();
-
-    // Create persistent buttons for each research station
-    // For each station, we create: unlock button (4*i), observe button (4*i+1), upgrade button (4*i+2), buy max button (4*i+3)
-    for (size_t i = 0; i < m_Stations.size(); i++) {
-        // Unlock Button
-        UIButton unlockBtn;
-        unlockBtn.text = "Unlock";
-        unlockBtn.color = Color::QuantumBlue() * 0.7f;
-        unlockBtn.hoverColor = Color::QuantumBlue();
-        unlockBtn.onClick = [this, i]() {
-            if (SpendResource(QuantumResource::Qubits, m_Stations[i].unlockCost)) {
-                m_Stations[i].unlocked = true;
-                m_Stations[i].level = 0;
-                Log::Infof("Unlocked: ", m_Stations[i].name);
-            }
-        };
-        m_StationButtons.push_back(unlockBtn);
-
-        // Observe Button
-        UIButton observeBtn;
-        observeBtn.text = "OBSERVE";
-        observeBtn.color = Color::QuantumPurple() * 0.7f;
-        observeBtn.hoverColor = Color::QuantumPurple();
-        observeBtn.onClick = [this, i]() {
-            auto& st = m_Stations[i];
-            st.Observe(this);
-            Log::Infof("Observed ", st.name);
-        };
-        m_StationButtons.push_back(observeBtn);
-
-        // Upgrade Button
-        UIButton upgradeBtn;
-        upgradeBtn.text = "Upgrade";
-        upgradeBtn.color = Color::EntanglementOrange() * 0.7f;
-        upgradeBtn.hoverColor = Color::EntanglementOrange();
-        upgradeBtn.onClick = [this, i]() {
-            // Calculate effective upgrade cost with challenge modifiers
-            f64 effectiveCost = m_Stations[i].upgradeCost;
-            if (m_ChallengeManager.HasModifier(ChallengeModifier::ExpensiveUpgrades)) {
-                effectiveCost *= 3.0;
-            }
-
-            if (SpendResource(QuantumResource::Qubits, effectiveCost)) {
-                m_Stations[i].Upgrade();
-                UpdateResearchBonuses(); // Recalculate production
-                Log::Infof("Upgraded ", m_Stations[i].name, " to level ", m_Stations[i].level);
-            }
-        };
-        m_StationButtons.push_back(upgradeBtn);
-
-        // Buy Max Button
-        UIButton buyMaxBtn;
-        buyMaxBtn.text = "BUY MAX";
-        buyMaxBtn.color = Color::CoherenceGreen() * 0.7f;
-        buyMaxBtn.hoverColor = Color::CoherenceGreen();
-        buyMaxBtn.onClick = [this, i]() {
-            auto& station = m_Stations[i];
-            f64 currentQubits = GetResource(QuantumResource::Qubits);
-            i32 upgradesBought = 0;
-
-            // Check if expensive upgrades modifier is active
-            bool expensiveUpgrades = m_ChallengeManager.HasModifier(ChallengeModifier::ExpensiveUpgrades);
-
-            // Keep buying while we can afford it
-            while (upgradesBought < 1000) { // Cap at 1000 to prevent infinite loops
-                // Calculate effective upgrade cost with challenge modifiers
-                f64 effectiveCost = station.upgradeCost;
-                if (expensiveUpgrades) {
-                    effectiveCost *= 3.0;
-                }
-
-                if (currentQubits >= effectiveCost) {
-                    if (SpendResource(QuantumResource::Qubits, effectiveCost)) {
-                        station.Upgrade();
-                        currentQubits = GetResource(QuantumResource::Qubits);
-                        upgradesBought++;
-                    } else {
-                        break;
-                    }
-                } else {
-                    break;
-                }
-            }
-
-            if (upgradesBought > 0) {
-                UpdateResearchBonuses(); // Recalculate production
-                Log::Infof("Bought ", upgradesBought, " upgrades for ", station.name, " (now level ", station.level, ")");
-            }
-        };
-        m_StationButtons.push_back(buyMaxBtn);
-    }
-
-    // Create Prestige Button (last button in the list)
-    UIButton prestigeBtn;
-    prestigeBtn.text = "PRESTIGE";
-    prestigeBtn.color = Color::Magenta() * 0.5f;
-    prestigeBtn.hoverColor = Color::Magenta();
-    prestigeBtn.onClick = [this]() {
-        PerformPrestige();
-    };
-    m_StationButtons.push_back(prestigeBtn);
+    // Note: Button creation removed - buttons are now rendered inline in RenderStationsContent()
 }
 
 void GameState::Update(f64 deltaTime, Input* input, Renderer* renderer) {
@@ -718,6 +620,7 @@ void GameState::UpdateStations(f64 deltaTime) {
             if (currentQubits >= safeThreshold) {
                 if (SpendResource(QuantumResource::Qubits, effectiveCost)) {
                     station.Upgrade();
+                    m_SpecializedSkills.AddExperience(SkillCategory::Engineering, SkillXP::UPGRADE_STATION);
                     currentQubits = GetResource(QuantumResource::Qubits); // Update current amount
                 }
             }
@@ -1018,14 +921,7 @@ void GameState::UpdateUI(Input* input) {
         }
     }
 
-    // Update buttons
-    for (auto& button : m_StationButtons) {
-        button.Update(mousePos);
-
-        if (button.WasClicked(mousePos, mousePressed) && button.onClick) {
-            button.onClick();
-        }
-    }
+    // Note: Button updates removed - all buttons now handled by ImGui in RenderStationsContent()
 
     // Handle auto-prestige threshold adjustment button clicks
     if (mousePressed && m_ResearchTree->IsResearched(ResearchID::AutoPrestige)) {
@@ -1310,33 +1206,23 @@ void GameState::RenderStationsContent() {
     for (size_t i = 0; i < m_Stations.size(); i++) {
         auto& station = m_Stations[i];
 
-        // Get the unique button ID indices created in InitializeUI
-        size_t unlockBtnIndex = i * 4;
-        size_t observeBtnIndex = i * 4 + 1;
-        size_t upgradeBtnIndex = i * 4 + 2;
-        size_t buyMaxBtnIndex = i * 4 + 3;
-
         // --- Station Display Header ---
         Color tierColor = GetStationTierColor(station.level);
         ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(tierColor.r, tierColor.g, tierColor.b, 1.0f));
         ImGui::Text(">> %s (Level %d)", station.name.c_str(), station.level);
         ImGui::PopStyleColor();
 
-        // Removed problematic ImGui::SameLine(ImGui::GetWindowWidth() - 100.0f)
-
         ImGui::TextWrapped("%s", station.description.c_str());
         ImGui::Separator();
 
         // --- UNLOCKED STATION UI ---
         if (station.unlocked) {
-
             f64 productionRate = station.currentProduction * effectiveBonus;
 
             // Superposition progress bar
             char barOverlay[64];
             f32 progress = 0.0f;
             if (station.upgradeCost > 0.0) {
-                // Estimate bar length based on next upgrade cost
                 progress = static_cast<f32>(station.superpositionValue / (station.upgradeCost * 0.1));
                 if (progress > 1.0f) progress = 1.0f;
             }
@@ -1345,45 +1231,81 @@ void GameState::RenderStationsContent() {
                      GameUtils::FormatNumber(station.superpositionValue, m_NumberFormat).c_str(),
                      GameUtils::FormatNumber(productionRate, m_NumberFormat).c_str());
 
-            // Show progress bar
             ImGui::ProgressBar(progress, ImVec2(-1, 0), barOverlay);
 
             // Button Row 1 (Observe, Upgrade, Buy Max)
 
-            // OBSERVE Button
-            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(m_StationButtons[observeBtnIndex].color.r, m_StationButtons[observeBtnIndex].color.g, m_StationButtons[observeBtnIndex].color.b, 0.7f));
-            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(m_StationButtons[observeBtnIndex].hoverColor.r, m_StationButtons[observeBtnIndex].hoverColor.g, m_StationButtons[observeBtnIndex].hoverColor.b, 1.0f));
+            // OBSERVE Button - Purple
+            Color observeColor = Color::QuantumPurple();
+            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(observeColor.r * 0.7f, observeColor.g * 0.7f, observeColor.b * 0.7f, 0.7f));
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(observeColor.r, observeColor.g, observeColor.b, 1.0f));
             if (ImGui::Button(("OBSERVE##ObserveBtn" + std::to_string(i)).c_str(), ImVec2(ImGui::GetContentRegionAvail().x * 0.30f, 40.0f))) {
-                m_StationButtons[observeBtnIndex].onClick();
+                station.Observe(this);
+                Log::Infof("Observed ", station.name);
             }
             ImGui::PopStyleColor(2);
 
-            // UPGRADE Button
+            // UPGRADE Button - Orange
             ImGui::SameLine();
             f64 effectiveUpgradeCost = station.upgradeCost * (m_ChallengeManager.HasModifier(ChallengeModifier::ExpensiveUpgrades) ? 3.0 : 1.0);
             bool canAffordUpgrade = currentQubits >= effectiveUpgradeCost && canUpgrade;
-
-            // Disabled/Enabled styling based on affordability
             if (!canAffordUpgrade) ImGui::PushStyleVar(ImGuiStyleVar_Alpha, 0.5f);
 
-            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(m_StationButtons[upgradeBtnIndex].color.r, m_StationButtons[upgradeBtnIndex].color.g, m_StationButtons[upgradeBtnIndex].color.b, 0.7f));
-            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(m_StationButtons[upgradeBtnIndex].hoverColor.r, m_StationButtons[upgradeBtnIndex].hoverColor.g, m_StationButtons[upgradeBtnIndex].hoverColor.b, 1.0f));
+            Color upgradeColor = Color::EntanglementOrange();
+            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(upgradeColor.r * 0.7f, upgradeColor.g * 0.7f, upgradeColor.b * 0.7f, 0.7f));
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(upgradeColor.r, upgradeColor.g, upgradeColor.b, 1.0f));
 
             std::string upgradeText = "Upgrade (" + GameUtils::FormatNumber(effectiveUpgradeCost, m_NumberFormat) + ")";
 
             if (ImGui::Button((upgradeText + "##UpgradeBtn" + std::to_string(i)).c_str(), ImVec2(ImGui::GetContentRegionAvail().x * 0.45f, 40.0f)) && canAffordUpgrade) {
-                m_StationButtons[upgradeBtnIndex].onClick();
+                f64 effectiveCost = station.upgradeCost;
+                if (m_ChallengeManager.HasModifier(ChallengeModifier::ExpensiveUpgrades)) {
+                    effectiveCost *= 3.0;
+                }
+                if (SpendResource(QuantumResource::Qubits, effectiveCost)) {
+                    station.Upgrade();
+                    UpdateResearchBonuses();
+                    m_SpecializedSkills.AddExperience(SkillCategory::Engineering, SkillXP::UPGRADE_STATION);
+                    m_SoundManager.PlaySound(SoundEffect::UpgradeComplete);
+                    Log::Infof("Upgraded ", station.name, " to level ", station.level);
+                }
             }
             ImGui::PopStyleColor(2);
             if (!canAffordUpgrade) ImGui::PopStyleVar();
 
-            // BUY MAX Button
+            // BUY MAX Button - Green
             ImGui::SameLine();
-            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(m_StationButtons[buyMaxBtnIndex].color.r, m_StationButtons[buyMaxBtnIndex].color.g, m_StationButtons[buyMaxBtnIndex].color.b, 0.7f));
-            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(m_StationButtons[buyMaxBtnIndex].hoverColor.r, m_StationButtons[buyMaxBtnIndex].hoverColor.g, m_StationButtons[buyMaxBtnIndex].hoverColor.b, 1.0f));
+            Color buyMaxColor = Color::CoherenceGreen();
+            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(buyMaxColor.r * 0.7f, buyMaxColor.g * 0.7f, buyMaxColor.b * 0.7f, 0.7f));
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(buyMaxColor.r, buyMaxColor.g, buyMaxColor.b, 1.0f));
 
             if (ImGui::Button(("BUY MAX##BuyMaxBtn" + std::to_string(i)).c_str(), ImVec2(ImGui::GetContentRegionAvail().x, 40.0f))) {
-                m_StationButtons[buyMaxBtnIndex].onClick();
+                f64 qubits = GetResource(QuantumResource::Qubits);
+                i32 upgradesBought = 0;
+                bool expensiveUpgrades = m_ChallengeManager.HasModifier(ChallengeModifier::ExpensiveUpgrades);
+
+                while (upgradesBought < 1000) {
+                    f64 effectiveCost = station.upgradeCost;
+                    if (expensiveUpgrades) effectiveCost *= 3.0;
+
+                    if (qubits >= effectiveCost) {
+                        if (SpendResource(QuantumResource::Qubits, effectiveCost)) {
+                            station.Upgrade();
+                            m_SpecializedSkills.AddExperience(SkillCategory::Engineering, SkillXP::UPGRADE_STATION);
+                            qubits = GetResource(QuantumResource::Qubits);
+                            upgradesBought++;
+                        } else {
+                            break;
+                        }
+                    } else {
+                        break;
+                    }
+                }
+
+                if (upgradesBought > 0) {
+                    UpdateResearchBonuses();
+                    Log::Infof("Bought ", upgradesBought, " upgrades for ", station.name, " (now level ", station.level, ")");
+                }
             }
             ImGui::PopStyleColor(2);
 
@@ -1393,16 +1315,21 @@ void GameState::RenderStationsContent() {
         }
         // --- LOCKED STATION UI ---
         else {
-            // UNLOCK Button
+            // UNLOCK Button - Blue
             bool canAffordUnlock = currentQubits >= station.unlockCost;
             if (!canAffordUnlock) ImGui::PushStyleVar(ImGuiStyleVar_Alpha, 0.5f);
 
-            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(m_StationButtons[unlockBtnIndex].color.r, m_StationButtons[unlockBtnIndex].color.g, m_StationButtons[unlockBtnIndex].color.b, 0.7f));
-            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(m_StationButtons[unlockBtnIndex].hoverColor.r, m_StationButtons[unlockBtnIndex].hoverColor.g, m_StationButtons[unlockBtnIndex].hoverColor.b, 1.0f));
+            Color unlockColor = Color::QuantumBlue();
+            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(unlockColor.r * 0.7f, unlockColor.g * 0.7f, unlockColor.b * 0.7f, 0.7f));
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(unlockColor.r, unlockColor.g, unlockColor.b, 1.0f));
 
             std::string unlockText = "Unlock for " + GameUtils::FormatNumber(station.unlockCost, m_NumberFormat) + " Qubits";
             if (ImGui::Button((unlockText + "##UnlockBtn" + std::to_string(i)).c_str(), ImVec2(-1, 50.0f)) && canAffordUnlock) {
-                 m_StationButtons[unlockBtnIndex].onClick();
+                if (SpendResource(QuantumResource::Qubits, station.unlockCost)) {
+                    station.unlocked = true;
+                    station.level = 0;
+                    Log::Infof("Unlocked: ", station.name);
+                }
             }
             ImGui::PopStyleColor(2);
             if (!canAffordUnlock) ImGui::PopStyleVar();
@@ -1429,11 +1356,9 @@ void GameState::RenderStationsContent() {
         ImGui::PushStyleVar(ImGuiStyleVar_Alpha, 0.3f);
     }
 
-    // Check for the prestige button click (m_StationButtons.back() is the prestige button)
-    if (!m_StationButtons.empty()) {
-        if (ImGui::Button(prestigeText.c_str(), ImVec2(-1, 80.0f)) && photonsToGain > 0.0) {
-            m_StationButtons.back().onClick();
-        }
+    // Prestige button
+    if (ImGui::Button(prestigeText.c_str(), ImVec2(-1, 80.0f)) && photonsToGain > 0.0) {
+        PerformPrestige();
     }
 
     if (photonsToGain <= 0.0) {
@@ -2077,7 +2002,10 @@ bool GameState::Save(const std::string& filepath) {
         if (i < researchedNodes.size() - 1) file << ",";
         file << "\n";
     }
-    file << "  ]\n";
+    file << "  ],\n";
+
+    // Specialized Skills
+    m_SpecializedSkills.SaveToJson(file);
 
     file << "}\n";
 
@@ -2098,6 +2026,7 @@ bool GameState::Load(const std::string& filepath) {
         bool inStatistics = false;
         bool inAchievements = false;
         bool inResearch = false;
+        bool inSpecializedSkills = false;
 
         while (std::getline(file, line)) {
             // Track sections
@@ -2105,22 +2034,32 @@ bool GameState::Load(const std::string& filepath) {
                 inStatistics = true;
                 inAchievements = false;
                 inResearch = false;
+                inSpecializedSkills = false;
                 continue;
             } else if (line.find("\"achievements\"") != std::string::npos) {
                 inStatistics = false;
                 inAchievements = true;
                 inResearch = false;
+                inSpecializedSkills = false;
                 continue;
             } else if (line.find("\"research\"") != std::string::npos) {
                 inStatistics = false;
                 inAchievements = false;
                 inResearch = true;
+                inSpecializedSkills = false;
+                continue;
+            } else if (line.find("\"specializedSkills\"") != std::string::npos) {
+                inStatistics = false;
+                inAchievements = false;
+                inResearch = false;
+                inSpecializedSkills = true;
                 continue;
             } else if (line.find("}") != std::string::npos || line.find("]") != std::string::npos) {
                 if (line.find("},") == std::string::npos) {
                     inStatistics = false;
                     inAchievements = false;
                     inResearch = false;
+                    inSpecializedSkills = false;
                 }
             }
 
@@ -2163,6 +2102,9 @@ bool GameState::Load(const std::string& filepath) {
                         // Ignore parse errors
                     }
                 }
+            } else if (inSpecializedSkills) {
+                // Parse specialized skills (delegate to LoadFromJson)
+                m_SpecializedSkills.LoadFromJson(line);
             } else {
                 // Parse main game state
                 if (line.find("\"saveTimestamp\"") != std::string::npos) {
@@ -3085,6 +3027,12 @@ bool GameState::PurchaseResearch(ResearchID id) {
 
     // Spawn celebration particles
     SpawnParticleBurst(Vec2(640.0f, 360.0f), Color::QuantumPurple(), 20);
+
+    // Award Engineering skill XP
+    m_SpecializedSkills.AddExperience(SkillCategory::Engineering, SkillXP::PURCHASE_RESEARCH);
+
+    // Play research complete sound
+    m_SoundManager.PlaySound(SoundEffect::ResearchComplete);
 
     Log::Info("Researched: " + node->name);
 
@@ -4293,6 +4241,12 @@ void GameState::EndCombat() {
         // Award XP
         AddXP(static_cast<f64>(m_CombatSystem.GetXPEarned()));
 
+        // Award Command skill XP for combat victory
+        m_SpecializedSkills.AddExperience(SkillCategory::Command, SkillXP::WIN_COMBAT);
+
+        // Play victory sound
+        m_SoundManager.PlaySound(SoundEffect::Victory);
+
         // Award enhancement materials based on enemy level
         i32 techScraps = 2 + (m_PlayerLevel / 5); // 2-22 scraps
         i32 nanoAlloy = (m_PlayerLevel >= 10) ? (1 + m_PlayerLevel / 10) : 0; // 0-11 alloy
@@ -4316,7 +4270,23 @@ void GameState::EndCombat() {
             
             ShipPart droppedPart = ShipPartGenerator::GeneratePart(rarity);
             m_Spaceship.AddPart(droppedPart);
-            
+
+            // Play loot sound based on rarity
+            switch (rarity) {
+                case PartRarity::Legendary:
+                    m_SoundManager.PlaySound(SoundEffect::LootLegendary);
+                    break;
+                case PartRarity::Epic:
+                    m_SoundManager.PlaySound(SoundEffect::LootEpic);
+                    break;
+                case PartRarity::Rare:
+                    m_SoundManager.PlaySound(SoundEffect::LootRare);
+                    break;
+                default:
+                    m_SoundManager.PlaySound(SoundEffect::LootDrop);
+                    break;
+            }
+
             Log::Infof("Combat reward: ", droppedPart.GetRarityName(), " ", droppedPart.name);
         }
     }
@@ -4343,6 +4313,9 @@ void GameState::AddXP(f64 amount) {
         m_PlayerLevel++;
 
         Log::Infof("LEVEL UP! You are now level ", m_PlayerLevel);
+
+        // Play level up sound
+        m_SoundManager.PlaySound(SoundEffect::LevelUp);
 
         // Check for unlocked features
         m_UnlockManager.OnLevelUp(m_PlayerLevel);
@@ -4456,4 +4429,164 @@ void GameState::RenderSkillTree(Renderer* renderer) {
 
     // NOTE: The previous manual mouse click check for the close button in UpdateUI
     // is now handled implicitly by ImGui within the RenderSkillTree function.
+}
+
+void GameState::RenderSpecializedSkills(Renderer* renderer) {
+    (void)renderer; // Unused in ImGui rendering
+
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(20, 20));
+
+    // Header
+    ImGui::TextColored(ImVec4(0.4f, 0.8f, 1.0f, 1.0f), "SPECIALIZED SKILLS");
+    ImGui::TextWrapped("Gain experience through gameplay actions. Each skill provides unique bonuses.");
+    ImGui::Spacing();
+    ImGui::Separator();
+    ImGui::Spacing();
+
+    // Summary stats
+    ImGui::Text("Total Skill Level: %d", m_SpecializedSkills.GetTotalSkillLevel());
+    ImGui::Text("Average Skill Level: %d", m_SpecializedSkills.GetAverageSkillLevel());
+    ImGui::Spacing();
+    ImGui::Separator();
+    ImGui::Spacing();
+
+    // Skill cards in a grid
+    float cardWidth = 350.0f;
+    float availableWidth = ImGui::GetContentRegionAvail().x;
+    i32 cardsPerRow = static_cast<i32>(availableWidth / (cardWidth + 10.0f));
+    if (cardsPerRow < 1) cardsPerRow = 1;
+
+    // Define skill data
+    struct SkillDisplay {
+        SkillCategory category;
+        const char* name;
+        const char* icon;
+        const char* description;
+        ImVec4 color;
+        const char* bonusDesc;
+    };
+
+    SkillDisplay skills[] = {
+        {
+            SkillCategory::Observation,
+            "OBSERVATION",
+            "👁",
+            "Production & Discovery\nGain XP by observing and unlocking stations.",
+            ImVec4(0.3f, 0.7f, 1.0f, 1.0f),
+            "+%% Global Production"
+        },
+        {
+            SkillCategory::Engineering,
+            "ENGINEERING",
+            "⚙",
+            "Efficiency & Building\nGain XP by upgrading stations and researching.",
+            ImVec4(0.4f, 1.0f, 0.4f, 1.0f),
+            "+%% Cost Reduction"
+        },
+        {
+            SkillCategory::Command,
+            "COMMAND",
+            "⚔",
+            "Combat & Management\nGain XP by winning battles and managing crew.",
+            ImVec4(1.0f, 0.4f, 0.4f, 1.0f),
+            "+%% Combat Power"
+        }
+    };
+
+    // Render each skill card
+    for (i32 i = 0; i < 3; i++) {
+        const SkillDisplay& display = skills[i];
+        const SpecializedSkill& skill = m_SpecializedSkills.GetSkill(display.category);
+
+        // Card background
+        ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.15f, 0.15f, 0.2f, 0.9f));
+        ImGui::PushStyleColor(ImGuiCol_Border, display.color);
+        ImGui::PushStyleVar(ImGuiStyleVar_ChildBorderSize, 2.0f);
+        ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 8.0f);
+
+        char cardId[64];
+        snprintf(cardId, sizeof(cardId), "SkillCard%d", i);
+
+        if (ImGui::BeginChild(cardId, ImVec2(cardWidth, 220.0f), true)) {
+            // Icon and title
+            ImGui::PushFont(ImGui::GetFont()); // Use current font (you can customize)
+            ImGui::TextColored(display.color, "%s %s", display.icon, display.name);
+            ImGui::PopFont();
+
+            ImGui::Spacing();
+
+            // Level display
+            ImGui::Text("Level: %d", skill.level);
+
+            // XP Progress bar
+            f32 progress = static_cast<f32>(m_SpecializedSkills.GetSkillProgress(display.category));
+            ImGui::PushStyleColor(ImGuiCol_PlotHistogram, display.color);
+            ImGui::ProgressBar(progress, ImVec2(-1, 25));
+            ImGui::PopStyleColor();
+
+            // XP text
+            ImGui::Text("XP: %.0f / %.0f", skill.experience, skill.experienceToNextLevel);
+
+            ImGui::Spacing();
+            ImGui::Separator();
+            ImGui::Spacing();
+
+            // Description
+            ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + cardWidth - 40);
+            ImGui::TextColored(ImVec4(0.8f, 0.8f, 0.8f, 1.0f), "%s", display.description);
+            ImGui::PopTextWrapPos();
+
+            ImGui::Spacing();
+
+            // Bonus display
+            f64 bonusPercent = (skill.GetBonusMultiplier() - 1.0) * 100.0;
+            ImGui::TextColored(ImVec4(1.0f, 0.9f, 0.3f, 1.0f), "Bonus: +%.0f%% (%s)",
+                             bonusPercent, display.bonusDesc);
+        }
+        ImGui::EndChild();
+
+        ImGui::PopStyleVar(2);
+        ImGui::PopStyleColor(2);
+
+        // Same line for next card if not the last in row
+        if ((i + 1) % cardsPerRow != 0 && i < 2) {
+            ImGui::SameLine(0, 10.0f);
+        }
+    }
+
+    ImGui::Spacing();
+    ImGui::Spacing();
+    ImGui::Separator();
+    ImGui::Spacing();
+
+    // XP Rewards Reference Table
+    if (ImGui::CollapsingHeader("XP Rewards Reference", ImGuiTreeNodeFlags_DefaultOpen)) {
+        ImGui::Columns(3, "XPTable", true);
+
+        // Observation column
+        ImGui::TextColored(ImVec4(0.3f, 0.7f, 1.0f, 1.0f), "OBSERVATION");
+        ImGui::Separator();
+        ImGui::Text("Observe Station: +5 XP");
+        ImGui::Text("Unlock Station: +25 XP");
+        ImGui::NextColumn();
+
+        // Engineering column
+        ImGui::TextColored(ImVec4(0.4f, 1.0f, 0.4f, 1.0f), "ENGINEERING");
+        ImGui::Separator();
+        ImGui::Text("Upgrade Station: +10 XP");
+        ImGui::Text("Purchase Research: +20 XP");
+        ImGui::Text("Buy Upgrade: +15 XP");
+        ImGui::NextColumn();
+
+        // Command column
+        ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "COMMAND");
+        ImGui::Separator();
+        ImGui::Text("Win Combat: +30 XP");
+        ImGui::Text("Install Ship Part: +15 XP");
+        ImGui::NextColumn();
+
+        ImGui::Columns(1);
+    }
+
+    ImGui::PopStyleVar();
 }

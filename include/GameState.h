@@ -15,6 +15,8 @@
 #include "SkillTree.h"
 #include "EnhancementSystem.h"
 #include "FeatureUnlockManager.h"
+#include "SpecializedSkills.h"
+#include "SoundManager.h"
 #include <vector>
 #include <string>
 #include <functional>
@@ -171,22 +173,6 @@ struct QuantumTimeline {
     QuantumTimeline();
 };
 
-// UI Button
-struct UIButton {
-    Rect bounds;
-    std::string text;
-    Color color;
-    Color hoverColor;
-    std::function<void()> onClick;
-    bool enabled = true;
-    bool hovered = false;
-    f64 affordability = 1.0; // 0.0-1.0: How close to affording (for visual feedback)
-
-    void Update(const Vec2& mousePos);
-    void Render(Renderer* renderer);
-    bool WasClicked(const Vec2& mousePos, bool mousePressed);
-};
-
 // Modal Window Management - ensures only one modal is active at a time
 enum class ActiveModal {
     None,           // Stations view (base state)
@@ -203,6 +189,7 @@ enum class ActiveModal {
     Gatcha,
     Skills,
     Enhancement,
+    SpecializedSkills,  // Activity-based progression system
     MoreMenu
 };
 
@@ -299,6 +286,12 @@ public:
     // Enhancement System
     EnhancementSystem& GetEnhancementSystem() { return m_EnhancementSystem; }
 
+    // Specialized Skills System
+    SpecializedSkillsSystem& GetSpecializedSkills() { return m_SpecializedSkills; }
+
+    // Sound Manager
+    SoundManager& GetSoundManager() { return m_SoundManager; }
+
     // Feature Unlock Manager
     FeatureUnlockManager& GetUnlockManager() { return m_UnlockManager; }
     const FeatureUnlockManager& GetUnlockManager() const { return m_UnlockManager; }
@@ -353,6 +346,7 @@ private:
     void RenderCombat(Renderer* renderer);
     void RenderGatcha(Renderer* renderer);
     void RenderSkillTree(Renderer* renderer);
+    void RenderSpecializedSkills(Renderer* renderer);
 
     // Particle system helpers
     void SpawnParticle(const Vec2& position, const Color& color, f64 lifetime = 1.0);
@@ -424,11 +418,16 @@ private:
     // Feature Unlock Manager
     FeatureUnlockManager m_UnlockManager;
 
+    // Specialized Skills System
+    SpecializedSkillsSystem m_SpecializedSkills;
+
+    // Sound Manager
+    SoundManager m_SoundManager;
+
     // Offline progress
     i64 m_LastSaveTimestamp;
 
     // UI
-    std::vector<UIButton> m_StationButtons; // Persistent buttons (unlock, observe, upgrade per station + prestige)
     Vec2 m_ScrollOffset;
 
     // Modal Window Management System

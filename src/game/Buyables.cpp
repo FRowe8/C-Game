@@ -106,6 +106,9 @@ bool BuyableManager::Purchase(const std::string& id, GameState* gameState) {
         buyable->onPurchase(gameState);
     }
 
+    // Award Engineering skill XP
+    gameState->GetSpecializedSkills().AddExperience(SkillCategory::Engineering, SkillXP::BUY_UPGRADE);
+
     Log::Infof("Purchased: ", buyable->name, " (", buyable->timesPurchased, " times)");
     return true;
 }
