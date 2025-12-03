@@ -8,6 +8,7 @@
 class GameState;
 class Renderer;
 struct ResearchStation;
+struct Particle;
 
 namespace UI {
 
