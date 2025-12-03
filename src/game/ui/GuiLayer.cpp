@@ -1153,13 +1153,203 @@ void StationView::RenderPrestigeButton(GameState* state) {
 // =============================================================================
 
 void AchievementView::Render(GameState* state, Renderer* renderer) {
-    // TODO: Extract from GameState::RenderAchievements
-    state->RenderAchievements(renderer);
+    (void)renderer; // Not used for ImGui rendering
+
+    // Use ActiveModal instead of legacy m_ShowAchievements boolean
+    if (state->GetActiveModal() != ActiveModal::Achievements) return;
+
+    ImGui::SetNextWindowSize(ImVec2(600, 700), ImGuiCond_Once);
+    ImGui::SetNextWindowPos(
+        ImVec2(ImGui::GetIO().DisplaySize.x * 0.5f, ImGui::GetIO().DisplaySize.y * 0.5f),
+        ImGuiCond_Once,
+        ImVec2(0.5f, 0.5f)
+    );
+
+    bool showWindow = true;
+    if (ImGui::Begin("Achievements", &showWindow, ImGuiWindowFlags_NoCollapse)) {
+        ImGui::Text("--- Achievement Progress ---");
+        ImGui::Separator();
+
+        for (auto& achievement : state->m_Achievements) {
+            // Determine text color based on status
+            ImVec4 statusColor = ImVec4(0.5f, 0.5f, 0.5f, 1.0f); // Default: in-progress
+            const char* statusText = "IN PROGRESS";
+
+            if (achievement.unlocked) {
+                statusColor = ImVec4(0.0f, 1.0f, 0.0f, 1.0f); // Green: Unlocked
+                statusText = "UNLOCKED";
+            } else if (achievement.progress >= achievement.target) {
+                statusColor = ImVec4(1.0f, 0.8f, 0.0f, 1.0f); // Gold: Ready to Claim
+                statusText = "CLAIMABLE";
+            }
+
+            // Achievement Title and Status
+            ImGui::PushStyleColor(ImGuiCol_Text, statusColor);
+            ImGui::Text("[%s] %s", statusText, achievement.name.c_str());
+            ImGui::PopStyleColor();
+
+            ImGui::Indent();
+            ImGui::TextWrapped("%s", achievement.description.c_str());
+
+            f32 progress = static_cast<f32>(achievement.progress / achievement.target);
+
+            if (achievement.progress < achievement.target) {
+                // Show progress bar if not complete
+                char overlay[64];
+                snprintf(overlay, sizeof(overlay), "%.0f / %.0f", achievement.progress, achievement.target);
+                ImGui::ProgressBar(progress, ImVec2(-1, 0), overlay);
+            } else if (achievement.unlocked) {
+                // Show a full bar for completed, claimed achievements
+                ImGui::ProgressBar(1.0f, ImVec2(-1, 0), "Completed");
+            }
+
+            // Claim Button Logic
+            if (achievement.progress >= achievement.target && !achievement.unlocked) {
+                ImGui::Spacing();
+                std::string rewardText = "Claim: ";
+                if (achievement.rewardQubits > 0) {
+                    rewardText += GameUtils::FormatNumber(achievement.rewardQubits, state->m_NumberFormat) + " Qubits ";
+                }
+                if (achievement.rewardPhotons > 0) {
+                    rewardText += std::to_string(achievement.rewardPhotons) + " Photons";
+                }
+
+                if (ImGui::Button((rewardText + "##ClaimAch" + std::to_string(static_cast<int>(achievement.id))).c_str(), ImVec2(150, 30))) {
+                    achievement.unlocked = true;
+                    state->AddResource(QuantumResource::Qubits, achievement.rewardQubits);
+                    state->m_Timeline.photons += achievement.rewardPhotons;
+                    state->GetSoundManager().PlaySound(SoundEffect::AchievementUnlock, 1.0f);
+                }
+                ImGui::Spacing();
+            }
+
+            ImGui::Unindent();
+            ImGui::Separator();
+        }
+    }
+    ImGui::End();
+
+    // Close modal if window was closed
+    if (!showWindow) {
+        state->SetActiveModal(ActiveModal::None);
+    }
 }
 
 void StatisticsView::Render(GameState* state, Renderer* renderer) {
-    // TODO: Extract from GameState::RenderStatistics
-    state->RenderStatistics(renderer);
+    (void)renderer; // Not used for ImGui rendering
+
+    if (state->GetActiveModal() != ActiveModal::Statistics) return;
+
+    ImGui::SetNextWindowSize(ImVec2(500, 600), ImGuiCond_Once);
+    ImGui::SetNextWindowPos(
+        ImVec2(ImGui::GetIO().DisplaySize.x * 0.5f, ImGui::GetIO().DisplaySize.y * 0.5f),
+        ImGuiCond_Once,
+        ImVec2(0.5f, 0.5f)
+    );
+
+    bool showWindow = true;
+    if (ImGui::Begin("Statistics", &showWindow, ImGuiWindowFlags_NoCollapse)) {
+        ImGui::Text("--- Total Lifetime Statistics ---");
+        ImGui::Separator();
+
+        ImGui::Columns(2, "StatColumns", true);
+        ImGui::SetColumnWidth(0, 300.0f);
+
+        auto format = [state](f64 value) { return GameUtils::FormatNumber(value, state->m_NumberFormat); };
+
+        // --- Total Stats ---
+        ImGui::Text("Total Qubits Earned:"); ImGui::NextColumn();
+        ImGui::Text("%s", format(state->m_Statistics.totalQubitsEarned).c_str()); ImGui::NextColumn();
+
+        ImGui::Text("Total Coherence Earned:"); ImGui::NextColumn();
+        ImGui::Text("%s", format(state->m_Statistics.totalCoherenceEarned).c_str()); ImGui::NextColumn();
+
+        ImGui::Text("Total Entanglement Earned:"); ImGui::NextColumn();
+        ImGui::Text("%s", format(state->m_Statistics.totalEntanglementEarned).c_str()); ImGui::NextColumn();
+
+        ImGui::Text("Total Observations:"); ImGui::NextColumn();
+        ImGui::Text("%d", state->m_Statistics.totalObservations); ImGui::NextColumn();
+
+        ImGui::Text("Total Upgrades Purchased:"); ImGui::NextColumn();
+        ImGui::Text("%d", state->m_Statistics.totalUpgrades); ImGui::NextColumn();
+
+        ImGui::Text("Prestiges Performed:"); ImGui::NextColumn();
+        ImGui::Text("%d", state->m_Statistics.totalPrestigesPerformed); ImGui::NextColumn();
+
+        ImGui::Columns(1);
+        ImGui::Separator();
+
+        ImGui::Text("--- Session Statistics ---");
+        ImGui::Separator();
+
+        ImGui::Columns(2, "SessionStatColumns", true);
+        ImGui::SetColumnWidth(0, 300.0f);
+
+        ImGui::Text("Session Qubits Earned:"); ImGui::NextColumn();
+        ImGui::Text("%s", format(state->m_Statistics.sessionQubits).c_str()); ImGui::NextColumn();
+
+        ImGui::Text("Session Time (seconds):"); ImGui::NextColumn();
+        ImGui::Text("%.1f", state->m_Statistics.sessionTime); ImGui::NextColumn();
+
+        ImGui::Text("Session Observations:"); ImGui::NextColumn();
+        ImGui::Text("%d", state->m_Statistics.sessionObservations); ImGui::NextColumn();
+
+        ImGui::Columns(1);
+        ImGui::Separator();
+
+        // Live telemetry
+        ImGui::Text("--- Live Telemetry ---");
+        ImGui::Separator();
+
+        const TelemetryManager& telemetry = state->m_Telemetry;
+
+        ImGui::Columns(2, "TelemetryStatColumns", true);
+        ImGui::SetColumnWidth(0, 300.0f);
+
+        ImGui::Text("Current Session Length:"); ImGui::NextColumn();
+        ImGui::Text("%s", GameUtils::FormatTime(telemetry.GetSessionLengthSeconds()).c_str()); ImGui::NextColumn();
+
+        ImGui::Text("Prestiges This Session:"); ImGui::NextColumn();
+        ImGui::Text("%d", telemetry.GetSessionPrestiges()); ImGui::NextColumn();
+
+        ImGui::Text("Prestiges Per Hour:"); ImGui::NextColumn();
+        ImGui::Text("%.2f", telemetry.GetPrestigesPerHour()); ImGui::NextColumn();
+
+        ImGui::Text("Avg. Minutes Between Prestiges:"); ImGui::NextColumn();
+        ImGui::Text("%.2f", telemetry.GetAveragePrestigeIntervalMinutes()); ImGui::NextColumn();
+
+        ImGui::Text("Last Prestige Interval (seconds):"); ImGui::NextColumn();
+        ImGui::Text("%.1f", telemetry.GetLastPrestigeIntervalSeconds()); ImGui::NextColumn();
+
+        ImGui::Columns(1);
+        ImGui::Separator();
+
+        ImGui::Text("--- Records ---");
+        ImGui::Separator();
+
+        ImGui::Columns(2, "RecordStatColumns", true);
+        ImGui::SetColumnWidth(0, 300.0f);
+
+        ImGui::Text("Highest Qubits Achieved:"); ImGui::NextColumn();
+        ImGui::Text("%s", format(state->m_Statistics.highestQubits).c_str()); ImGui::NextColumn();
+
+        ImGui::Text("Fastest Prestige (seconds):"); ImGui::NextColumn();
+        if (state->m_Statistics.fastestPrestige < 99999.0) {
+            ImGui::Text("%.1f", state->m_Statistics.fastestPrestige); ImGui::NextColumn();
+        } else {
+            ImGui::Text("N/A"); ImGui::NextColumn();
+        }
+
+        ImGui::Text("Longest Login Streak:"); ImGui::NextColumn();
+        ImGui::Text("%d days", state->m_Statistics.longestStreak); ImGui::NextColumn();
+
+        ImGui::Columns(1);
+    }
+    ImGui::End();
+
+    if (!showWindow) {
+        state->SetActiveModal(ActiveModal::None);
+    }
 }
 
 void ResearchView::Render(GameState* state, Renderer* renderer) {
@@ -1168,8 +1358,77 @@ void ResearchView::Render(GameState* state, Renderer* renderer) {
 }
 
 void MilestoneView::Render(GameState* state, Renderer* renderer) {
-    // TODO: Extract from GameState::RenderMilestones
-    state->RenderMilestones(renderer);
+    (void)renderer; // Not used for ImGui rendering
+
+    if (state->GetActiveModal() != ActiveModal::Milestones) return;
+
+    ImGui::SetNextWindowSize(ImVec2(600, 700), ImGuiCond_Once);
+    ImGui::SetNextWindowPos(
+        ImVec2(ImGui::GetIO().DisplaySize.x * 0.5f, ImGui::GetIO().DisplaySize.y * 0.5f),
+        ImGuiCond_Once,
+        ImVec2(0.5f, 0.5f)
+    );
+
+    bool showWindow = true;
+    if (ImGui::Begin("Timeline Milestones", &showWindow, ImGuiWindowFlags_NoCollapse)) {
+        ImGui::Text("--- Timeline Milestones ---");
+        ImGui::Separator();
+
+        for (auto& milestone : state->m_MilestoneSystem.GetMilestones()) {
+            // Determine text color based on status
+            ImVec4 statusColor = ImVec4(0.5f, 0.5f, 0.5f, 1.0f); // Default: in-progress
+            const char* statusText = "IN PROGRESS";
+
+            if (milestone.claimed) {
+                statusColor = ImVec4(0.0f, 1.0f, 0.0f, 1.0f); // Green: Completed
+                statusText = "COMPLETED";
+            } else if (milestone.progress >= milestone.target) {
+                statusColor = ImVec4(1.0f, 0.8f, 0.0f, 1.0f); // Gold: Ready to Claim
+                statusText = "CLAIMABLE";
+            }
+
+            // Milestone Title and Status
+            ImGui::PushStyleColor(ImGuiCol_Text, statusColor);
+            ImGui::Text("[%s] %s", statusText, milestone.name.c_str());
+            ImGui::PopStyleColor();
+
+            ImGui::Indent();
+            ImGui::TextWrapped("Target: %s %s",
+                GameUtils::FormatNumber(milestone.target, state->m_NumberFormat).c_str(),
+                milestone.featureName.c_str());
+
+            f32 progress = static_cast<f32>(milestone.progress / milestone.target);
+
+            if (!milestone.claimed) {
+                char overlay[64];
+                snprintf(overlay, sizeof(overlay), "%.0f / %.0f", milestone.progress, milestone.target);
+                ImGui::ProgressBar(progress, ImVec2(-1, 0), overlay);
+            } else {
+                ImGui::ProgressBar(1.0f, ImVec2(-1, 0), "Completed");
+            }
+
+            // Claim Button Logic
+            if (milestone.progress >= milestone.target && !milestone.claimed) {
+                ImGui::Spacing();
+                std::string rewardText = "Claim: " + std::to_string(milestone.rewardSingularities) + " Singularities";
+
+                if (ImGui::Button((rewardText + "##ClaimMS" + std::to_string(static_cast<int>(milestone.id))).c_str(), ImVec2(200, 30))) {
+                    milestone.claimed = true;
+                    state->m_Timeline.singularities += milestone.rewardSingularities;
+                    state->GetSoundManager().PlaySound(SoundEffect::Achievement, 1.0f);
+                }
+                ImGui::Spacing();
+            }
+
+            ImGui::Unindent();
+            ImGui::Separator();
+        }
+    }
+    ImGui::End();
+
+    if (!showWindow) {
+        state->SetActiveModal(ActiveModal::None);
+    }
 }
 
 void BuyablesView::Render(GameState* state, Renderer* renderer) {
