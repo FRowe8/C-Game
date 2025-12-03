@@ -387,6 +387,7 @@ private:
     void InitializeUI();
     void UpdateStations(f64 deltaTime);
     void UpdateCoherence(f64 deltaTime);
+    void UpdateDynamicMusic();  // Phase 4.2: Switch music based on active modal
     void UpdateUI(Input* input);
     void RenderUI(Renderer* renderer);
     void RenderResources(Renderer* renderer);

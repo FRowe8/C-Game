@@ -465,6 +465,9 @@ void NavigationView::Render(GameState* state, Renderer* renderer) {
             ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.0f);
 
             if (ImGui::Button(btn.label, ImVec2(btnWidth, btnHeight))) {
+                // Phase 4.2: Play click sound
+                state->GetSoundManager().PlaySound(SoundEffect::ButtonPress, 0.8f);
+
                 // Phase 1.2: Use state machine - toggle between modal and None
                 if (active) {
                     state->SetActiveModal(ActiveModal::None);
@@ -568,6 +571,9 @@ void NavigationView::Render(GameState* state, Renderer* renderer) {
                 ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 1.0f);
 
                 if (ImGui::Button(btn.label, ImVec2(itemWidth, itemHeight))) {
+                    // Phase 4.2: Play click sound
+                    state->GetSoundManager().PlaySound(SoundEffect::ButtonPress, 0.8f);
+
                     // Phase 1.2: Use state machine - toggle between modal and None
                     if (active) {
                         state->SetActiveModal(ActiveModal::None);

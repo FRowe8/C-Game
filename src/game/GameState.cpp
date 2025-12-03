@@ -476,6 +476,12 @@ void GameState::Update(f64 deltaTime, Input* input, Renderer* renderer) {
     // Update feature unlock manager (handles notifications)
     m_UnlockManager.Update(deltaTime);
 
+    // Phase 4.2: Update music system (handle cross-fading)
+    m_SoundManager.UpdateMusic(deltaTime);
+
+    // Phase 4.2: Dynamic music based on active modal
+    UpdateDynamicMusic();
+
     // Update boost timers
     if (m_BoostActive) {
         m_BoostTimeRemaining -= deltaTime;
@@ -718,6 +724,61 @@ void GameState::UpdateCoherence(f64 deltaTime) {
     if (m_Coherence < 0) m_Coherence = 0;
 
     // Coherence affects production (applied in UpdateStations)
+}
+
+// Phase 4.2: Dynamic music system - change music based on active modal
+void GameState::UpdateDynamicMusic() {
+    if (!m_SoundManager.IsAudioAvailable()) return;
+
+    // Don't switch music if we're currently fading
+    if (m_SoundManager.IsFading()) return;
+
+    // Determine which music track should be playing based on current modal
+    MusicTrack targetTrack = MusicTrack::MainTheme;  // Default
+
+    switch (m_ActiveModal) {
+        case ActiveModal::None:
+            // Idle/stations gameplay
+            targetTrack = MusicTrack::MainTheme;
+            break;
+
+        case ActiveModal::Combat:
+            // Combat mode
+            targetTrack = MusicTrack::CombatTheme;
+            break;
+
+        case ActiveModal::Research:
+        case ActiveModal::Skills:
+        case ActiveModal::SpecializedSkills:
+            // Research/skill trees
+            targetTrack = MusicTrack::ResearchTheme;
+            break;
+
+        case ActiveModal::EssenceShop:
+        case ActiveModal::SingularityShop:
+        case ActiveModal::Buyables:
+            // Shops
+            targetTrack = MusicTrack::ShopTheme;
+            break;
+
+        case ActiveModal::Statistics:
+        case ActiveModal::Achievements:
+        case ActiveModal::Milestones:
+        case ActiveModal::Collection:
+            // Calm menus
+            targetTrack = MusicTrack::AmbientCalm;
+            break;
+
+        default:
+            // Keep current track for other modals
+            targetTrack = m_SoundManager.GetCurrentTrack();
+            break;
+    }
+
+    // Fade to new track if different from current
+    if (targetTrack != m_SoundManager.GetCurrentTrack()) {
+        m_SoundManager.FadeMusicTo(targetTrack, 2.0f);  // 2-second cross-fade
+    }
 }
 
 void GameState::UpdateUI(Input* input) {

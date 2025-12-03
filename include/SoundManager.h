@@ -50,14 +50,21 @@ enum class SoundEffect {
     UpgradeComplete,
     ResearchComplete,
 
+    // Phase 4.2: Additional UI Sounds
+    Error,              // Error/cannot afford sound
+    AchievementUnlock,  // More prominent achievement sound
+
     COUNT
 };
 
 enum class MusicTrack {
-    MainTheme,
-    CombatTheme,
-    BossTheme,
-    VictoryTheme,
+    MainTheme,          // Idle/stations gameplay
+    CombatTheme,        // Combat mode
+    BossTheme,          // Boss encounters (future)
+    VictoryTheme,       // Victory screen (future)
+    ResearchTheme,      // Research/skill trees
+    ShopTheme,          // Essence/Singularity shops
+    AmbientCalm,        // Calm ambient for menus
     COUNT
 };
 
@@ -80,6 +87,12 @@ public:
     void StopMusic();
     void PauseMusic();
     void ResumeMusic();
+
+    // Phase 4.2: Cross-fading and dynamic music
+    void FadeMusicTo(MusicTrack track, f32 fadeTimeSeconds = 1.0f);
+    void UpdateMusic(f64 deltaTime);  // Call each frame to handle fades
+    MusicTrack GetCurrentTrack() const { return m_CurrentMusicTrack; }
+    bool IsFading() const { return m_IsFading; }
 
     // Volume control
     void SetMasterVolume(f32 volume);      // 0.0 to 1.0
@@ -112,6 +125,13 @@ private:
     // Currently playing music
     MusicTrack m_CurrentMusicTrack;
     bool m_MusicPlaying;
+
+    // Phase 4.2: Cross-fade state
+    bool m_IsFading;
+    MusicTrack m_TargetMusicTrack;
+    f32 m_FadeTimeTotal;
+    f32 m_FadeTimeElapsed;
+    f32 m_FadeStartVolume;
 
     // Helper methods
     void LoadSounds();
