@@ -102,7 +102,6 @@ private:
 
     // UI state
     SummonBanner m_SelectedBanner;
-    f32 m_ScrollOffset;
 
     // Helper methods
     ShipPart GeneratePartForBanner(SummonBanner banner, bool forcedRarity = false, PartRarity rarity = PartRarity::Common);
