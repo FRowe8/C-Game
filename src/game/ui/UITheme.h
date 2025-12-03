@@ -18,29 +18,103 @@ namespace UITheme {
     const ImVec4 ColorText         = ImVec4(0.95f, 0.95f, 0.95f, 1.00f);
     const ImVec4 ColorTextDim      = ImVec4(0.60f, 0.60f, 0.60f, 1.00f);
 
-    // --- Layout Constants ---
-    const float TopBarHeight       = 60.0f;
-    const float BottomBarHeight    = 80.0f;
-    const float SidebarWidth       = 250.0f;
-    const float WindowRounding     = 8.0f;
-    const float ItemSpacing        = 12.0f;
-    const float FramePaddingX      = 10.0f;
-    const float FramePaddingY      = 6.0f;
+    // --- Layout Constants (scaled for mobile/desktop) ---
+    struct LayoutMetrics {
+        float topBarHeight = 60.0f;
+        float bottomBarHeight = 80.0f;
+        float sidebarWidth = 250.0f;
+        float windowRounding = 8.0f;
+        float itemSpacing = 12.0f;
+        float framePaddingX = 10.0f;
+        float framePaddingY = 6.0f;
+        float fontScale = 1.0f;
+        float contentPadding = 16.0f;
+        float safeAreaPadding = 12.0f;
+        float touchPadding = 6.0f;
+        float navButtonHeight = 56.0f;
+        float buttonRounding = 10.0f;
+        float borderThickness = 1.0f;
+        float scrollbarSize = 16.0f;
+    };
+
+    inline LayoutMetrics& GetLayout() {
+        static LayoutMetrics metrics{};
+        return metrics;
+    }
+
+    inline float CalculateScale(const ImVec2& displaySize) {
+        const float shortSide = (displaySize.x < displaySize.y) ? displaySize.x : displaySize.y;
+
+        // Heuristic: aggressively scale up on smaller screens to keep touch targets usable.
+        if (shortSide <= 540.0f) {
+            return 1.45f; // Small phones
+        }
+        if (shortSide <= 720.0f) {
+            return 1.30f; // Large phones / small tablets
+        }
+        if (shortSide <= 900.0f) {
+            return 1.15f; // Small laptops / medium tablets
+        }
+        return 1.0f; // Desktop baseline
+    }
+
+    inline void ApplyLayoutScale(float scale) {
+        auto& layout = GetLayout();
+        layout.fontScale = scale;
+        layout.topBarHeight = 60.0f * scale;
+        layout.bottomBarHeight = 80.0f * scale;
+        layout.sidebarWidth = 250.0f * scale;
+        layout.windowRounding = 8.0f * scale;
+        layout.itemSpacing = 12.0f * scale;
+        layout.framePaddingX = 10.0f * scale;
+        layout.framePaddingY = 6.0f * scale;
+        layout.contentPadding = 16.0f * scale;
+        layout.safeAreaPadding = 12.0f * scale;
+        layout.touchPadding = 6.0f * scale;
+        layout.navButtonHeight = 56.0f * scale;
+        layout.buttonRounding = 10.0f * scale;
+        layout.borderThickness = 1.0f * scale;
+        layout.scrollbarSize = 16.0f * scale;
+    }
+
+    inline float TopBarHeight() { return GetLayout().topBarHeight; }
+    inline float BottomBarHeight() { return GetLayout().bottomBarHeight; }
+    inline float ItemSpacing() { return GetLayout().itemSpacing; }
+    inline float ContentPadding() { return GetLayout().contentPadding; }
+    inline float SafeAreaPadding() { return GetLayout().safeAreaPadding; }
+    inline float NavigationButtonHeight() { return GetLayout().navButtonHeight; }
+    inline float NavigationButtonRounding() { return GetLayout().buttonRounding; }
+    inline float BorderThickness() { return GetLayout().borderThickness; }
+    inline float ScrollbarSize() { return GetLayout().scrollbarSize; }
+    inline ImVec2 FramePadding() { return ImVec2(GetLayout().framePaddingX, GetLayout().framePaddingY); }
+    inline ImVec2 TouchPadding() { return ImVec2(GetLayout().touchPadding, GetLayout().touchPadding); }
 
     // --- Helper to Apply Style ---
     inline void SetupStyle() {
         ImGuiStyle& style = ImGui::GetStyle();
-        
-        style.WindowRounding    = WindowRounding;
-        style.FrameRounding     = 6.0f;
-        style.PopupRounding     = WindowRounding;
-        style.ScrollbarRounding = 12.0f;
-        style.GrabRounding      = 12.0f;
-        
-        style.WindowPadding     = ImVec2(15, 15);
-        style.FramePadding      = ImVec2(FramePaddingX, FramePaddingY);
-        style.ItemSpacing       = ImVec2(ItemSpacing, 8);
-        
+        ImGuiIO& io = ImGui::GetIO();
+
+        const float scale = CalculateScale(io.DisplaySize);
+        ApplyLayoutScale(scale);
+        io.FontGlobalScale = GetLayout().fontScale;
+
+        style.WindowRounding    = GetLayout().windowRounding;
+        style.FrameRounding     = 6.0f * scale;
+        style.PopupRounding     = GetLayout().windowRounding;
+        style.ScrollbarRounding = 12.0f * scale;
+        style.GrabRounding      = 12.0f * scale;
+
+        style.WindowPadding     = ImVec2(GetLayout().contentPadding, GetLayout().contentPadding);
+        style.FramePadding      = FramePadding();
+        style.ItemSpacing       = ImVec2(GetLayout().itemSpacing, 8.0f * scale);
+        style.TouchExtraPadding = TouchPadding();
+        style.ScrollbarSize     = GetLayout().scrollbarSize;
+        style.GrabMinSize       = 18.0f * scale;
+        style.WindowBorderSize  = GetLayout().borderThickness;
+        style.ChildBorderSize   = GetLayout().borderThickness * 0.75f;
+        style.PopupBorderSize   = GetLayout().borderThickness;
+        style.FrameBorderSize   = GetLayout().borderThickness * 0.75f;
+
         style.Colors[ImGuiCol_WindowBg]       = ColorPanelBg;
         style.Colors[ImGuiCol_Border]         = ColorBorder;
         style.Colors[ImGuiCol_Text]           = ColorText;
