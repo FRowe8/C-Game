@@ -2027,11 +2027,10 @@ void SkillTreeView::Render(GameState* state, Renderer* renderer) {
 }
 
 void EnhancementView::Render(GameState* state, Renderer* renderer) {
-    // TODO: Extract from GameState::RenderEnhancement
-    // Note: This method doesn't exist yet in GameState
-    (void)state;
-    (void)renderer;
-    ImGui::Text("Enhancement view - Coming soon!");
+    if (state->GetActiveModal() != ActiveModal::Enhancement) return;
+
+    // EnhancementSystem handles its own ImGui window creation
+    state->m_EnhancementSystem.RenderEnhancementUI(renderer, state);
 }
 
 void SpecializedSkillsView::Render(GameState* state, Renderer* renderer) {
