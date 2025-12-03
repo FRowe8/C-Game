@@ -204,8 +204,10 @@ public:
 private:
     // Particle system
     std::vector<Particle> m_Particles;
+    std::vector<Particle> m_ParticlePool;
     bool m_ParticlesEnabled;
     f32 m_ParticleScale;
+    size_t m_MaxActiveParticles = 500;
 
     // Quantum Anomaly system
     std::vector<QuantumAnomaly> m_Anomalies;

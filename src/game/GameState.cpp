@@ -235,6 +235,9 @@ GameState::GameState()
     for (int i = 0; i < 3; i++) {
         m_Resources[i] = 0;
     }
+
+    m_Particles.reserve(m_MaxActiveParticles);
+    m_ParticlePool.reserve(m_MaxActiveParticles);
 }
 
 GameState::~GameState() {
@@ -2730,6 +2733,10 @@ void GameState::CalculateOfflineProgress() {
 // Particle System Implementation
 void GameState::SpawnParticle(const Vec2& position, const Color& color, f64 lifetime) {
     Particle p;
+    if (!m_ParticlePool.empty()) {
+        p = std::move(m_ParticlePool.back());
+        m_ParticlePool.pop_back();
+    }
     p.position = position;
     p.velocity = Vec2(
         static_cast<f32>(GameUtils::RandomRange(-50.0, 50.0)),
@@ -2739,6 +2746,13 @@ void GameState::SpawnParticle(const Vec2& position, const Color& color, f64 life
     p.lifetime = 0.0f;
     p.maxLifetime = static_cast<f32>(lifetime);
     m_Particles.push_back(p);
+
+    // Enforce active particle budget
+    while (m_Particles.size() > m_MaxActiveParticles) {
+        m_ParticlePool.push_back(std::move(m_Particles.front()));
+        m_Particles.front() = std::move(m_Particles.back());
+        m_Particles.pop_back();
+    }
 }
 
 void GameState::SpawnParticleBurst(const Vec2& position, const Color& color, i32 count) {
@@ -2748,7 +2762,9 @@ void GameState::SpawnParticleBurst(const Vec2& position, const Color& color, i32
 }
 
 void GameState::UpdateParticles(f64 deltaTime) {
-    // Update and remove dead particles
+    // Update and recycle dead or culled particles
+    const ImVec2 displaySize = ImGui::GetIO().DisplaySize;
+    const f32 cullPadding = 16.0f; // Prevent rendering just off-screen
     auto it = m_Particles.begin();
     while (it != m_Particles.end()) {
         it->lifetime += static_cast<f32>(deltaTime);
@@ -2762,17 +2778,21 @@ void GameState::UpdateParticles(f64 deltaTime) {
         f32 alpha = 1.0f - (it->lifetime / it->maxLifetime);
         it->color.a = alpha;
 
-        // Remove if dead
-        if (it->lifetime >= it->maxLifetime) {
-            it = m_Particles.erase(it);
+        const f32 maxParticleSize = 6.0f; // Matches rendering size ramp
+        const bool expired = it->lifetime >= it->maxLifetime;
+        const bool offscreen =
+            (it->position.x < -cullPadding - maxParticleSize) ||
+            (it->position.x > displaySize.x + cullPadding + maxParticleSize) ||
+            (it->position.y < -cullPadding - maxParticleSize) ||
+            (it->position.y > displaySize.y + cullPadding + maxParticleSize);
+
+        if (expired || offscreen) {
+            m_ParticlePool.push_back(std::move(*it));
+            *it = std::move(m_Particles.back());
+            m_Particles.pop_back();
         } else {
             ++it;
         }
-    }
-
-    // Limit particle count to prevent lag
-    if (m_Particles.size() > 500) {
-        m_Particles.erase(m_Particles.begin(), m_Particles.begin() + 100);
     }
 }
 
@@ -4351,11 +4371,19 @@ void GameState::SpawnQuantumAnomaly() {
 
 void GameState::UpdateQuantumAnomalies(f64 deltaTime) {
     // Update existing anomalies
+    const ImVec2 displaySize = ImGui::GetIO().DisplaySize;
+    const f32 cullPadding = 32.0f;
     for (auto it = m_Anomalies.begin(); it != m_Anomalies.end();) {
         it->lifetime += deltaTime;
 
+        const bool offscreen =
+            (it->position.x + it->radius < -cullPadding) ||
+            (it->position.x - it->radius > displaySize.x + cullPadding) ||
+            (it->position.y + it->radius < -cullPadding) ||
+            (it->position.y - it->radius > displaySize.y + cullPadding);
+
         // Remove if expired or clicked
-        if (it->lifetime >= it->maxLifetime || it->clicked) {
+        if (it->lifetime >= it->maxLifetime || it->clicked || offscreen) {
             if (it->lifetime >= it->maxLifetime && !it->clicked) {
                 Log::Info("Quantum Anomaly expired...");
             }

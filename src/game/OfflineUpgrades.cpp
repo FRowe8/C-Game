@@ -81,12 +81,12 @@ const char* OfflineUpgrades::GetCryoStasisLevelName() const {
 
 const char* OfflineUpgrades::GetCryoStasisDescription() const {
     switch (m_CryoStasisLevel) {
-        case 0: return "Basic 4-hour offline cap";
-        case 1: return "Extended 8-hour offline cap";
-        case 2: return "Advanced 12-hour offline cap";
-        case 3: return "Superior 16-hour offline cap";
-        case 4: return "Elite 20-hour offline cap";
-        case 5: return "Maximum 24-hour offline cap";
+        case 0: return "Crew naps in survival pods. 4-hour offline cap.";
+        case 1: return "Seal the cryo doors for an 8-hour hibernation window.";
+        case 2: return "Deep-freeze cycle holds 12 hours of background work.";
+        case 3: return "Supercooled chambers stretch uptime to 16 hours.";
+        case 4: return "Phase-change coolant keeps labs frozen for 20 hours.";
+        case 5: return "Temporal lock—24 hours of offline stability.";
         default: return "Unknown level";
     }
 }
@@ -137,7 +137,7 @@ f64 OfflineUpgrades::GetOfflineEfficiencyUpgradeCost() const {
 const char* OfflineUpgrades::GetOfflineEfficiencyDescription() const {
     i32 percent = static_cast<i32>(GetOfflineMultiplier() * 100.0);
     static char buffer[128];
-    snprintf(buffer, sizeof(buffer), "Offline resources generate at %d%% of active rate", percent);
+    snprintf(buffer, sizeof(buffer), "Background simulations hum at %d%% efficiency while you sleep", percent);
     return buffer;
 }
 
@@ -187,7 +187,7 @@ f64 OfflineUpgrades::GetCombatSimulationUpgradeCost() const {
 const char* OfflineUpgrades::GetCombatSimulationDescription() const {
     i32 rate = static_cast<i32>(GetOfflineCombatRate());
     static char buffer[128];
-    snprintf(buffer, sizeof(buffer), "Simulate %d combats per hour while offline", rate);
+    snprintf(buffer, sizeof(buffer), "Holodecks run %d training skirmishes per hour without you", rate);
     return buffer;
 }
 
@@ -237,7 +237,7 @@ f64 OfflineUpgrades::GetLootDropUpgradeCost() const {
 const char* OfflineUpgrades::GetLootDropDescription() const {
     i32 percent = static_cast<i32>(GetOfflineLootChance() * 100.0);
     static char buffer[128];
-    snprintf(buffer, sizeof(buffer), "%d%% chance for loot per offline combat", percent);
+    snprintf(buffer, sizeof(buffer), "Salvage drones sift wrecks: %d%% loot chance per offline combat", percent);
     return buffer;
 }
 
