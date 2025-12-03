@@ -2,6 +2,7 @@
 #include "TutorialOverlay.h"
 #include "FloatingTextManager.h"
 #include "GameState.h"
+#include "ParticleCollection.h"
 #include "Renderer.h"
 #include "ImGuiUtils.h"
 #include "GameUtils.h"

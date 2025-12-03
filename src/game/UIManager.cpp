@@ -14,6 +14,8 @@
 #include "Logger.h"
 #include <string>
 
+#include "imgui_internal.h"
+
 // NOTE: This implementation assumes the UIManager.h DrawNavButton signature
 // has been updated to include width and height parameters.
 

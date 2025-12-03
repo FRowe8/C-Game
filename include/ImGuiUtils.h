@@ -2,6 +2,7 @@
 
 #include "imgui.h"
 #include "Types.h" // Assumed to define 'Color'
+#include <cmath>
 
 // Use 'inline' to avoid "multiple definition" linker errors
 inline ImVec4 ToImVec4(const Color& color) {

@@ -6,6 +6,7 @@
 #include "Platform.h"
 #include "GameUtils.h"
 #include "SteamIntegration.h"
+#include "ParticleCollection.h"
 #include "imgui.h"
 #include <fstream>
 #include <cstring>
