@@ -339,7 +339,6 @@ void TutorialManager::RenderHighlight(Renderer* renderer) {
     fgDrawList->AddRectFilled(p0, p1, glowColor, 8.0f);
 
     // Draw arrow pointing to highlight
-    f32 arrowLength = 60.0f;
     f32 arrowAngle = m_CurrentHighlight.arrowAngle;
     ImVec2 arrowStart = ImVec2(
         center.x - std::cos(arrowAngle) * (halfSize.x + 30.0f),
