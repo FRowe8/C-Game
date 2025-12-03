@@ -136,7 +136,7 @@ enum class ExperimentType {
     QuantumTeleportation,     // Transfer qubits instantly
     EntanglementTest,         // Create maximum entanglement
     TimeReversal,             // Run simulation backwards
-    WaveCollapse Race,        // Speed challenge
+    WaveCollapseRace,         // Speed challenge
     CoherencePreservation,    // Keep coherence at 100%
     PhotonBlast,              // Generate photons rapidly
 
