@@ -55,10 +55,11 @@ void UIManager::Render(Renderer* renderer) {
 void UIManager::RenderTopBar() {
     ImGuiViewport* viewport = ImGui::GetMainViewport();
     ImGui::SetNextWindowPos(viewport->Pos);
-    ImGui::SetNextWindowSize(ImVec2(viewport->Size.x, UITheme::TopBarHeight));
+    ImGui::SetNextWindowSize(ImVec2(viewport->Size.x, UITheme::TopBarHeight()));
 
     ImGui::PushStyleColor(ImGuiCol_WindowBg, UITheme::ColorPanelBg);
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, UITheme::BorderThickness());
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(UITheme::SafeAreaPadding(), UITheme::SafeAreaPadding() * 0.5f));
 
     // Removed ImGuiWindowFlags_NoDocking
     if (ImGui::Begin("TopBar", nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove)) {
@@ -66,7 +67,7 @@ void UIManager::RenderTopBar() {
         // Draw Bottom Border Glow
         auto* drawList = ImGui::GetWindowDrawList();
         ImVec2 p0 = ImGui::GetWindowPos();
-        p0.y += UITheme::TopBarHeight - 2.0f;
+        p0.y += UITheme::TopBarHeight() - 2.0f;
         ImVec2 p1 = ImVec2(p0.x + viewport->Size.x, p0.y + 2.0f);
         drawList->AddRectFilled(p0, p1, ImGui::GetColorU32(UITheme::ColorAccent));
 
@@ -97,16 +98,18 @@ void UIManager::RenderTopBar() {
     }
     ImGui::End();
     ImGui::PopStyleVar();
+    ImGui::PopStyleVar();
     ImGui::PopStyleColor();
 }
 
 void UIManager::RenderBottomNavigation() {
     ImGuiViewport* viewport = ImGui::GetMainViewport();
-    ImGui::SetNextWindowPos(ImVec2(viewport->Pos.x, viewport->Pos.y + viewport->Size.y - UITheme::BottomBarHeight));
-    ImGui::SetNextWindowSize(ImVec2(viewport->Size.x, UITheme::BottomBarHeight));
+    ImGui::SetNextWindowPos(ImVec2(viewport->Pos.x, viewport->Pos.y + viewport->Size.y - UITheme::BottomBarHeight()));
+    ImGui::SetNextWindowSize(ImVec2(viewport->Size.x, UITheme::BottomBarHeight()));
 
     ImGui::PushStyleColor(ImGuiCol_WindowBg, UITheme::ColorPanelBg);
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, UITheme::BorderThickness());
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(UITheme::SafeAreaPadding(), UITheme::SafeAreaPadding() * 0.75f));
 
     // Removed ImGuiWindowFlags_NoDocking
     if (ImGui::Begin("BottomNav", nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove)) {
@@ -120,12 +123,12 @@ void UIManager::RenderBottomNavigation() {
         // Navigation Buttons
         float width = ImGui::GetContentRegionAvail().x;
         int btnCount = 5; // Stations, Research, Upgrades, Combat, Menu
-        float btnHeight = UITheme::BottomBarHeight - 20.0f; // Padding
+        float btnHeight = UITheme::NavigationButtonHeight();
 
         // Calculate dynamic button width, accounting for spacing
-        float btnWidth = (width - (UITheme::ItemSpacing * static_cast<float>(btnCount - 1))) / static_cast<float>(btnCount);
+        float btnWidth = (width - (UITheme::ItemSpacing() * static_cast<float>(btnCount - 1))) / static_cast<float>(btnCount);
 
-        ImGui::SetCursorPosY(10.0f); // Padding top
+        ImGui::SetCursorPosY(UITheme::SafeAreaPadding());
 
         // 1. Stations (Home)
         bool isBaseState = (m_GameState->GetActiveModal() == ActiveModal::None);
@@ -133,21 +136,21 @@ void UIManager::RenderBottomNavigation() {
             // Close all overlays - return to base state
             m_GameState->SetActiveModal(ActiveModal::None);
         }
-        ImGui::SameLine(0.0f, UITheme::ItemSpacing);
+        ImGui::SameLine(0.0f, UITheme::ItemSpacing());
 
         // 2. Research
         bool showingResearch = (m_GameState->GetActiveModal() == ActiveModal::Research);
         if (DrawNavButton("RESEARCH", showingResearch, UITheme::ColorPrimary, btnWidth, btnHeight)) {
             m_GameState->SetActiveModal(showingResearch ? ActiveModal::None : ActiveModal::Research);
         }
-        ImGui::SameLine(0.0f, UITheme::ItemSpacing);
+        ImGui::SameLine(0.0f, UITheme::ItemSpacing());
 
         // 3. Upgrades (Buyables)
         bool showingBuyables = (m_GameState->GetActiveModal() == ActiveModal::Buyables);
         if (DrawNavButton("UPGRADES", showingBuyables, UITheme::ColorSuccess, btnWidth, btnHeight)) {
             m_GameState->SetActiveModal(showingBuyables ? ActiveModal::None : ActiveModal::Buyables);
         }
-        ImGui::SameLine(0.0f, UITheme::ItemSpacing);
+        ImGui::SameLine(0.0f, UITheme::ItemSpacing());
 
         // 4. Combat/Map
         bool showingCombat = (m_GameState->GetActiveModal() == ActiveModal::Combat);
@@ -155,7 +158,7 @@ void UIManager::RenderBottomNavigation() {
             if(!showingCombat) m_GameState->StartRandomCombat();
             m_GameState->SetActiveModal(showingCombat ? ActiveModal::None : ActiveModal::Combat);
         }
-        ImGui::SameLine(0.0f, UITheme::ItemSpacing);
+        ImGui::SameLine(0.0f, UITheme::ItemSpacing());
 
         // 5. Menu (More)
         bool showingMenu = (m_GameState->GetActiveModal() == ActiveModal::MoreMenu);
@@ -165,13 +168,14 @@ void UIManager::RenderBottomNavigation() {
     }
     ImGui::End();
     ImGui::PopStyleVar();
+    ImGui::PopStyleVar();
     ImGui::PopStyleColor();
 }
 
 void UIManager::RenderMainContent() {
     ImGuiViewport* viewport = ImGui::GetMainViewport();
-    float topY = viewport->Pos.y + UITheme::TopBarHeight;
-    float bottomY = viewport->Pos.y + viewport->Size.y - UITheme::BottomBarHeight;
+    float topY = viewport->Pos.y + UITheme::TopBarHeight();
+    float bottomY = viewport->Pos.y + viewport->Size.y - UITheme::BottomBarHeight();
     float height = bottomY - topY;
 
     ImGui::SetNextWindowPos(ImVec2(viewport->Pos.x, topY));
@@ -179,7 +183,7 @@ void UIManager::RenderMainContent() {
 
     // Transparent background for content area to see game particles
     ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0,0,0,0));
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(20, 20));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(UITheme::ContentPadding(), UITheme::ContentPadding()));
 
     if (ImGui::Begin("MainContent", nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove)) {
         // Render content based on active modal (tab-based navigation)
@@ -374,9 +378,13 @@ void UIManager::DrawResourceCounter(const char* label, double value, const ImVec
 bool UIManager::DrawNavButton(const char* label, bool isActive, const ImVec4& activeColor, float width, float height) {
     ImVec4 btnColor = isActive ? activeColor : ImVec4(0.2f, 0.2f, 0.2f, 0.5f);
     ImGui::PushStyleColor(ImGuiCol_Button, btnColor);
+    ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, UITheme::NavigationButtonRounding());
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, UITheme::FramePadding());
+    ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, UITheme::BorderThickness());
 
     bool clicked = ImGui::Button(label, ImVec2(width, height));
 
+    ImGui::PopStyleVar(3);
     ImGui::PopStyleColor();
 
     // Active Indicator Line (Draw glow/line at the bottom of the button)
