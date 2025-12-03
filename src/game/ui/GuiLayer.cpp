@@ -485,7 +485,10 @@ void NavigationView::Render(GameState* state, Renderer* renderer) {
                 }
 
                 // Visual/audio feedback hook
-                state->RegisterUIButtonFeedback(btn.label, ImGui::GetItemRectCenter(), ToImVec4(btn.color));
+                ImVec2 itemMin = ImGui::GetItemRectMin();
+                ImVec2 itemMax = ImGui::GetItemRectMax();
+                ImVec2 itemCenter((itemMin.x + itemMax.x) * 0.5f, (itemMin.y + itemMax.y) * 0.5f);
+                state->RegisterUIButtonFeedback(btn.label, itemCenter, ToImVec4(btn.color));
             } else if (ImGui::IsItemHovered()) {
                 ImGui::SetTooltip("Open the %s panel", btn.label);
             }
@@ -753,10 +756,6 @@ void StationView::Render(GameState* state, Renderer* renderer) {
     // NOTE: This is extracted from GameState::RenderStationsContent
     // This content is rendered inside a window created by UIManager
 
-    f64 currentQubits = state->GetResource(QuantumResource::Qubits);
-    f64 effectiveBonus = state->GetProductionMultiplier(QuantumResource::Qubits);
-    bool canUpgrade = !state->GetChallengeManager().HasModifier(ChallengeModifier::NoUpgrades);
-
     // Iterate through all stations
     for (size_t i = 0; i < state->m_Stations.size(); i++) {
         auto& station = state->m_Stations[i];
@@ -834,7 +833,10 @@ void StationView::RenderUnlockedStation(GameState* state, ResearchStation& stati
                              Color::EntanglementOrange();
         state->SpawnParticleBurst(particlePos, particleColor, 10);
 
-        state->RegisterUIButtonFeedback("Observed", ImGui::GetItemRectCenter(), ToImVec4(observeColor));
+        ImVec2 itemMin = ImGui::GetItemRectMin();
+        ImVec2 itemMax = ImGui::GetItemRectMax();
+        ImVec2 itemCenter((itemMin.x + itemMax.x) * 0.5f, (itemMin.y + itemMax.y) * 0.5f);
+        state->RegisterUIButtonFeedback("Observed", itemCenter, ToImVec4(observeColor));
     }
 
     // Phase 2.3: Add tooltip explaining observation mechanics
@@ -881,7 +883,10 @@ void StationView::RenderUnlockedStation(GameState* state, ResearchStation& stati
             Vec2 particlePos(upgradeBtnPos.x + upgradeBtnSize.x * 0.5f, upgradeBtnPos.y + upgradeBtnSize.y * 0.5f);
             state->SpawnParticleBurst(particlePos, Color::EntanglementOrange(), 15);
 
-            state->RegisterUIButtonFeedback("Upgraded", ImGui::GetItemRectCenter(), ToImVec4(upgradeColor));
+            ImVec2 itemMin = ImGui::GetItemRectMin();
+            ImVec2 itemMax = ImGui::GetItemRectMax();
+            ImVec2 itemCenter((itemMin.x + itemMax.x) * 0.5f, (itemMin.y + itemMax.y) * 0.5f);
+            state->RegisterUIButtonFeedback("Upgraded", itemCenter, ToImVec4(upgradeColor));
         }
     }
     ImGui::PopStyleColor(2);
@@ -919,7 +924,10 @@ void StationView::RenderUnlockedStation(GameState* state, ResearchStation& stati
         if (upgradesBought > 0) {
             state->UpdateResearchBonuses();
             Log::Infof("Bought ", upgradesBought, " upgrades for ", station.name, " (now level ", station.level, ")");
-            state->RegisterUIButtonFeedback("Upgraded", ImGui::GetItemRectCenter(), ToImVec4(upgradeColor));
+            ImVec2 itemMin = ImGui::GetItemRectMin();
+            ImVec2 itemMax = ImGui::GetItemRectMax();
+            ImVec2 itemCenter((itemMin.x + itemMax.x) * 0.5f, (itemMin.y + itemMax.y) * 0.5f);
+            state->RegisterUIButtonFeedback("Upgraded", itemCenter, ToImVec4(upgradeColor));
         }
     }
     ImGui::PopStyleColor(2);
@@ -954,7 +962,10 @@ void StationView::RenderLockedStation(GameState* state, ResearchStation& station
             station.unlocked = true;
             station.level = 0;
             Log::Infof("Unlocked: ", station.name);
-            state->RegisterUIButtonFeedback("Unlocked", ImGui::GetItemRectCenter(), ToImVec4(unlockColor));
+            ImVec2 itemMin = ImGui::GetItemRectMin();
+            ImVec2 itemMax = ImGui::GetItemRectMax();
+            ImVec2 itemCenter((itemMin.x + itemMax.x) * 0.5f, (itemMin.y + itemMax.y) * 0.5f);
+            state->RegisterUIButtonFeedback("Unlocked", itemCenter, ToImVec4(unlockColor));
         }
     }
     ImGui::PopStyleColor(2);
@@ -1092,7 +1103,6 @@ void CollectionView::Render(GameState* state, Renderer* renderer) {
 
     const i32 cols = 7;
     const i32 rows = 4;
-    const f32 slotSize = 100.0f;
 
     for (i32 row = 0; row < rows; row++) {
         for (i32 col = 0; col < cols; col++) {
