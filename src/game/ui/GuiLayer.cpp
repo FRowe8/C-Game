@@ -2013,13 +2013,17 @@ void CombatView::Render(GameState* state, Renderer* renderer) {
 }
 
 void GatchaView::Render(GameState* state, Renderer* renderer) {
-    // TODO: Extract from GameState::RenderGatcha
-    state->RenderGatcha(renderer);
+    if (state->GetActiveModal() != ActiveModal::Gatcha) return;
+
+    // GatchaSystem handles its own ImGui window creation
+    state->m_GatchaSystem.RenderSummonUI(renderer, state);
 }
 
 void SkillTreeView::Render(GameState* state, Renderer* renderer) {
-    // TODO: Extract from GameState::RenderSkillTree
-    state->RenderSkillTree(renderer);
+    if (state->GetActiveModal() != ActiveModal::Skills) return;
+
+    // SkillTree handles its own ImGui window creation
+    state->m_SkillTree.RenderSkillTree(renderer, state);
 }
 
 void EnhancementView::Render(GameState* state, Renderer* renderer) {
@@ -2031,8 +2035,182 @@ void EnhancementView::Render(GameState* state, Renderer* renderer) {
 }
 
 void SpecializedSkillsView::Render(GameState* state, Renderer* renderer) {
-    // TODO: Extract from GameState::RenderSpecializedSkills
-    state->RenderSpecializedSkills(renderer);
+    if (state->GetActiveModal() != ActiveModal::SpecializedSkills) return;
+    (void)renderer; // Unused in ImGui rendering
+
+    // Window setup
+    f32 panelWidth = 800.0f;
+    f32 panelHeight = 600.0f;
+    ImVec2 displaySize = ImGui::GetIO().DisplaySize;
+    ImVec2 centerPos(displaySize.x * 0.5f, displaySize.y * 0.5f);
+    ImGui::SetNextWindowPos(centerPos, ImGuiCond_Always, ImVec2(0.5f, 0.5f));
+    ImGui::SetNextWindowSize(ImVec2(panelWidth, panelHeight), ImGuiCond_Always);
+
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(20, 20));
+
+    bool windowOpen = true;
+    if (ImGui::Begin("Specialized Skills", &windowOpen,
+                     ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
+                     ImGuiWindowFlags_NoCollapse)) {
+
+        // Header
+        ImGui::TextColored(ImVec4(0.4f, 0.8f, 1.0f, 1.0f), "SPECIALIZED SKILLS");
+        ImGui::TextWrapped("Gain experience through gameplay actions. Each skill provides unique bonuses.");
+        ImGui::Spacing();
+        ImGui::Separator();
+        ImGui::Spacing();
+
+        // Summary stats
+        ImGui::Text("Total Skill Level: %d", state->m_SpecializedSkills.GetTotalSkillLevel());
+        ImGui::Text("Average Skill Level: %d", state->m_SpecializedSkills.GetAverageSkillLevel());
+        ImGui::Spacing();
+        ImGui::Separator();
+        ImGui::Spacing();
+
+        // Skill cards in a grid
+        float cardWidth = 350.0f;
+        float availableWidth = ImGui::GetContentRegionAvail().x;
+        i32 cardsPerRow = static_cast<i32>(availableWidth / (cardWidth + 10.0f));
+        if (cardsPerRow < 1) cardsPerRow = 1;
+
+        // Define skill data
+        struct SkillDisplay {
+            SkillCategory category;
+            const char* name;
+            const char* icon;
+            const char* description;
+            ImVec4 color;
+            const char* bonusDesc;
+        };
+
+        SkillDisplay skills[] = {
+            {
+                SkillCategory::Observation,
+                "OBSERVATION",
+                "",
+                "Production & Discovery\nGain XP by observing and unlocking stations.",
+                ImVec4(0.3f, 0.7f, 1.0f, 1.0f),
+                "+%% Global Production"
+            },
+            {
+                SkillCategory::Engineering,
+                "ENGINEERING",
+                "",
+                "Efficiency & Building\nGain XP by upgrading stations and researching.",
+                ImVec4(0.4f, 1.0f, 0.4f, 1.0f),
+                "+%% Cost Reduction"
+            },
+            {
+                SkillCategory::Command,
+                "COMMAND",
+                "",
+                "Combat & Management\nGain XP by winning battles and managing crew.",
+                ImVec4(1.0f, 0.4f, 0.4f, 1.0f),
+                "+%% Combat Power"
+            }
+        };
+
+        // Render each skill card
+        for (i32 i = 0; i < 3; i++) {
+            const SkillDisplay& display = skills[i];
+            const SpecializedSkill& skill = state->m_SpecializedSkills.GetSkill(display.category);
+
+            // Card background
+            ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.15f, 0.15f, 0.2f, 0.9f));
+            ImGui::PushStyleColor(ImGuiCol_Border, display.color);
+            ImGui::PushStyleVar(ImGuiStyleVar_ChildBorderSize, 2.0f);
+            ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 8.0f);
+
+            char cardId[64];
+            snprintf(cardId, sizeof(cardId), "SkillCard%d", i);
+
+            if (ImGui::BeginChild(cardId, ImVec2(cardWidth, 220.0f), true)) {
+                // Icon and title
+                ImGui::TextColored(display.color, "%s %s", display.icon, display.name);
+
+                ImGui::Spacing();
+
+                // Level display
+                ImGui::Text("Level: %d", skill.level);
+
+                // XP Progress bar
+                f32 progress = static_cast<f32>(state->m_SpecializedSkills.GetSkillProgress(display.category));
+                ImGui::PushStyleColor(ImGuiCol_PlotHistogram, display.color);
+                ImGui::ProgressBar(progress, ImVec2(-1, 25));
+                ImGui::PopStyleColor();
+
+                // XP text
+                ImGui::Text("XP: %.0f / %.0f", skill.experience, skill.experienceToNextLevel);
+
+                ImGui::Spacing();
+                ImGui::Separator();
+                ImGui::Spacing();
+
+                // Description
+                ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + cardWidth - 40);
+                ImGui::TextColored(ImVec4(0.8f, 0.8f, 0.8f, 1.0f), "%s", display.description);
+                ImGui::PopTextWrapPos();
+
+                ImGui::Spacing();
+
+                // Bonus display
+                f64 bonusPercent = (skill.GetBonusMultiplier() - 1.0) * 100.0;
+                ImGui::TextColored(ImVec4(1.0f, 0.9f, 0.3f, 1.0f), "Bonus: +%.0f%% (%s)",
+                                 bonusPercent, display.bonusDesc);
+            }
+            ImGui::EndChild();
+
+            ImGui::PopStyleVar(2);
+            ImGui::PopStyleColor(2);
+
+            // Same line for next card if not the last in row
+            if ((i + 1) % cardsPerRow != 0 && i < 2) {
+                ImGui::SameLine(0, 10.0f);
+            }
+        }
+
+        ImGui::Spacing();
+        ImGui::Spacing();
+        ImGui::Separator();
+        ImGui::Spacing();
+
+        // XP Rewards Reference Table
+        if (ImGui::CollapsingHeader("XP Rewards Reference", ImGuiTreeNodeFlags_DefaultOpen)) {
+            ImGui::Columns(3, "XPTable", true);
+
+            // Observation column
+            ImGui::TextColored(ImVec4(0.3f, 0.7f, 1.0f, 1.0f), "OBSERVATION");
+            ImGui::Separator();
+            ImGui::Text("Observe Station: +5 XP");
+            ImGui::Text("Unlock Station: +25 XP");
+            ImGui::NextColumn();
+
+            // Engineering column
+            ImGui::TextColored(ImVec4(0.4f, 1.0f, 0.4f, 1.0f), "ENGINEERING");
+            ImGui::Separator();
+            ImGui::Text("Upgrade Station: +10 XP");
+            ImGui::Text("Purchase Research: +20 XP");
+            ImGui::Text("Buy Upgrade: +15 XP");
+            ImGui::NextColumn();
+
+            // Command column
+            ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "COMMAND");
+            ImGui::Separator();
+            ImGui::Text("Win Combat: +30 XP");
+            ImGui::Text("Install Ship Part: +15 XP");
+            ImGui::NextColumn();
+
+            ImGui::Columns(1);
+        }
+    }
+    ImGui::End();
+
+    ImGui::PopStyleVar();
+
+    // Handle close
+    if (!windowOpen) {
+        state->SetActiveModal(ActiveModal::None);
+    }
 }
 
 // ============================================================================
