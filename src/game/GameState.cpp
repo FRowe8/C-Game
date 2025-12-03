@@ -2114,6 +2114,25 @@ bool GameState::Save(const std::string& filepath) {
     }
     file << "  ],\n";
 
+    // Phase 4.1: Particle Collection
+    file << "  \"particleCollection\": {\n";
+    file << "    \"discovered\": [";
+    for (i32 i = 0; i < static_cast<i32>(ParticleType::COUNT); i++) {
+        ParticleType type = static_cast<ParticleType>(i);
+        bool discovered = m_ParticleCollection.IsDiscovered(type);
+        file << (discovered ? "true" : "false");
+        if (i < static_cast<i32>(ParticleType::COUNT) - 1) file << ", ";
+    }
+    file << "],\n";
+    file << "    \"equipped\": [";
+    auto equippedParticles = m_ParticleCollection.GetEquippedParticles();
+    for (size_t i = 0; i < equippedParticles.size(); i++) {
+        file << static_cast<i32>(equippedParticles[i]->type);
+        if (i < equippedParticles.size() - 1) file << ", ";
+    }
+    file << "]\n";
+    file << "  },\n";
+
     // Specialized Skills
     m_SpecializedSkills.SaveToJson(file);
 
@@ -2137,6 +2156,7 @@ bool GameState::Load(const std::string& filepath) {
         bool inAchievements = false;
         bool inResearch = false;
         bool inSpecializedSkills = false;
+        bool inParticleCollection = false;  // Phase 4.1
 
         while (std::getline(file, line)) {
             // Track sections
@@ -2162,7 +2182,16 @@ bool GameState::Load(const std::string& filepath) {
                 inStatistics = false;
                 inAchievements = false;
                 inResearch = false;
+                inParticleCollection = false;  // Phase 4.1
                 inSpecializedSkills = true;
+                continue;
+            } else if (line.find("\"particleCollection\"") != std::string::npos) {
+                // Phase 4.1
+                inStatistics = false;
+                inAchievements = false;
+                inResearch = false;
+                inSpecializedSkills = false;
+                inParticleCollection = true;
                 continue;
             } else if (line.find("}") != std::string::npos || line.find("]") != std::string::npos) {
                 if (line.find("},") == std::string::npos) {
@@ -2170,6 +2199,7 @@ bool GameState::Load(const std::string& filepath) {
                     inAchievements = false;
                     inResearch = false;
                     inSpecializedSkills = false;
+                    inParticleCollection = false;  // Phase 4.1
                 }
             }
 
@@ -2210,6 +2240,63 @@ bool GameState::Load(const std::string& filepath) {
                         }
                     } catch (...) {
                         // Ignore parse errors
+                    }
+                }
+            } else if (inParticleCollection) {
+                // Phase 4.1: Parse particle collection data
+                if (line.find("\"discovered\"") != std::string::npos) {
+                    // Parse discovered array
+                    size_t start = line.find('[');
+                    size_t end = line.find(']');
+                    if (start != std::string::npos && end != std::string::npos) {
+                        std::string values = line.substr(start + 1, end - start - 1);
+                        size_t pos = 0;
+                        i32 index = 0;
+                        while (pos < values.length() && index < static_cast<i32>(ParticleType::COUNT)) {
+                            // Skip whitespace
+                            while (pos < values.length() && std::isspace(values[pos])) pos++;
+                            // Check if true/false
+                            if (values.substr(pos, 4) == "true") {
+                                m_ParticleCollection.DiscoverParticle(static_cast<ParticleType>(index));
+                                pos += 4;
+                            } else if (values.substr(pos, 5) == "false") {
+                                pos += 5;
+                            }
+                            // Skip comma and whitespace
+                            while (pos < values.length() && (values[pos] == ',' || std::isspace(values[pos]))) pos++;
+                            index++;
+                        }
+                    }
+                } else if (line.find("\"equipped\"") != std::string::npos) {
+                    // Parse equipped array
+                    size_t start = line.find('[');
+                    size_t end = line.find(']');
+                    if (start != std::string::npos && end != std::string::npos) {
+                        std::string values = line.substr(start + 1, end - start - 1);
+                        if (!values.empty()) {
+                            size_t pos = 0;
+                            while (pos < values.length()) {
+                                // Skip whitespace
+                                while (pos < values.length() && std::isspace(values[pos])) pos++;
+                                if (pos >= values.length()) break;
+
+                                // Parse number
+                                size_t numStart = pos;
+                                while (pos < values.length() && std::isdigit(values[pos])) pos++;
+                                if (pos > numStart) {
+                                    try {
+                                        i32 particleId = std::stoi(values.substr(numStart, pos - numStart));
+                                        if (particleId >= 0 && particleId < static_cast<i32>(ParticleType::COUNT)) {
+                                            m_ParticleCollection.EquipParticle(static_cast<ParticleType>(particleId));
+                                        }
+                                    } catch (...) {
+                                        // Ignore parse errors
+                                    }
+                                }
+                                // Skip comma and whitespace
+                                while (pos < values.length() && (values[pos] == ',' || std::isspace(values[pos]))) pos++;
+                            }
+                        }
                     }
                 }
             } else if (inSpecializedSkills) {
