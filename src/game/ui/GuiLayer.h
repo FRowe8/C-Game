@@ -316,6 +316,16 @@ public:
      */
     FloatingTextManager* GetFloatingTextManager() { return m_FloatingTextManager.get(); }
 
+    /**
+     * Expose navigation view for legacy callers during migration
+     */
+    NavigationView* GetNavigationView() { return m_NavigationView.get(); }
+
+    /**
+     * Expose station view for legacy callers during migration
+     */
+    StationView* GetStationView() { return m_StationView.get(); }
+
 private:
     // Core Views (always visible)
     std::unique_ptr<ResourceView> m_ResourceView;
