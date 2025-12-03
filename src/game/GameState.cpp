@@ -103,6 +103,7 @@ void ResearchStation::Observe(GameState* state) {
     // Phase 4.1: Apply particle collection observation bonus
     f64 particleObservationBonus = state->GetParticleCollection().GetTotalObservationBonus();
     observeBonus *= (1.0 + particleObservationBonus);
+    observeBonus *= (1.0 + state->GetParticleCollection().GetDiscoveryObservationBonus());
 
     if (roll < superpositionProbability) {
         // Success - full value
@@ -659,7 +660,6 @@ void GameState::UpdateStations(f64 deltaTime) {
 
     // Check if manual observation is disabled by challenge
     bool canManuallyObserve = !m_ChallengeManager.HasModifier(ChallengeModifier::NoObserve);
-    (void)canManuallyObserve; // Reserved for future use
 
     f64 currentQubits = GetResource(QuantumResource::Qubits);
     bool canUpgrade = !m_ChallengeManager.HasModifier(ChallengeModifier::NoUpgrades);
@@ -1164,6 +1164,14 @@ f64 GameState::GetProductionMultiplier(QuantumResource type) const {
     f64 particleBonus = m_ParticleCollection.GetTotalProductionBonus();
     multiplier *= (1.0 + particleBonus);
 
+    // Discovery tree passive bonuses
+    multiplier *= (1.0 + m_ParticleCollection.GetDiscoveryProductionBonus());
+
+    // Challenge modifiers
+    if (m_ChallengeManager.HasModifier(ChallengeModifier::HalfProduction)) {
+        multiplier *= 0.5;
+    }
+
     return multiplier;
 }
 
@@ -1388,13 +1396,20 @@ void GameState::RenderStationsContent() {
 
             // OBSERVE Button - Purple
             Color observeColor = Color::QuantumPurple();
+            if (!canManuallyObserve) ImGui::PushStyleVar(ImGuiStyleVar_Alpha, 0.5f);
             ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(observeColor.r * 0.7f, observeColor.g * 0.7f, observeColor.b * 0.7f, 0.7f));
             ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(observeColor.r, observeColor.g, observeColor.b, 1.0f));
-            if (ImGui::Button(("OBSERVE##ObserveBtn" + std::to_string(i)).c_str(), ImVec2(ImGui::GetContentRegionAvail().x * 0.30f, 40.0f))) {
+            if (ImGui::Button(("OBSERVE##ObserveBtn" + std::to_string(i)).c_str(), ImVec2(ImGui::GetContentRegionAvail().x * 0.30f, 40.0f)) && canManuallyObserve) {
                 station.Observe(this);
                 Log::Infof("Observed ", station.name);
             }
             ImGui::PopStyleColor(2);
+            if (!canManuallyObserve) {
+                ImGui::PopStyleVar();
+                if (ImGui::IsItemHovered()) {
+                    ImGui::SetTooltip("Manual observation disabled during this challenge");
+                }
+            }
 
             // UPGRADE Button - Orange
             ImGui::SameLine();

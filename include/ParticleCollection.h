@@ -4,6 +4,13 @@
 #include <string>
 #include <vector>
 
+struct DiscoveryTier {
+    i32 requiredDiscoveries;
+    f64 productionBonus;
+    f64 observationBonus;
+    std::string name;
+};
+
 // Particle Collection System - Discover exotic quantum particles
 
 enum class ParticleType {
@@ -118,15 +125,24 @@ public:
 
     void ClearRecentDiscoveries();
 
+    // Discovery tiers
+    f64 GetDiscoveryProductionBonus() const;
+    f64 GetDiscoveryObservationBonus() const;
+    const std::vector<DiscoveryTier>& GetDiscoveryTiers() const { return m_DiscoveryTiers; }
+    i32 GetMaxEquipmentSlots() const { return m_MaxEquipmentSlots; }
+
 private:
     std::vector<Particle> m_Particles;
     std::vector<ParticleType> m_EquippedParticles;
     std::vector<ParticleType> m_RecentDiscoveries;
+    std::vector<DiscoveryTier> m_DiscoveryTiers;
     f64 m_TimeSinceLastCheck;
+    i32 m_MaxEquipmentSlots;
 
     void AddParticle(ParticleType type, const std::string& name, const std::string& desc,
                      ParticleRarity rarity, f64 dropChance, const Color& color,
                      f64 prodBonus = 0.0, f64 obsBonus = 0.0, f64 photonBonus = 0.0);
+    void UpdateEquipmentSlots();
 };
 
 // Quantum Experiments - Challenge mode
