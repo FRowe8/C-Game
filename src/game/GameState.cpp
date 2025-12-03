@@ -5,6 +5,7 @@
 #include "Logger.h"
 #include "Platform.h"
 #include "GameUtils.h"
+#include "SteamIntegration.h"
 #include "imgui.h"
 #include <fstream>
 #include <cstring>
@@ -2263,6 +2264,9 @@ bool GameState::Save(const std::string& filepath) {
 
     file.close();
     Log::Debugf("Game saved to ", filepath);
+
+    // Mirror to Steam Cloud when available
+    SteamIntegration::MirrorSaveToCloud(filepath, "default");
     return true;
 }
 
@@ -2583,6 +2587,9 @@ void GameState::UnlockAchievement(AchievementID id) {
     AddEssence(essenceReward);
 
     Log::Infof("Achievement Unlocked: ", ach->name);
+
+    // Propagate unlock to Steam where available
+    SteamIntegration::UnlockAchievement(ach->name);
 }
 
 Achievement* GameState::GetAchievement(AchievementID id) {

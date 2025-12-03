@@ -63,6 +63,15 @@ jobs:
             cp -r web/assets dist/
           fi
 
+      - name: Smoke test asset preload bundle
+        run: |
+          if [ -f "build/QuantumIdle.data" ]; then
+            python3 scripts/smoke_test_web_preload.py build/QuantumIdle.data \
+              assets/fonts/Roboto-Regular.ttf
+          else
+            echo "QuantumIdle.data not found, skipping preload verification"
+          fi
+
       - name: Create 404 page (redirect to index)
         run: |
           cat > dist/404.html << 'EOF'

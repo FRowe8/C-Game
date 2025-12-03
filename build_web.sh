@@ -50,6 +50,15 @@ cp build-web/QuantumIdle.wasm web/dist/
 cp build-web/QuantumIdle.data web/dist/ 2>/dev/null || true  # Data file may not exist
 cp web/index.html web/dist/
 
+# Smoke-test asset preloading to catch missing bundles early
+if [ -f "build-web/QuantumIdle.data" ]; then
+    echo "[Smoke Test] Verifying assets were embedded into QuantumIdle.data..."
+    python3 scripts/smoke_test_web_preload.py build-web/QuantumIdle.data \
+        assets/fonts/Roboto-Regular.ttf
+else
+    echo "[Smoke Test] Skipped (no QuantumIdle.data produced)"
+fi
+
 echo ""
 echo "========================================="
 echo "✨ Build Complete!"
