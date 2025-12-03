@@ -1432,33 +1432,584 @@ void MilestoneView::Render(GameState* state, Renderer* renderer) {
 }
 
 void BuyablesView::Render(GameState* state, Renderer* renderer) {
-    // TODO: Extract from GameState::RenderBuyables
-    state->RenderBuyables(renderer);
+    (void)renderer;
+
+    if (state->GetActiveModal() != ActiveModal::Buyables) return;
+
+    f32 panelWidth = 900.0f;
+    f32 panelHeight = 600.0f;
+    ImVec2 displaySize = ImGui::GetIO().DisplaySize;
+
+    ImVec2 centerPos(displaySize.x * 0.5f, displaySize.y * 0.5f);
+    ImGui::SetNextWindowPos(centerPos, ImGuiCond_Always, ImVec2(0.5f, 0.5f));
+    ImGui::SetNextWindowSize(ImVec2(panelWidth, panelHeight), ImGuiCond_Always);
+
+    Color mainBorderColor = Color::ElectricBlue() * 0.8f;
+    Color mainBgColor = Color(0.05f, 0.05f, 0.1f, 0.95f) * 0.8f;
+
+    ImGui::PushStyleColor(ImGuiCol_WindowBg, ToImVec4(mainBgColor));
+    ImGui::PushStyleColor(ImGuiCol_Border, ToImVec4(mainBorderColor));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 2.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(15.0f, 15.0f));
+
+    bool showWindow = true;
+    if (ImGui::Begin("Buyable Upgrades", &showWindow,
+                     ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
+                     ImGuiWindowFlags_NoCollapse)) {
+
+        ImGui::TextColored(ToImVec4(Color(0.6f, 0.6f, 0.6f, 1.0f)), "(Press B or ESC to close)");
+        ImGui::Separator();
+
+        f32 contentStartY = ImGui::GetCursorPosY();
+        f32 buyablesContentHeight = panelHeight - contentStartY - 30.0f;
+
+        if (ImGui::BeginChild("##BuyablesList", ImVec2(0, buyablesContentHeight), false, ImGuiWindowFlags_AlwaysVerticalScrollbar)) {
+            f32 buyableWidth = ImGui::GetContentRegionAvail().x;
+            f32 buyableHeight = 100.0f;
+
+            auto& buyables = state->m_BuyableManager.GetBuyables();
+
+            for (size_t i = 0; i < buyables.size(); i++) {
+                const auto& buyable = buyables[i];
+                bool maxed = buyable.IsMaxed();
+                bool canAfford = buyable.CanAfford(state->m_Resources[0]);
+                bool disabledByChallenge = state->m_ChallengeManager.HasModifier(ChallengeModifier::NoBuyables);
+                bool interactive = canAfford && !disabledByChallenge;
+
+                Color buyableBg = maxed ? Color(0.1f, 0.2f, 0.15f, 1.0f) : Color(0.15f, 0.15f, 0.2f, 1.0f);
+                Color buyableBorder = maxed ? Color::CoherenceGreen() * 0.6f : Color::ElectricBlue() * 0.6f;
+
+                ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 0.0f);
+                ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(10.0f, 10.0f));
+                ImGui::PushStyleColor(ImGuiCol_ChildBg, ToImVec4(buyableBg));
+                ImGui::PushStyleColor(ImGuiCol_Border, ToImVec4(buyableBorder));
+
+                std::string buyableChildName = "##Buyable_" + std::to_string(i);
+
+                if (ImGui::BeginChild(buyableChildName.c_str(), ImVec2(buyableWidth, buyableHeight), true, ImGuiWindowFlags_NoScrollbar)) {
+                    ImGui::TextColored(ToImVec4(Color::White()), "%s", buyable.name.c_str());
+
+                    ImGui::SameLine(400.0f);
+                    ImGui::TextColored(ToImVec4(Color::QuantumPurple()), "Owned: %s", buyable.GetProgressString().c_str());
+
+                    ImGui::TextWrapped("%s", buyable.description.c_str());
+
+                    ImGui::SetCursorPosY(buyableHeight - 35.0f);
+
+                    if (!maxed) {
+                        std::string costStr = GameUtils::FormatNumber(buyable.GetCurrentCost(), state->m_NumberFormat) + " Qubits";
+                        Color costColor = interactive ? Color::CoherenceGreen() : Color(0.7f, 0.5f, 0.5f, 1.0f);
+                        ImGui::TextColored(ToImVec4(costColor), "Cost: %s", costStr.c_str());
+
+                        ImGui::SameLine(buyableWidth - 120.0f);
+                        std::string btnText = disabledByChallenge ? "DISABLED" : "PURCHASE";
+
+                        Color btnColor = interactive ? Color::CoherenceGreen() : Color(0.3f, 0.3f, 0.3f, 1.0f);
+                        Color btnHoveredColor = interactive ? Color::CoherenceGreen() * 1.5f : Color(0.4f, 0.4f, 0.4f, 1.0f);
+
+                        ImGui::PushStyleColor(ImGuiCol_Button, ToImVec4(btnColor * 0.3f));
+                        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ToImVec4(btnHoveredColor * 0.5f));
+                        ImGui::PushStyleColor(ImGuiCol_Border, ToImVec4(btnHoveredColor));
+
+                        if (ImGui::Button(btnText.c_str(), ImVec2(110.0f, 35.0f)) && interactive) {
+                            state->m_BuyableManager.Purchase(buyable.id, state);
+                            state->GetSoundManager().PlaySound(SoundEffect::ButtonPress, 0.8f);
+                        }
+                        ImGui::PopStyleColor(3);
+                    } else {
+                        ImGui::TextColored(ToImVec4(Color::CoherenceGreen()), "MAXED OUT");
+                    }
+                }
+                ImGui::EndChild();
+
+                ImGui::PopStyleColor(2);
+                ImGui::PopStyleVar(2);
+
+                ImGui::Spacing();
+            }
+        }
+        ImGui::EndChild();
+    }
+    ImGui::End();
+
+    ImGui::PopStyleVar(3);
+    ImGui::PopStyleColor(2);
+
+    if (!showWindow) {
+        state->SetActiveModal(ActiveModal::None);
+    }
 }
 
 void ChallengeView::Render(GameState* state, Renderer* renderer) {
-    // TODO: Extract from GameState::RenderChallenges
-    state->RenderChallenges(renderer);
+    (void)renderer;
+
+    if (state->GetActiveModal() != ActiveModal::Challenges) return;
+
+    f32 panelWidth = 900.0f;
+    f32 panelHeight = 650.0f;
+    ImVec2 displaySize = ImGui::GetIO().DisplaySize;
+
+    ImVec2 centerPos(displaySize.x * 0.5f, displaySize.y * 0.5f);
+    ImGui::SetNextWindowPos(centerPos, ImGuiCond_Always, ImVec2(0.5f, 0.5f));
+    ImGui::SetNextWindowSize(ImVec2(panelWidth, panelHeight), ImGuiCond_Always);
+
+    Color mainBorderColor = Color::Red() * 0.8f;
+    Color mainBgColor = Color(0.05f, 0.05f, 0.1f, 0.95f) * 0.8f;
+
+    ImGui::PushStyleColor(ImGuiCol_WindowBg, ToImVec4(mainBgColor));
+    ImGui::PushStyleColor(ImGuiCol_Border, ToImVec4(mainBorderColor));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 2.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(15.0f, 15.0f));
+
+    bool showWindow = true;
+    if (ImGui::Begin("Quantum Challenges", &showWindow,
+                     ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
+                     ImGuiWindowFlags_NoCollapse)) {
+
+        ImGui::TextColored(ToImVec4(Color(0.6f, 0.6f, 0.6f, 1.0f)), "(Press C or ESC to close)");
+        ImGui::Separator();
+
+        const Challenge* currentChallenge = state->m_ChallengeManager.GetCurrentChallenge();
+        f32 contentStartY = ImGui::GetCursorPosY();
+
+        if (currentChallenge) {
+            ImGui::TextColored(ToImVec4(Color::Red()), "⚠ ACTIVE CHALLENGE: %s", currentChallenge->name.c_str());
+
+            f64 currentQubits = state->GetResource(QuantumResource::Qubits);
+            std::string goalText = "Goal: " + GameUtils::FormatNumber(currentQubits, state->m_NumberFormat) +
+                                   " / " + GameUtils::FormatNumber(currentChallenge->goalQubits, state->m_NumberFormat) + " Qubits";
+            ImGui::TextColored(ToImVec4(Color::Yellow()), "%s", goalText.c_str());
+
+            ImGui::Spacing();
+            contentStartY = ImGui::GetCursorPosY();
+        }
+
+        ImGui::Separator();
+
+        f32 challengesContentHeight = panelHeight - contentStartY - 30.0f;
+
+        if (ImGui::BeginChild("##ChallengesList", ImVec2(0, challengesContentHeight), false, ImGuiWindowFlags_AlwaysVerticalScrollbar)) {
+            f32 challengeWidth = ImGui::GetContentRegionAvail().x;
+            f32 challengeHeight = 120.0f;
+
+            auto& challenges = state->m_ChallengeManager.GetChallenges();
+            i32 currentPrestige = state->m_Statistics.totalPrestigesPerformed;
+
+            for (size_t i = 0; i < challenges.size(); i++) {
+                const auto& challenge = challenges[i];
+                bool completed = challenge.completed;
+                bool active = challenge.active;
+                bool canEnter = challenge.CanEnter(currentPrestige, currentChallenge != nullptr && currentChallenge != &challenge);
+
+                Color challengeBg;
+                Color challengeBorder;
+                if (active) {
+                    challengeBg = Color(0.2f, 0.1f, 0.1f, 1.0f);
+                    challengeBorder = Color::Red();
+                } else if (completed) {
+                    challengeBg = Color(0.1f, 0.2f, 0.15f, 1.0f);
+                    challengeBorder = Color::CoherenceGreen() * 0.6f;
+                } else {
+                    challengeBg = Color(0.15f, 0.15f, 0.2f, 1.0f);
+                    challengeBorder = Color::Red() * 0.6f;
+                }
+
+                ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 0.0f);
+                ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(10.0f, 10.0f));
+                ImGui::PushStyleColor(ImGuiCol_ChildBg, ToImVec4(challengeBg));
+                ImGui::PushStyleColor(ImGuiCol_Border, ToImVec4(challengeBorder));
+
+                std::string challengeChildName = "##Challenge_" + std::to_string(i);
+
+                if (ImGui::BeginChild(challengeChildName.c_str(), ImVec2(challengeWidth, challengeHeight), true, ImGuiWindowFlags_NoScrollbar)) {
+                    std::string nameStr = challenge.name;
+                    if (active) nameStr += " [ACTIVE]";
+                    if (completed) nameStr += " [COMPLETED]";
+                    Color nameColor = completed ? Color::CoherenceGreen() : (active ? Color::Red() : Color::White());
+                    ImGui::TextColored(ToImVec4(nameColor), "%s", nameStr.c_str());
+
+                    ImGui::TextWrapped("%s", challenge.description.c_str());
+
+                    std::string reqText = "Requires: " + std::to_string(challenge.minPrestigeLevel) + " prestiges";
+                    Color reqColor = currentPrestige >= challenge.minPrestigeLevel ? Color::CoherenceGreen() : Color(0.7f, 0.5f, 0.5f, 1.0f);
+                    ImGui::TextColored(ToImVec4(reqColor), "%s", reqText.c_str());
+
+                    std::string goalText = "Goal: " + GameUtils::FormatNumber(challenge.goalQubits, state->m_NumberFormat) + " Qubits";
+                    ImGui::TextColored(ToImVec4(Color::Yellow()), "%s", goalText.c_str());
+
+                    ImGui::TextColored(ToImVec4(Color::QuantumPurple()), "Reward: %s", challenge.rewardDescription.c_str());
+
+                    if (!completed) {
+                        ImGui::SetCursorPosY(challengeHeight - 40.0f);
+                        ImGui::SameLine(challengeWidth - 120.0f);
+
+                        if (active) {
+                            ImGui::PushStyleColor(ImGuiCol_Button, ToImVec4(Color::Red() * 0.3f));
+                            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ToImVec4(Color::Red() * 0.5f));
+                            ImGui::PushStyleColor(ImGuiCol_Border, ToImVec4(Color::Red()));
+                            if (ImGui::Button("EXIT##ChallengeBtn", ImVec2(110.0f, 30.0f))) {
+                                state->m_ChallengeManager.ExitChallenge(state);
+                            }
+                            ImGui::PopStyleColor(3);
+                        } else {
+                            Color btnColor = canEnter ? Color::CoherenceGreen() : Color(0.3f, 0.3f, 0.3f, 1.0f);
+                            Color btnHoveredColor = canEnter ? Color::CoherenceGreen() * 1.5f : Color(0.4f, 0.4f, 0.4f, 1.0f);
+
+                            ImGui::PushStyleColor(ImGuiCol_Button, ToImVec4(btnColor * 0.3f));
+                            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ToImVec4(btnHoveredColor * 0.5f));
+                            ImGui::PushStyleColor(ImGuiCol_Border, ToImVec4(btnHoveredColor));
+
+                            if (ImGui::Button("ENTER##ChallengeBtn", ImVec2(110.0f, 30.0f)) && canEnter) {
+                                state->m_ChallengeManager.EnterChallenge(challenge.id, state);
+                            }
+                            ImGui::PopStyleColor(3);
+                        }
+                    }
+                }
+                ImGui::EndChild();
+
+                ImGui::PopStyleColor(2);
+                ImGui::PopStyleVar(2);
+
+                ImGui::Spacing();
+            }
+        }
+        ImGui::EndChild();
+    }
+    ImGui::End();
+
+    ImGui::PopStyleVar(3);
+    ImGui::PopStyleColor(2);
+
+    if (!showWindow) {
+        state->SetActiveModal(ActiveModal::None);
+    }
 }
 
 void EssenceShopView::Render(GameState* state, Renderer* renderer) {
-    // TODO: Extract from GameState::RenderEssenceShop
-    state->RenderEssenceShop(renderer);
+    (void)renderer;
+
+    if (state->GetActiveModal() != ActiveModal::EssenceShop) return;
+
+    f32 panelWidth = 900.0f;
+    f32 panelHeight = 650.0f;
+    ImVec2 displaySize = ImGui::GetIO().DisplaySize;
+
+    ImVec2 centerPos(displaySize.x * 0.5f, displaySize.y * 0.5f);
+    ImGui::SetNextWindowPos(centerPos, ImGuiCond_Always, ImVec2(0.5f, 0.5f));
+    ImGui::SetNextWindowSize(ImVec2(panelWidth, panelHeight), ImGuiCond_Always);
+
+    Color mainBorderColor = Color::Magenta() * 0.8f;
+    Color mainBgColor = Color(0.05f, 0.05f, 0.1f, 0.95f) * 0.8f;
+
+    ImGui::PushStyleColor(ImGuiCol_WindowBg, ToImVec4(mainBgColor));
+    ImGui::PushStyleColor(ImGuiCol_Border, ToImVec4(mainBorderColor));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 2.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(15.0f, 15.0f));
+
+    bool showWindow = true;
+    if (ImGui::Begin("Essence Shop - Permanent Upgrades", &showWindow,
+                     ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
+                     ImGuiWindowFlags_NoCollapse)) {
+
+        ImGui::TextColored(ToImVec4(Color(0.6f, 0.6f, 0.6f, 1.0f)), "(Press E or ESC to close)");
+        ImGui::Separator();
+
+        std::string essenceText = "Your Quantum Essence: " + GameUtils::FormatNumber(state->m_QuantumEssence, state->m_NumberFormat);
+        ImGui::TextColored(ToImVec4(Color::Magenta() * 1.3f), "%s", essenceText.c_str());
+
+        ImGui::Spacing();
+        ImGui::Separator();
+
+        f32 upgradesContentHeight = panelHeight - ImGui::GetCursorPosY() - 30.0f;
+
+        if (ImGui::BeginChild("##EssenceUpgradesList", ImVec2(0, upgradesContentHeight), false, ImGuiWindowFlags_AlwaysVerticalScrollbar)) {
+            f32 upgradeWidth = ImGui::GetContentRegionAvail().x;
+            f32 upgradeHeight = 100.0f;
+
+            auto& upgrades = state->m_EssenceShopManager.GetUpgrades();
+
+            for (size_t i = 0; i < upgrades.size(); i++) {
+                const auto& upgrade = upgrades[i];
+                bool maxed = upgrade.IsMaxed();
+                bool canAfford = upgrade.CanAfford(state->m_QuantumEssence);
+
+                Color upgradeBg = maxed ? Color(0.1f, 0.2f, 0.15f, 1.0f) : Color(0.15f, 0.15f, 0.2f, 1.0f);
+                Color upgradeBorder = maxed ? Color::CoherenceGreen() * 0.6f : Color::Magenta() * 0.6f;
+
+                ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 0.0f);
+                ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(10.0f, 10.0f));
+                ImGui::PushStyleColor(ImGuiCol_ChildBg, ToImVec4(upgradeBg));
+                ImGui::PushStyleColor(ImGuiCol_Border, ToImVec4(upgradeBorder));
+
+                if (ImGui::BeginChild(upgrade.name.c_str(), ImVec2(upgradeWidth, upgradeHeight), true, ImGuiWindowFlags_NoScrollbar)) {
+                    ImGui::TextColored(ToImVec4(Color::White()), "%s", upgrade.name.c_str());
+                    ImGui::SameLine(400.0f);
+                    ImGui::TextColored(ToImVec4(Color::Magenta()), "Owned: %s", upgrade.GetProgressString().c_str());
+
+                    ImGui::TextWrapped("%s", upgrade.description.c_str());
+
+                    ImGui::SetCursorPosY(upgradeHeight - 35.0f);
+
+                    if (!maxed) {
+                        f64 cost = upgrade.GetCurrentCost();
+                        std::string costStr = "Cost: " + GameUtils::FormatNumber(cost, state->m_NumberFormat) + " Essence";
+                        Color costColor = canAfford ? Color::Magenta() * 1.3f : Color(0.7f, 0.5f, 0.5f, 1.0f);
+                        ImGui::TextColored(ToImVec4(costColor), "%s", costStr.c_str());
+
+                        ImGui::SameLine(upgradeWidth - 120.0f);
+                        Color btnColor = canAfford ? Color::Magenta() : Color(0.3f, 0.3f, 0.3f, 1.0f);
+                        Color btnHoveredColor = canAfford ? Color::Magenta() * 1.5f : Color(0.4f, 0.4f, 0.4f, 1.0f);
+
+                        ImGui::PushStyleColor(ImGuiCol_Button, ToImVec4(btnColor * 0.3f));
+                        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ToImVec4(btnHoveredColor * 0.5f));
+                        ImGui::PushStyleColor(ImGuiCol_Border, ToImVec4(btnHoveredColor));
+
+                        if (ImGui::Button("PURCHASE", ImVec2(110.0f, 35.0f)) && canAfford) {
+                            state->m_EssenceShopManager.Purchase(upgrade.id, state);
+                            state->GetSoundManager().PlaySound(SoundEffect::ButtonPress, 0.8f);
+                        }
+                        ImGui::PopStyleColor(3);
+                    } else {
+                        ImGui::TextColored(ToImVec4(Color::CoherenceGreen()), "MAXED OUT");
+                    }
+                }
+                ImGui::EndChild();
+
+                ImGui::PopStyleColor(2);
+                ImGui::PopStyleVar(2);
+
+                ImGui::Spacing();
+            }
+        }
+        ImGui::EndChild();
+    }
+    ImGui::End();
+
+    ImGui::PopStyleVar(3);
+    ImGui::PopStyleColor(2);
+
+    if (!showWindow) {
+        state->SetActiveModal(ActiveModal::None);
+    }
 }
 
 void SingularityShopView::Render(GameState* state, Renderer* renderer) {
-    // TODO: Extract from GameState::RenderSingularityShop
-    state->RenderSingularityShop(renderer);
+    (void)renderer;
+
+    if (state->GetActiveModal() != ActiveModal::SingularityShop) return;
+
+    f32 panelWidth = 900.0f;
+    f32 panelHeight = 650.0f;
+    ImVec2 displaySize = ImGui::GetIO().DisplaySize;
+
+    ImVec2 centerPos(displaySize.x * 0.5f, displaySize.y * 0.5f);
+    ImGui::SetNextWindowPos(centerPos, ImGuiCond_Always, ImVec2(0.5f, 0.5f));
+    ImGui::SetNextWindowSize(ImVec2(panelWidth, panelHeight), ImGuiCond_Always);
+
+    Color mainBorderColor = Color(0.5f, 0.0f, 1.0f, 1.0f) * 0.8f;
+    Color mainBgColor = Color(0.05f, 0.05f, 0.1f, 0.95f) * 0.8f;
+
+    ImGui::PushStyleColor(ImGuiCol_WindowBg, ToImVec4(mainBgColor));
+    ImGui::PushStyleColor(ImGuiCol_Border, ToImVec4(mainBorderColor));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 2.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(15.0f, 15.0f));
+
+    bool showWindow = true;
+    if (ImGui::Begin("Singularity Shop - Cosmic Upgrades", &showWindow,
+                     ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
+                     ImGuiWindowFlags_NoCollapse)) {
+
+        ImGui::TextColored(ToImVec4(Color(0.6f, 0.6f, 0.6f, 1.0f)), "(Press ESC to close)");
+        ImGui::Separator();
+
+        std::string singularityText = "Your Singularities: " + GameUtils::FormatNumber(state->m_Timeline.singularities, state->m_NumberFormat);
+        ImGui::TextColored(ToImVec4(Color(0.8f, 0.0f, 1.0f, 1.0f) * 1.3f), "%s", singularityText.c_str());
+
+        ImGui::Spacing();
+        ImGui::Separator();
+
+        f32 upgradesContentHeight = panelHeight - ImGui::GetCursorPosY() - 30.0f;
+
+        if (ImGui::BeginChild("##UpgradesList", ImVec2(0, upgradesContentHeight), false, ImGuiWindowFlags_AlwaysVerticalScrollbar)) {
+            f32 upgradeWidth = ImGui::GetContentRegionAvail().x;
+            f32 upgradeHeight = 100.0f;
+
+            auto& upgrades = state->m_SingularityShopManager.GetUpgrades();
+
+            for (size_t i = 0; i < upgrades.size(); i++) {
+                const auto& upgrade = upgrades[i];
+                bool maxed = upgrade.IsMaxed();
+                bool canAfford = upgrade.CanAfford(state->m_Timeline.singularities);
+
+                Color upgradeBg = maxed ? Color(0.1f, 0.15f, 0.2f, 1.0f) : Color(0.1f, 0.1f, 0.15f, 1.0f);
+                Color upgradeBorder = maxed ? Color::CoherenceGreen() * 0.6f : mainBorderColor * 0.6f;
+
+                ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 0.0f);
+                ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(10.0f, 10.0f));
+                ImGui::PushStyleColor(ImGuiCol_ChildBg, ToImVec4(upgradeBg));
+                ImGui::PushStyleColor(ImGuiCol_Border, ToImVec4(upgradeBorder));
+
+                if (ImGui::BeginChild(upgrade.name.c_str(), ImVec2(upgradeWidth, upgradeHeight), true, ImGuiWindowFlags_NoScrollbar)) {
+                    ImGui::TextColored(ToImVec4(Color::White()), "%s", upgrade.name.c_str());
+                    ImGui::SameLine(400.0f);
+                    ImGui::TextColored(ToImVec4(Color(0.8f, 0.0f, 1.0f, 1.0f)), "Owned: %s", upgrade.GetProgressString().c_str());
+
+                    ImGui::TextWrapped("%s", upgrade.description.c_str());
+
+                    ImGui::SetCursorPosY(upgradeHeight - 35.0f);
+
+                    if (!maxed) {
+                        f64 cost = upgrade.GetCurrentCost();
+                        std::string costStr = "Cost: " + GameUtils::FormatNumber(cost, state->m_NumberFormat) + " Singularities";
+                        Color costColor = canAfford ? Color(0.8f, 0.0f, 1.0f, 1.0f) * 1.3f : Color(0.7f, 0.5f, 0.5f, 1.0f);
+                        ImGui::TextColored(ToImVec4(costColor), "%s", costStr.c_str());
+
+                        ImGui::SameLine(upgradeWidth - 120.0f);
+                        Color btnColor = canAfford ? Color(0.5f, 0.0f, 1.0f, 1.0f) : Color(0.3f, 0.3f, 0.3f, 1.0f);
+                        Color btnHoveredColor = canAfford ? Color(0.8f, 0.0f, 1.0f, 1.0f) : Color(0.4f, 0.4f, 0.4f, 1.0f);
+
+                        ImGui::PushStyleColor(ImGuiCol_Button, ToImVec4(btnColor * 0.3f));
+                        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ToImVec4(btnHoveredColor * 0.5f));
+                        ImGui::PushStyleColor(ImGuiCol_Border, ToImVec4(btnHoveredColor));
+
+                        if (ImGui::Button("PURCHASE", ImVec2(110.0f, 35.0f)) && canAfford) {
+                            state->m_SingularityShopManager.Purchase(upgrade.id, state);
+                            state->GetSoundManager().PlaySound(SoundEffect::ButtonPress, 0.8f);
+                        }
+                        ImGui::PopStyleColor(3);
+                    } else {
+                        ImGui::TextColored(ToImVec4(Color::CoherenceGreen()), "MAXED OUT");
+                    }
+                }
+                ImGui::EndChild();
+
+                ImGui::PopStyleColor(2);
+                ImGui::PopStyleVar(2);
+
+                ImGui::Spacing();
+            }
+        }
+        ImGui::EndChild();
+    }
+    ImGui::End();
+
+    ImGui::PopStyleVar(3);
+    ImGui::PopStyleColor(2);
+
+    if (!showWindow) {
+        state->SetActiveModal(ActiveModal::None);
+    }
 }
 
 void SpaceshipView::Render(GameState* state, Renderer* renderer) {
-    // TODO: Extract from GameState::RenderSpaceship
-    state->RenderSpaceship(renderer);
+    if (state->GetActiveModal() != ActiveModal::Spaceship) return;
+
+    // We still pass the renderer to the m_Spaceship functions, but the main UI relies on ImGui
+    (void)renderer;
+
+    // 1. Setup position and size
+    f32 panelWidth = 1100.0f;
+    f32 panelHeight = 700.0f;
+    ImVec2 displaySize = ImGui::GetIO().DisplaySize;
+
+    // Center the window
+    ImVec2 centerPos(displaySize.x * 0.5f, displaySize.y * 0.5f);
+    ImGui::SetNextWindowPos(centerPos, ImGuiCond_Always, ImVec2(0.5f, 0.5f));
+    ImGui::SetNextWindowSize(ImVec2(panelWidth, panelHeight), ImGuiCond_Always);
+
+    // 2. Setup styles (matching old aesthetics)
+    ImGui::PushStyleColor(ImGuiCol_WindowBg, ToImVec4(Color(0.05f, 0.05f, 0.1f, 0.95f) * 0.8f));
+    ImGui::PushStyleColor(ImGuiCol_Border, ToImVec4(Color(1.0f, 0.7f, 0.0f, 1.0f) * 0.8f));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 2.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(10.0f, 10.0f));
+
+    // 3. Begin the main spaceship window
+    bool windowOpen = true;
+    if (ImGui::Begin("Spaceship - Repair and Upgrade", &windowOpen,
+                     ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
+                     ImGuiWindowFlags_NoCollapse)) {
+
+        // --- Header ---
+        ImGui::TextColored(ToImVec4(Color(0.6f, 0.6f, 0.6f, 1.0f)), "(Press H or ESC to close)");
+        ImGui::Separator();
+
+        // --- Split Panel Layout ---
+        f32 availableHeight = panelHeight - ImGui::GetCursorPosY() - 40.0f;
+        f32 spacing = 20.0f;
+        f32 totalContentWidth = ImGui::GetWindowContentRegionMax().x - ImGui::GetWindowContentRegionMin().x - spacing;
+        f32 panelContentWidth = totalContentWidth * 0.5f;
+
+        // Left panel: Ship status and installed parts
+        ImGui::BeginChild("##ShipStatusPanel", ImVec2(panelContentWidth, availableHeight), true);
+        {
+            state->m_Spaceship.RenderShipPanel();
+        }
+        ImGui::EndChild();
+
+        ImGui::SameLine();
+
+        // Right panel: Part inventory
+        ImGui::BeginChild("##InventoryPanel", ImVec2(panelContentWidth, availableHeight), true);
+        {
+            state->m_Spaceship.RenderInventoryPanel();
+        }
+        ImGui::EndChild();
+
+        // --- Instructions at bottom ---
+        ImGui::SetCursorPosY(panelHeight - 35.0f);
+        ImGui::TextColored(ToImVec4(Color(0.7f, 0.7f, 0.7f, 1.0f)),
+                           "Ship parts drop from Research Station observations. Install parts to increase production & unlock travel!");
+    }
+    ImGui::End();
+
+    // 4. Pop styles
+    ImGui::PopStyleVar(3);
+    ImGui::PopStyleColor(2);
+
+    // Handle close
+    if (!windowOpen) {
+        state->SetActiveModal(ActiveModal::None);
+    }
 }
 
 void CombatView::Render(GameState* state, Renderer* renderer) {
-    // TODO: Extract from GameState::RenderCombat
-    state->RenderCombat(renderer);
+    if (state->GetActiveModal() != ActiveModal::Combat) return;
+
+    // Pass the renderer to CombatSystem (even if unused in ImGui logic)
+    state->m_CombatSystem.RenderCombatUI(renderer);
+
+    // Draw XP bar on the background layer for visibility
+    f32 xpBarWidth = 300.0f;
+    f32 xpBarHeight = 25.0f;
+
+    ImDrawList* bg_draw_list = ImGui::GetBackgroundDrawList();
+
+    ImVec2 xpBarStart(10.0f, 10.0f);
+    ImVec2 xpBarEnd(xpBarStart.x + xpBarWidth, xpBarStart.y + xpBarHeight);
+
+    f64 xpRequired = state->GetXPForNextLevel();
+    f64 xpPercent = xpRequired > 0 ? (state->m_PlayerXP / xpRequired) : 0.0;
+
+    // 1. Draw Background Rect
+    bg_draw_list->AddRectFilled(xpBarStart, xpBarEnd, ImGui::GetColorU32(ImVec4(0.2f, 0.2f, 0.2f, 0.8f)));
+
+    // 2. Draw Fill Rect
+    ImVec2 xpBarFillEnd(xpBarStart.x + xpBarWidth * static_cast<f32>(xpPercent), xpBarEnd.y);
+    bg_draw_list->AddRectFilled(xpBarStart, xpBarFillEnd, ImGui::GetColorU32(ImVec4(1.0f, 0.9f, 0.0f, 1.0f))); // Gold
+
+    char levelText[64];
+    snprintf(levelText, sizeof(levelText), "Level %d - %.0f / %.0f XP",
+             state->m_PlayerLevel, state->m_PlayerXP, xpRequired);
+
+    // 3. Draw Text (Centered over the bar)
+    ImVec2 textPos(xpBarStart.x + 5.0f, xpBarStart.y + 5.0f);
+    bg_draw_list->AddText(textPos, ImGui::GetColorU32(ImVec4(1.0f, 1.0f, 1.0f, 1.0f)), levelText);
 }
 
 void GatchaView::Render(GameState* state, Renderer* renderer) {
