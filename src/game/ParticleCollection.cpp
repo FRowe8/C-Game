@@ -1,5 +1,5 @@
 #include "../../include/ParticleCollection.h"
-#include "../../include/Log.h"
+#include "../../include/Logger.h"
 #include <algorithm>
 #include <random>
 
