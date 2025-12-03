@@ -202,9 +202,9 @@ struct QuantumTimeline {
     QuantumTimeline();
 };
 
-// Modal Window Management - ensures only one modal is active at a time
-enum class ActiveModal {
-    None,           // Stations view (base state)
+// GameMode replaces scattered boolean flags for active screens
+enum class GameMode {
+    None,              // Stations view (base state)
     Achievements,
     Statistics,
     Research,
@@ -222,6 +222,9 @@ enum class ActiveModal {
     Collection,         // Phase 4.1: Particle collection system
     MoreMenu
 };
+
+// Backwards compatibility alias
+using ActiveModal = GameMode;
 
 class GameState {
 public:
@@ -367,8 +370,12 @@ public:
     void RenderStationsContent();
 
     // Modal Window Management
-    void SetActiveModal(ActiveModal modal);
-    ActiveModal GetActiveModal() const { return m_ActiveModal; }
+    void SetGameMode(GameMode mode);
+    GameMode GetGameMode() const { return m_GameMode; }
+
+    // Legacy compatibility for older callers
+    void SetActiveModal(GameMode modal) { SetGameMode(modal); }
+    GameMode GetActiveModal() const { return GetGameMode(); }
 
     // NEW: Friend the manager and GuiLayer so they can access private members
     friend class UIManager;
@@ -515,9 +522,8 @@ private:
     Vec2 m_ScrollOffset;
 
     // Modal Window Management System
-    ActiveModal m_ActiveModal;
-
-    // Legacy UI flags (synchronized by SetActiveModal)
+    GameMode m_GameMode;
+    bool m_ShowMoreMenu; // Overflow menu for less frequent pages
     bool m_ShowAchievements;
     bool m_ShowStats;
     bool m_ShowResearch;
@@ -531,7 +537,6 @@ private:
     bool m_ShowGatcha;
     bool m_ShowSkills;
     bool m_ShowEnhancement;
-    bool m_ShowMoreMenu; // Overflow menu for less frequent pages
     GameUtils::NumberFormat m_NumberFormat; // Toggle between suffix (1.23M) and scientific (1.23e6)
 
     // Game time
