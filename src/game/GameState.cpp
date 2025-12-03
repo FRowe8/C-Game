@@ -66,6 +66,7 @@ ResearchStation::ResearchStation()
     : baseProduction(0), currentProduction(0), level(0),
       upgradeCost(0), upgradeCostMultiplier(1.15f),
       superpositionValue(0), superpositionProbability(0.5f),
+      passiveCollapseRate(0.0),  // Phase 3.1: Default to 0 (no passive income)
       unlocked(false), unlockCost(0), autoUpgrade(false) {
 }
 
@@ -98,6 +99,10 @@ void ResearchStation::Observe(GameState* state) {
     } else if (activeEvent && activeEvent->type == QuantumEventType::WaveCollapse) {
         observeBonus = activeEvent->multiplier;
     }
+
+    // Phase 4.1: Apply particle collection observation bonus
+    f64 particleObservationBonus = state->GetParticleCollection().GetTotalObservationBonus();
+    observeBonus *= (1.0 + particleObservationBonus);
 
     if (roll < superpositionProbability) {
         // Success - full value
@@ -134,6 +139,12 @@ void ResearchStation::Observe(GameState* state) {
 
     // Award Observation skill XP
     state->GetSpecializedSkills().AddExperience(SkillCategory::Observation, SkillXP::OBSERVE_STATION);
+
+    // Phase 4.1: Particle discovery chance! (0.5% chance on each observation)
+    if (state->GetParticleCollection().TryFindParticle()) {
+        // Particle discovered! TryFindParticle() handles logging and notifications
+        state->GetSoundManager().PlaySound(SoundEffect::AchievementUnlock); // Celebratory sound
+    }
 
     // Ship part drop chance! (20% base chance + bonus from ship's drop rate bonus)
     f64 partDropChance = 0.20; // 20% base chance
@@ -177,6 +188,21 @@ void ResearchStation::Update(f64 deltaTime) {
 
     // Accumulate in superposition
     superpositionValue += currentProduction * deltaTime;
+
+    // Phase 3.1: Passive collapse for early game smoothing
+    // Automatically collapse a percentage of superposition every second
+    if (passiveCollapseRate > 0.0 && superpositionValue > 0.0) {
+        f64 amountToCollapse = superpositionValue * passiveCollapseRate * deltaTime;
+        if (amountToCollapse > 0.0) {
+            // Note: passive collapse is guaranteed (no RNG), but at reduced efficiency
+            // This provides steady income without frustrating failures
+            superpositionValue -= amountToCollapse;
+
+            // The passive collapse will be added to resources via GameState
+            // We'll need to pass this back to GameState, so we'll handle it there
+            // For now, just reduce the superposition
+        }
+    }
 }
 
 // GameState implementation
@@ -184,6 +210,9 @@ GameState::GameState()
     : m_CurrentEvent(nullptr), m_TimeSinceLastEvent(0), m_EventCooldown(120.0),
       m_QuantumEssence(0),
       m_PlayerCredits(0),
+      m_CreditProductionMultiplier(1.0),  // Phase 3.2: No bonus by default
+      m_CreditConversionRate(100.0),      // Phase 3.2: 100 credits = 1% production
+      m_ExoticMaterials(0),               // Phase 3.3: Start with 0 exotic materials
       m_PlayerLevel(1),
       m_PlayerXP(0.0),
       m_LastSaveTimestamp(0),
@@ -326,6 +355,10 @@ void GameState::Initialize() {
     // Initialize specialized skills system
     m_SpecializedSkills.Initialize();
 
+    // Phase 4.1: Initialize particle collection system
+    m_ParticleCollection.Initialize();
+    Log::Info("Particle collection system initialized");
+
     // Initialize sound manager
     m_SoundManager.Initialize();
     if (m_SoundManager.IsAudioAvailable()) {
@@ -352,6 +385,7 @@ void GameState::InitializeStations() {
     station1.upgradeCost = 10.0;
     station1.upgradeCostMultiplier = 1.5; // Increased from 1.15 for better balance
     station1.superpositionProbability = 0.7;
+    station1.passiveCollapseRate = 0.05; // Phase 3.1: 5% passive income per second (smooths early game)
     station1.unlocked = true; // First one is unlocked
     m_Stations.push_back(station1);
 
@@ -410,6 +444,21 @@ void GameState::InitializeStations() {
     station5.unlocked = false;
     station5.unlockCost = 15000.0; // Increased from 1000
     m_Stations.push_back(station5);
+
+    // Phase 3.2: Station 6: Matter Converter (Combat Integration)
+    // Special station that converts Combat Credits into production bonuses
+    ResearchStation station6;
+    station6.name = "Matter Converter";
+    station6.description = "Converts combat spoils into quantum energy";
+    station6.resourceType = QuantumResource::Qubits;  // Produces qubits from credits
+    station6.baseProduction = 0.0;  // No automatic production
+    station6.level = 0;
+    station6.upgradeCost = 5000.0;
+    station6.upgradeCostMultiplier = 2.2;
+    station6.superpositionProbability = 1.0;  // Always succeeds
+    station6.unlocked = false;
+    station6.unlockCost = 7500.0;  // Unlocks at Tier 2
+    m_Stations.push_back(station6);
 }
 
 void GameState::InitializeUI() {
@@ -426,6 +475,12 @@ void GameState::Update(f64 deltaTime, Input* input, Renderer* renderer) {
 
     // Update feature unlock manager (handles notifications)
     m_UnlockManager.Update(deltaTime);
+
+    // Phase 4.2: Update music system (handle cross-fading)
+    m_SoundManager.UpdateMusic(deltaTime);
+
+    // Phase 4.2: Dynamic music based on active modal
+    UpdateDynamicMusic();
 
     // Update boost timers
     if (m_BoostActive) {
@@ -596,6 +651,9 @@ void GameState::UpdateStations(f64 deltaTime) {
     // Apply skill tree production bonus
     globalMultiplier *= m_SkillTree.GetProductionMultiplier();
 
+    // Phase 3.2: Apply credit conversion production bonus
+    globalMultiplier *= m_CreditProductionMultiplier;
+
     // Check if Auto-Observer research is unlocked
     bool hasAutoObserver = m_ResearchTree->IsResearched(ResearchID::AutoObserver);
 
@@ -607,7 +665,22 @@ void GameState::UpdateStations(f64 deltaTime) {
     bool canUpgrade = !m_ChallengeManager.HasModifier(ChallengeModifier::NoUpgrades);
 
     for (auto& station : m_Stations) {
+        // Store superposition before update for passive collapse calculation
+        f64 superpositionBefore = station.superpositionValue;
+
         station.Update(deltaTime * globalMultiplier);
+
+        // Phase 3.1: Handle passive collapse rewards
+        if (station.passiveCollapseRate > 0.0 && station.unlocked) {
+            f64 superpositionAfter = station.superpositionValue;
+            f64 collapsed = superpositionBefore - superpositionAfter;
+
+            // If superposition decreased due to passive collapse (not just normal growth)
+            if (collapsed > 0.0 && superpositionAfter < superpositionBefore) {
+                // Award resources from passive collapse (no floating text to avoid spam)
+                AddResource(station.resourceType, collapsed, false);
+            }
+        }
 
         // Auto-observe if research is unlocked and superposition is high enough
         // Auto-observe still works even in NoObserve challenge (only manual is disabled)
@@ -651,6 +724,61 @@ void GameState::UpdateCoherence(f64 deltaTime) {
     if (m_Coherence < 0) m_Coherence = 0;
 
     // Coherence affects production (applied in UpdateStations)
+}
+
+// Phase 4.2: Dynamic music system - change music based on active modal
+void GameState::UpdateDynamicMusic() {
+    if (!m_SoundManager.IsAudioAvailable()) return;
+
+    // Don't switch music if we're currently fading
+    if (m_SoundManager.IsFading()) return;
+
+    // Determine which music track should be playing based on current modal
+    MusicTrack targetTrack = MusicTrack::MainTheme;  // Default
+
+    switch (m_ActiveModal) {
+        case ActiveModal::None:
+            // Idle/stations gameplay
+            targetTrack = MusicTrack::MainTheme;
+            break;
+
+        case ActiveModal::Combat:
+            // Combat mode
+            targetTrack = MusicTrack::CombatTheme;
+            break;
+
+        case ActiveModal::Research:
+        case ActiveModal::Skills:
+        case ActiveModal::SpecializedSkills:
+            // Research/skill trees
+            targetTrack = MusicTrack::ResearchTheme;
+            break;
+
+        case ActiveModal::EssenceShop:
+        case ActiveModal::SingularityShop:
+        case ActiveModal::Buyables:
+            // Shops
+            targetTrack = MusicTrack::ShopTheme;
+            break;
+
+        case ActiveModal::Statistics:
+        case ActiveModal::Achievements:
+        case ActiveModal::Milestones:
+        case ActiveModal::Collection:
+            // Calm menus
+            targetTrack = MusicTrack::AmbientCalm;
+            break;
+
+        default:
+            // Keep current track for other modals
+            targetTrack = m_SoundManager.GetCurrentTrack();
+            break;
+    }
+
+    // Fade to new track if different from current
+    if (targetTrack != m_SoundManager.GetCurrentTrack()) {
+        m_SoundManager.FadeMusicTo(targetTrack, 2.0f);  // 2-second cross-fade
+    }
 }
 
 void GameState::UpdateUI(Input* input) {
@@ -1031,6 +1159,10 @@ f64 GameState::GetProductionMultiplier(QuantumResource type) const {
     // if (m_ChallengeManager.IsProductionHalved()) {
     //     multiplier *= 0.5;
     // }
+
+    // Phase 4.1: Particle Collection Production Bonus
+    f64 particleBonus = m_ParticleCollection.GetTotalProductionBonus();
+    multiplier *= (1.0 + particleBonus);
 
     return multiplier;
 }
@@ -1991,6 +2123,9 @@ bool GameState::Save(const std::string& filepath) {
     file << "  \"photons\": " << m_Timeline.photons << ",\n";
     file << "  \"resets\": " << m_Timeline.completedResets << ",\n";
 
+    // Phase 3.3: Exotic Materials
+    file << "  \"exoticMaterials\": " << m_ExoticMaterials << ",\n";
+
     // Time
     file << "  \"timePlayed\": " << m_TotalTimePlayed << ",\n";
 
@@ -2040,6 +2175,25 @@ bool GameState::Save(const std::string& filepath) {
     }
     file << "  ],\n";
 
+    // Phase 4.1: Particle Collection
+    file << "  \"particleCollection\": {\n";
+    file << "    \"discovered\": [";
+    for (i32 i = 0; i < static_cast<i32>(ParticleType::COUNT); i++) {
+        ParticleType type = static_cast<ParticleType>(i);
+        bool discovered = m_ParticleCollection.IsDiscovered(type);
+        file << (discovered ? "true" : "false");
+        if (i < static_cast<i32>(ParticleType::COUNT) - 1) file << ", ";
+    }
+    file << "],\n";
+    file << "    \"equipped\": [";
+    auto equippedParticles = m_ParticleCollection.GetEquippedParticles();
+    for (size_t i = 0; i < equippedParticles.size(); i++) {
+        file << static_cast<i32>(equippedParticles[i]->type);
+        if (i < equippedParticles.size() - 1) file << ", ";
+    }
+    file << "]\n";
+    file << "  },\n";
+
     // Specialized Skills
     m_SpecializedSkills.SaveToJson(file);
 
@@ -2063,6 +2217,7 @@ bool GameState::Load(const std::string& filepath) {
         bool inAchievements = false;
         bool inResearch = false;
         bool inSpecializedSkills = false;
+        bool inParticleCollection = false;  // Phase 4.1
 
         while (std::getline(file, line)) {
             // Track sections
@@ -2088,7 +2243,16 @@ bool GameState::Load(const std::string& filepath) {
                 inStatistics = false;
                 inAchievements = false;
                 inResearch = false;
+                inParticleCollection = false;  // Phase 4.1
                 inSpecializedSkills = true;
+                continue;
+            } else if (line.find("\"particleCollection\"") != std::string::npos) {
+                // Phase 4.1
+                inStatistics = false;
+                inAchievements = false;
+                inResearch = false;
+                inSpecializedSkills = false;
+                inParticleCollection = true;
                 continue;
             } else if (line.find("}") != std::string::npos || line.find("]") != std::string::npos) {
                 if (line.find("},") == std::string::npos) {
@@ -2096,6 +2260,7 @@ bool GameState::Load(const std::string& filepath) {
                     inAchievements = false;
                     inResearch = false;
                     inSpecializedSkills = false;
+                    inParticleCollection = false;  // Phase 4.1
                 }
             }
 
@@ -2138,6 +2303,63 @@ bool GameState::Load(const std::string& filepath) {
                         // Ignore parse errors
                     }
                 }
+            } else if (inParticleCollection) {
+                // Phase 4.1: Parse particle collection data
+                if (line.find("\"discovered\"") != std::string::npos) {
+                    // Parse discovered array
+                    size_t start = line.find('[');
+                    size_t end = line.find(']');
+                    if (start != std::string::npos && end != std::string::npos) {
+                        std::string values = line.substr(start + 1, end - start - 1);
+                        size_t pos = 0;
+                        i32 index = 0;
+                        while (pos < values.length() && index < static_cast<i32>(ParticleType::COUNT)) {
+                            // Skip whitespace
+                            while (pos < values.length() && std::isspace(values[pos])) pos++;
+                            // Check if true/false
+                            if (values.substr(pos, 4) == "true") {
+                                m_ParticleCollection.DiscoverParticle(static_cast<ParticleType>(index));
+                                pos += 4;
+                            } else if (values.substr(pos, 5) == "false") {
+                                pos += 5;
+                            }
+                            // Skip comma and whitespace
+                            while (pos < values.length() && (values[pos] == ',' || std::isspace(values[pos]))) pos++;
+                            index++;
+                        }
+                    }
+                } else if (line.find("\"equipped\"") != std::string::npos) {
+                    // Parse equipped array
+                    size_t start = line.find('[');
+                    size_t end = line.find(']');
+                    if (start != std::string::npos && end != std::string::npos) {
+                        std::string values = line.substr(start + 1, end - start - 1);
+                        if (!values.empty()) {
+                            size_t pos = 0;
+                            while (pos < values.length()) {
+                                // Skip whitespace
+                                while (pos < values.length() && std::isspace(values[pos])) pos++;
+                                if (pos >= values.length()) break;
+
+                                // Parse number
+                                size_t numStart = pos;
+                                while (pos < values.length() && std::isdigit(values[pos])) pos++;
+                                if (pos > numStart) {
+                                    try {
+                                        i32 particleId = std::stoi(values.substr(numStart, pos - numStart));
+                                        if (particleId >= 0 && particleId < static_cast<i32>(ParticleType::COUNT)) {
+                                            m_ParticleCollection.EquipParticle(static_cast<ParticleType>(particleId));
+                                        }
+                                    } catch (...) {
+                                        // Ignore parse errors
+                                    }
+                                }
+                                // Skip comma and whitespace
+                                while (pos < values.length() && (values[pos] == ',' || std::isspace(values[pos]))) pos++;
+                            }
+                        }
+                    }
+                }
             } else if (inSpecializedSkills) {
                 // Parse specialized skills (delegate to LoadFromJson)
                 m_SpecializedSkills.LoadFromJson(line);
@@ -2170,6 +2392,9 @@ bool GameState::Load(const std::string& filepath) {
                     m_Timeline.photonBonus = 1.0 + (m_Timeline.photons * 0.1);
                 } else if (line.find("\"resets\"") != std::string::npos) {
                     m_Timeline.completedResets = static_cast<i32>(GameUtils::ParseJsonNumber(line, "resets"));
+                } else if (line.find("\"exoticMaterials\"") != std::string::npos) {
+                    // Phase 3.3: Load Exotic Materials
+                    m_ExoticMaterials = static_cast<i32>(GameUtils::ParseJsonNumber(line, "exoticMaterials"));
                 } else if (line.find("\"timePlayed\"") != std::string::npos) {
                     m_TotalTimePlayed = GameUtils::ParseJsonNumber(line, "timePlayed");
                 }
@@ -2912,6 +3137,7 @@ void GameState::RenderResearchTree(Renderer* renderer) {
                         if (node->coherenceCost > 0) costText += GameUtils::FormatNumber(node->coherenceCost, m_NumberFormat) + " Coherence | ";
                         if (node->entanglementCost > 0) costText += GameUtils::FormatNumber(node->entanglementCost, m_NumberFormat) + " Entanglement | ";
                         if (node->photonCost > 0) costText += std::to_string(node->photonCost) + " Photons";
+                        if (node->exoticMaterialsCost > 0) costText += " | " + std::to_string(node->exoticMaterialsCost) + " Exotic Materials";
 
                         Color costColor = canAfford ? Color::CoherenceGreen() : Color::QuantumPurple();
                         ImGui::TextColored(ToImVec4(costColor), "%s", costText.c_str());
@@ -3036,6 +3262,9 @@ bool GameState::CanAffordResearch(ResearchID id) const {
     // Check photon cost
     if (m_Timeline.photons < node->photonCost * costMultiplier) return false;
 
+    // Phase 3.3: Check exotic materials cost (not affected by discount)
+    if (m_ExoticMaterials < node->exoticMaterialsCost) return false;
+
     // Check if can be researched
     if (!m_ResearchTree->CanResearch(id, m_Timeline.completedResets)) return false;
 
@@ -3056,6 +3285,9 @@ bool GameState::PurchaseResearch(ResearchID id) {
     SpendResource(QuantumResource::Coherence, node->coherenceCost * costMultiplier);
     SpendResource(QuantumResource::Entanglement, node->entanglementCost * costMultiplier);
     m_Timeline.photons -= node->photonCost * costMultiplier;
+
+    // Phase 3.3: Spend exotic materials (not affected by discount)
+    SpendExoticMaterials(node->exoticMaterialsCost);
 
     // Research it
     m_ResearchTree->Research(id);
@@ -4301,6 +4533,12 @@ void GameState::EndCombat() {
         i32 nanoAlloy = (m_PlayerLevel >= 10) ? (1 + m_PlayerLevel / 10) : 0; // 0-11 alloy
         i32 quantumCore = (m_PlayerLevel >= 30) ? (m_PlayerLevel / 30) : 0; // 0-3 cores
 
+        // Phase 3.3: Award Exotic Materials for Tier 3+ enemies (level 41+)
+        if (m_PlayerLevel >= 41) {
+            i32 exoticMaterials = 1 + ((m_PlayerLevel - 41) / 10); // 1 at level 41, 2 at 51, etc.
+            AddExoticMaterials(exoticMaterials);
+        }
+
         m_EnhancementSystem.AddMaterial(MaterialType::TechScraps, techScraps);
         if (nanoAlloy > 0) m_EnhancementSystem.AddMaterial(MaterialType::NanoAlloy, nanoAlloy);
         if (quantumCore > 0) m_EnhancementSystem.AddMaterial(MaterialType::QuantumCore, quantumCore);
@@ -4461,6 +4699,60 @@ void GameState::DeductPlayerCredits(i32 amount) { // <-- FIX IS HERE
         // Ensure Log::Infof is also available
         // Log::Infof("Deducted %d credits. Remaining: %d", amount, m_PlayerCredits);
     }
+}
+
+// Phase 3.3: Exotic Materials Management
+void GameState::AddExoticMaterials(i32 amount) {
+    if (amount > 0) {
+        m_ExoticMaterials += amount;
+        Log::Infof("Gained ", amount, " Exotic Materials! Total: ", m_ExoticMaterials);
+
+        // Spawn floating text for visual feedback
+        if (m_GuiLayer && m_GuiLayer->GetFloatingTextManager()) {
+            ImGuiIO& io = ImGui::GetIO();
+            Vec2 position(io.DisplaySize.x * 0.5f, io.DisplaySize.y * 0.3f);
+            ImVec4 color(1.0f, 0.5f, 1.0f, 1.0f); // Purple/magenta for exotic materials
+            std::string text = "+" + std::to_string(amount) + " Exotic Materials";
+            m_GuiLayer->GetFloatingTextManager()->SpawnText(text, position, color, 2.5f);
+        }
+    }
+}
+
+bool GameState::SpendExoticMaterials(i32 amount) {
+    if (amount <= 0) return true;
+    if (m_ExoticMaterials >= amount) {
+        m_ExoticMaterials -= amount;
+        return true;
+    }
+    return false;
+}
+
+// Phase 3.2: Credit Conversion System Implementation
+void GameState::ConvertCreditsToProduction(i32 credits) {
+    if (credits <= 0 || m_PlayerCredits < credits) {
+        return; // Not enough credits
+    }
+
+    // Calculate bonus (100 credits = 1% = 0.01 multiplier)
+    f64 bonusGained = static_cast<f64>(credits) / m_CreditConversionRate * 0.01;
+
+    // Deduct credits
+    DeductPlayerCredits(credits);
+
+    // Add to production multiplier (permanent bonus)
+    m_CreditProductionMultiplier += bonusGained;
+
+    Log::Infof("Converted ", credits, " credits to +",
+               static_cast<i32>(bonusGained * 100.0), "% production! Total: +",
+               static_cast<i32>((m_CreditProductionMultiplier - 1.0) * 100.0), "%");
+
+    // Spawn particle effect
+    SpawnParticleBurst(Vec2(640.0f, 360.0f), Color::EntanglementOrange(), 20);
+}
+
+f64 GameState::CalculateProductionBonusFromCredits(i32 credits) const {
+    // Returns the % bonus that would be gained from converting X credits
+    return (static_cast<f64>(credits) / m_CreditConversionRate * 0.01) * 100.0;
 }
 
 // Implement the setter for Gatcha UI visibility

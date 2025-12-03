@@ -17,6 +17,7 @@
 #include "FeatureUnlockManager.h"
 #include "SpecializedSkills.h"
 #include "SoundManager.h"
+#include "ParticleCollection.h"
 #include <vector>
 #include <string>
 #include <functional>
@@ -48,6 +49,7 @@ namespace UI {
     class EnhancementView;
     class SpecializedSkillsView;
     class TutorialOverlay;
+    class CollectionView;
 }
 
 // Research station that generates resources
@@ -66,6 +68,9 @@ struct ResearchStation {
     // Superposition state (resources waiting to be observed)
     f64 superpositionValue;
     f64 superpositionProbability; // Chance of getting full value on observation
+
+    // Phase 3.1: Passive collapse for early game smoothing
+    f64 passiveCollapseRate;      // Percentage of superposition auto-collapsed per second (0.0 to 1.0)
 
     bool unlocked;
     f64 unlockCost;
@@ -213,6 +218,7 @@ enum class ActiveModal {
     Skills,
     Enhancement,
     SpecializedSkills,  // Activity-based progression system
+    Collection,         // Phase 4.1: Particle collection system
     MoreMenu
 };
 
@@ -310,6 +316,9 @@ public:
     // Enhancement System
     EnhancementSystem& GetEnhancementSystem() { return m_EnhancementSystem; }
 
+    // Phase 4.1: Particle Collection System
+    ParticleCollection& GetParticleCollection() { return m_ParticleCollection; }
+
     // Specialized Skills System
     SpecializedSkillsSystem& GetSpecializedSkills() { return m_SpecializedSkills; }
 
@@ -327,6 +336,16 @@ public:
     i32 GetPlayerCredits();
 
     void DeductPlayerCredits(i32 amount);
+
+    // Phase 3.2: Credit Conversion System
+    void ConvertCreditsToProduction(i32 credits);
+    f64 GetCreditProductionMultiplier() const { return m_CreditProductionMultiplier; }
+    f64 CalculateProductionBonusFromCredits(i32 credits) const;
+
+    // Phase 3.3: Exotic Materials Management
+    i32 GetExoticMaterials() const { return m_ExoticMaterials; }
+    void AddExoticMaterials(i32 amount);
+    bool SpendExoticMaterials(i32 amount);
 
     bool IsGatchaUIVisible() const {
         return m_ShowGatcha;
@@ -368,6 +387,7 @@ private:
     void InitializeUI();
     void UpdateStations(f64 deltaTime);
     void UpdateCoherence(f64 deltaTime);
+    void UpdateDynamicMusic();  // Phase 4.2: Switch music based on active modal
     void UpdateUI(Input* input);
     void RenderUI(Renderer* renderer);
     void RenderResources(Renderer* renderer);
@@ -399,6 +419,13 @@ private:
     f64 m_Resources[3]; // Qubits, Coherence, Entanglement
 
     i32 m_PlayerCredits; // Currency for Gatcha/Summon system (or similar)
+
+    // Phase 3.2: Combat Integration - Credit Conversion
+    f64 m_CreditProductionMultiplier; // Production bonus from converted credits (1.0 = no bonus)
+    f64 m_CreditConversionRate;       // Credits per 1% production bonus (default: 100 credits = 1%)
+
+    // Phase 3.3: Mid-Game Gatekeeping - Exotic Materials
+    i32 m_ExoticMaterials;            // Special materials required for Tier 3+ research (from Spaceship/Combat)
 
     // Game objects
     std::vector<ResearchStation> m_Stations;
@@ -459,6 +486,9 @@ private:
 
     // Feature Unlock Manager
     FeatureUnlockManager m_UnlockManager;
+
+    // Phase 4.1: Particle Collection System
+    ParticleCollection m_ParticleCollection;
 
     // Specialized Skills System
     SpecializedSkillsSystem m_SpecializedSkills;

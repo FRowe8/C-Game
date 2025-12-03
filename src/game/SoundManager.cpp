@@ -14,6 +14,11 @@ SoundManager::SoundManager()
     , m_MusicVolume(0.5f)
     , m_CurrentMusicTrack(MusicTrack::MainTheme)
     , m_MusicPlaying(false)
+    , m_IsFading(false)  // Phase 4.2
+    , m_TargetMusicTrack(MusicTrack::MainTheme)
+    , m_FadeTimeTotal(1.0f)
+    , m_FadeTimeElapsed(0.0f)
+    , m_FadeStartVolume(0.5f)
 {
     for (i32 i = 0; i < static_cast<i32>(SoundEffect::COUNT); i++) {
         m_SoundHandles[i] = nullptr;
@@ -235,6 +240,64 @@ void SoundManager::LoadMusic() {
 #endif
 }
 
+// Phase 4.2: Cross-fading implementation
+void SoundManager::FadeMusicTo(MusicTrack track, f32 fadeTimeSeconds) {
+    if (!m_Initialized) return;
+
+    // If already on this track, do nothing
+    if (track == m_CurrentMusicTrack && m_MusicPlaying && !m_IsFading) {
+        return;
+    }
+
+    // Start fade out
+    m_IsFading = true;
+    m_TargetMusicTrack = track;
+    m_FadeTimeTotal = fadeTimeSeconds > 0.0f ? fadeTimeSeconds : 0.1f;
+    m_FadeTimeElapsed = 0.0f;
+    m_FadeStartVolume = m_MusicVolume;
+
+    Log::Debugf("Starting music fade to track ", static_cast<i32>(track));
+}
+
+void SoundManager::UpdateMusic(f64 deltaTime) {
+    if (!m_Initialized || !m_IsFading) return;
+
+    m_FadeTimeElapsed += static_cast<f32>(deltaTime);
+    f32 progress = m_FadeTimeElapsed / m_FadeTimeTotal;
+
+    if (progress >= 1.0f) {
+        // Fade complete - switch to new track
+        m_IsFading = false;
+        m_FadeTimeElapsed = 0.0f;
+
+        // Restore normal volume and play new track
+        SetMusicVolume(m_FadeStartVolume);
+        PlayMusic(m_TargetMusicTrack, true);
+
+        Log::Debugf("Music fade complete, now playing track ", static_cast<i32>(m_CurrentMusicTrack));
+    } else {
+        // Mid-fade - adjust volume
+        // Fade out: 1.0 -> 0.0 over first half
+        // Fade in: 0.0 -> 1.0 over second half
+        f32 volume;
+        if (progress < 0.5f) {
+            // Fade out phase
+            volume = m_FadeStartVolume * (1.0f - (progress * 2.0f));
+        } else {
+            // Fade in phase (switch track at midpoint)
+            if (m_CurrentMusicTrack != m_TargetMusicTrack) {
+                // Switch track at midpoint
+                StopMusic();
+                SetMusicVolume(0.0f);
+                PlayMusic(m_TargetMusicTrack, true);
+            }
+            volume = m_FadeStartVolume * ((progress - 0.5f) * 2.0f);
+        }
+
+        SetMusicVolume(volume);
+    }
+}
+
 const char* SoundManager::GetSoundPath(SoundEffect effect) const {
     switch (effect) {
         // UI Sounds
@@ -269,6 +332,10 @@ const char* SoundManager::GetSoundPath(SoundEffect effect) const {
         case SoundEffect::UpgradeComplete: return "assets/sounds/resources/upgrade.wav";
         case SoundEffect::ResearchComplete: return "assets/sounds/resources/research.wav";
 
+        // Phase 4.2: Additional UI Sounds
+        case SoundEffect::Error: return "assets/sounds/ui/error.wav";
+        case SoundEffect::AchievementUnlock: return "assets/sounds/progression/achievement_unlock.wav";
+
         default: return "";
     }
 }
@@ -279,6 +346,10 @@ const char* SoundManager::GetMusicPath(MusicTrack track) const {
         case MusicTrack::CombatTheme: return "assets/music/combat_theme.ogg";
         case MusicTrack::BossTheme: return "assets/music/boss_theme.ogg";
         case MusicTrack::VictoryTheme: return "assets/music/victory_theme.ogg";
+        // Phase 4.2: Additional music tracks
+        case MusicTrack::ResearchTheme: return "assets/music/research_theme.ogg";
+        case MusicTrack::ShopTheme: return "assets/music/shop_theme.ogg";
+        case MusicTrack::AmbientCalm: return "assets/music/ambient_calm.ogg";
         default: return "";
     }
 }
