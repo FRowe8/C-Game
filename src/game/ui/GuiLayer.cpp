@@ -9,6 +9,7 @@
 #include "Logger.h"
 #include "Research.h"
 #include "UITheme.h"
+#include "FeatureUnlockManager.h"
 #include "imgui.h"
 #include <algorithm>
 #include <cmath>
@@ -560,27 +561,55 @@ void NavigationView::Render(GameState* state, Renderer* renderer) {
             f32 itemWidth = menuWidth - 20.0f;
             f32 itemHeight = 60.0f;
 
-            // Phase 1.2: Use ActiveModal enum for state machine
+            // Phase 1.2: Use ActiveModal enum for state machine with feature gating
             struct MoreButton {
                 const char* label;
                 ActiveModal modal;
                 Color color;
+                GameFeature feature;  // For unlock checking
             };
 
             MoreButton moreButtons[] = {
-                {"ACHIEVEMENTS", ActiveModal::Achievements, Color::ElectricBlue()},
-                {"SINGULARITY", ActiveModal::SingularityShop, Color(0.5f, 0.0f, 1.0f, 1.0f)},
-                {"SPACESHIP", ActiveModal::Spaceship, Color(1.0f, 0.7f, 0.0f, 1.0f)},
-                {"BATTLE", ActiveModal::Combat, Color(1.0f, 0.3f, 0.3f, 1.0f)},
-                {"SUMMON", ActiveModal::Gatcha, Color(1.0f, 0.3f, 1.0f, 1.0f)},
-                {"SKILLS", ActiveModal::Skills, Color(0.0f, 1.0f, 0.5f, 1.0f)},
-                {"ENHANCE", ActiveModal::Enhancement, Color(0.8f, 0.6f, 0.2f, 1.0f)},
+                {"ACHIEVEMENTS", ActiveModal::Achievements, Color::ElectricBlue(), GameFeature::Achievements},
+                {"SINGULARITY", ActiveModal::SingularityShop, Color(0.5f, 0.0f, 1.0f, 1.0f), GameFeature::SingularityShop},
+                {"SPACESHIP", ActiveModal::Spaceship, Color(1.0f, 0.7f, 0.0f, 1.0f), GameFeature::Spaceship},
+                {"BATTLE", ActiveModal::Combat, Color(1.0f, 0.3f, 0.3f, 1.0f), GameFeature::Combat},
+                {"SUMMON", ActiveModal::Gatcha, Color(1.0f, 0.3f, 1.0f, 1.0f), GameFeature::Summon},
+                {"SKILLS", ActiveModal::Skills, Color(0.0f, 1.0f, 0.5f, 1.0f), GameFeature::SkillTree},
+                {"ENHANCE", ActiveModal::Enhancement, Color(0.8f, 0.6f, 0.2f, 1.0f), GameFeature::Enhancement},
             };
 
             ActiveModal currentModal = state->GetActiveModal();
+            const FeatureUnlockManager& unlockManager = state->GetUnlockManager();
 
             for (size_t i = 0; i < 7; i++) {
                 auto& btn = moreButtons[i];
+
+                // Feature gating: check if feature is unlocked
+                bool isUnlocked = unlockManager.IsUnlocked(btn.feature);
+                if (!isUnlocked) {
+                    // Show locked button with tooltip
+                    Color lockedColor = Color(0.2f, 0.2f, 0.2f, 0.5f);
+                    ImGui::PushStyleColor(ImGuiCol_Button, ToImVec4(lockedColor));
+                    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ToImVec4(lockedColor));
+                    ImGui::PushStyleColor(ImGuiCol_ButtonActive, ToImVec4(lockedColor));
+                    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.4f, 0.4f, 0.4f, 1.0f));
+
+                    ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 1.0f);
+                    ImGui::Button(("🔒 " + std::string(btn.label)).c_str(), ImVec2(itemWidth, itemHeight));
+                    ImGui::PopStyleVar();
+                    ImGui::PopStyleColor(4);
+
+                    if (ImGui::IsItemHovered()) {
+                        i32 unlockLevel = unlockManager.GetUnlockLevel(btn.feature);
+                        ImGui::SetTooltip("Unlocks at Level %d\n%s", unlockLevel,
+                                         unlockManager.GetFeatureDescription(btn.feature));
+                    }
+
+                    if (i < 6) ImGui::Spacing();
+                    continue;
+                }
+
                 bool active = (currentModal == btn.modal);
                 Color btnColor = active ? btn.color : Color(0.3f, 0.3f, 0.3f, 1.0f);
 
@@ -591,7 +620,13 @@ void NavigationView::Render(GameState* state, Renderer* renderer) {
 
                 ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 1.0f);
 
-                if (ImGui::Button(btn.label, ImVec2(itemWidth, itemHeight))) {
+                // Show "NEW!" badge for newly unlocked features
+                std::string buttonLabel = btn.label;
+                if (unlockManager.IsNewlyUnlocked(btn.feature)) {
+                    buttonLabel = std::string(btn.label) + " ✨";
+                }
+
+                if (ImGui::Button(buttonLabel.c_str(), ImVec2(itemWidth, itemHeight))) {
                     // Phase 4.2: Play click sound
                     state->GetSoundManager().PlaySound(SoundEffect::ButtonPress, 0.8f);
 
@@ -1007,33 +1042,37 @@ void StationView::RenderUnlockedStation(GameState* state, ResearchStation& stati
             if (RenderTouchButton(buyLabel + "##BuyMaxBtn" + std::to_string(index), buySize,
                                   ImVec4(buyMaxColor.r, buyMaxColor.g, buyMaxColor.b, 0.8f), UITheme::ColorText, false)) {
                 f64 qubits = state->GetResource(QuantumResource::Qubits);
-                i32 upgradesBought = 0;
+                f64 effectiveCostMultiplier = expensiveUpgrades ? 3.0 : 1.0;
+                f64 effectiveCurrentCost = station.upgradeCost * effectiveCostMultiplier;
 
-                while (upgradesBought < 1000) {
-                    f64 effectiveCost = station.upgradeCost;
-                    if (expensiveUpgrades) effectiveCost *= 3.0;
+                // O(1) calculation using geometric series formula
+                i32 maxAffordable = GameUtils::CalculateMaxAffordableUpgrades(
+                    qubits, effectiveCurrentCost, station.upgradeCostMultiplier, 10000);
 
-                    if (qubits >= effectiveCost) {
-                        if (state->SpendResource(QuantumResource::Qubits, effectiveCost)) {
+                if (maxAffordable > 0) {
+                    // Calculate total cost for all upgrades
+                    f64 totalCost = GameUtils::CalculateTotalUpgradeCost(
+                        effectiveCurrentCost, maxAffordable, station.upgradeCostMultiplier);
+
+                    if (state->SpendResource(QuantumResource::Qubits, totalCost)) {
+                        // Apply all upgrades at once
+                        i32 startLevel = station.level;
+                        for (i32 i = 0; i < maxAffordable; ++i) {
                             station.Upgrade();
-                            state->GetSpecializedSkills().AddExperience(SkillCategory::Engineering, SkillXP::UPGRADE_STATION);
-                            qubits = state->GetResource(QuantumResource::Qubits);
-                            upgradesBought++;
-                        } else {
-                            break;
                         }
-                    } else {
-                        break;
-                    }
-                }
+                        // Award XP for all upgrades
+                        state->GetSpecializedSkills().AddExperience(
+                            SkillCategory::Engineering,
+                            SkillXP::UPGRADE_STATION * maxAffordable);
 
-                if (upgradesBought > 0) {
-                    state->UpdateResearchBonuses();
-                    Log::Infof("Bought ", upgradesBought, " upgrades for ", station.name, " (now level ", station.level, ")");
-                    ImVec2 itemMin = ImGui::GetItemRectMin();
-                    ImVec2 itemMax = ImGui::GetItemRectMax();
-                    ImVec2 itemCenter((itemMin.x + itemMax.x) * 0.5f, (itemMin.y + itemMax.y) * 0.5f);
-                    state->RegisterUIButtonFeedback("Upgraded", itemCenter, ToImVec4(upgradeColor));
+                        state->UpdateResearchBonuses();
+                        Log::Infof("Bought ", maxAffordable, " upgrades for ", station.name,
+                                   " (level ", startLevel, " -> ", station.level, ")");
+                        ImVec2 itemMin = ImGui::GetItemRectMin();
+                        ImVec2 itemMax = ImGui::GetItemRectMax();
+                        ImVec2 itemCenter((itemMin.x + itemMax.x) * 0.5f, (itemMin.y + itemMax.y) * 0.5f);
+                        state->RegisterUIButtonFeedback("Upgraded", itemCenter, ToImVec4(upgradeColor));
+                    }
                 }
             }
 
