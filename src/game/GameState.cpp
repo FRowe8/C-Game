@@ -12,6 +12,8 @@
 #include <sstream>
 #include <cmath>
 #include <algorithm>
+#include <functional>
+#include <iomanip>
 
 #include "Research.h"
 #include "UIManager.h"
@@ -22,6 +24,21 @@
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
 #endif
+
+namespace {
+
+// Simple salted hash to protect save files from tampering/corruption.
+std::string ComputeSaveHash(const std::string& content) {
+    static const std::string SAVE_HASH_SALT = "QuantumIdle::SaveSalt::v1";
+    std::hash<std::string> hasher;
+    size_t value = hasher(SAVE_HASH_SALT + content);
+
+    std::ostringstream oss;
+    oss << std::hex << value;
+    return oss.str();
+}
+
+}
 
 
 // Achievement implementation
@@ -2117,10 +2134,7 @@ bool GameState::Save(const std::string& filepath) {
     // Save timestamp for offline progress
     m_LastSaveTimestamp = static_cast<i64>(Platform::GetTime());
 
-    // Improved JSON format with all game state
-    file << "{\n";
-    file << "  \"version\": 2,\n";
-    file << "  \"saveTimestamp\": " << m_LastSaveTimestamp << ",\n";
+    std::ostringstream body;
 
     // Tutorial progress
     i32 tutorialStep = 0;
@@ -2129,91 +2143,123 @@ bool GameState::Save(const std::string& filepath) {
         tutorialStep = static_cast<i32>(m_GuiLayer->GetTutorialOverlay()->GetCurrentStep());
         tutorialCompleted = m_GuiLayer->GetTutorialOverlay()->IsCompleted();
     }
-    file << "  \"tutorialStep\": " << tutorialStep << ",\n";
-    file << "  \"tutorialCompleted\": " << (tutorialCompleted ? "true" : "false") << ",\n";
+
+    body << "  \"saveTimestamp\": " << m_LastSaveTimestamp << ",\n";
+    body << "  \"tutorialStep\": " << tutorialStep << ",\n";
+    body << "  \"tutorialCompleted\": " << (tutorialCompleted ? "true" : "false") << ",\n";
 
     // Resources
-    file << "  \"resources\": [" << m_Resources[0] << ", " << m_Resources[1] << ", " << m_Resources[2] << "],\n";
-    file << "  \"coherence\": " << m_Coherence << ",\n";
+    body << "  \"resources\": [" << m_Resources[0] << ", " << m_Resources[1] << ", " << m_Resources[2] << "],\n";
+    body << "  \"coherence\": " << m_Coherence << ",\n";
 
     // Prestige
-    file << "  \"photons\": " << m_Timeline.photons << ",\n";
-    file << "  \"resets\": " << m_Timeline.completedResets << ",\n";
+    body << "  \"photons\": " << m_Timeline.photons << ",\n";
+    body << "  \"resets\": " << m_Timeline.completedResets << ",\n";
 
     // Phase 3.3: Exotic Materials
-    file << "  \"exoticMaterials\": " << m_ExoticMaterials << ",\n";
+    body << "  \"exoticMaterials\": " << m_ExoticMaterials << ",\n";
 
     // Time
-    file << "  \"timePlayed\": " << m_TotalTimePlayed << ",\n";
+    body << "  \"timePlayed\": " << m_TotalTimePlayed << ",\n";
 
     // Stations
-    file << "  \"stations\": [\n";
+    body << "  \"stations\": [\n";
     for (size_t i = 0; i < m_Stations.size(); i++) {
         const auto& s = m_Stations[i];
-        file << "    {\"level\": " << s.level << ", \"unlocked\": " << (s.unlocked ? "true" : "false") << "}";
-        if (i < m_Stations.size() - 1) file << ",";
-        file << "\n";
+        body << "    {\"level\": " << s.level << ", \"unlocked\": " << (s.unlocked ? "true" : "false") << "}";
+        if (i < m_Stations.size() - 1) body << ",";
+        body << "\n";
     }
-    file << "  ],\n";
+    body << "  ],\n";
 
     // Statistics
-    file << "  \"statistics\": {\n";
-    file << "    \"totalQubitsEarned\": " << m_Statistics.totalQubitsEarned << ",\n";
-    file << "    \"totalObservations\": " << m_Statistics.totalObservations << ",\n";
-    file << "    \"totalUpgrades\": " << m_Statistics.totalUpgrades << ",\n";
-    file << "    \"totalPrestiges\": " << m_Statistics.totalPrestigesPerformed << ",\n";
-    file << "    \"highestQubits\": " << m_Statistics.highestQubits << ",\n";
-    file << "    \"fastestPrestige\": " << m_Statistics.fastestPrestige << ",\n";
-    file << "    \"currentStreak\": " << m_Statistics.currentStreak << ",\n";
-    file << "    \"lastLogin\": " << m_Statistics.lastLoginTimestamp << "\n";
-    file << "  },\n";
+    body << "  \"statistics\": {\n";
+    body << "    \"totalQubitsEarned\": " << m_Statistics.totalQubitsEarned << ",\n";
+    body << "    \"totalObservations\": " << m_Statistics.totalObservations << ",\n";
+    body << "    \"totalUpgrades\": " << m_Statistics.totalUpgrades << ",\n";
+    body << "    \"totalPrestiges\": " << m_Statistics.totalPrestigesPerformed << ",\n";
+    body << "    \"highestQubits\": " << m_Statistics.highestQubits << ",\n";
+    body << "    \"fastestPrestige\": " << m_Statistics.fastestPrestige << ",\n";
+    body << "    \"currentStreak\": " << m_Statistics.currentStreak << ",\n";
+    body << "    \"lastLogin\": " << m_Statistics.lastLoginTimestamp << "\n";
+    body << "  },\n";
 
     // Achievements
-    file << "  \"achievements\": [\n";
+    body << "  \"achievements\": [\n";
     for (size_t i = 0; i < m_Achievements.size(); i++) {
         const auto& ach = m_Achievements[i];
-        file << "    {";
-        file << "\"id\": " << static_cast<i32>(ach.id) << ", ";
-        file << "\"unlocked\": " << (ach.unlocked ? "true" : "false") << ", ";
-        file << "\"progress\": " << ach.progress;
-        file << "}";
-        if (i < m_Achievements.size() - 1) file << ",";
-        file << "\n";
+        body << "    {";
+        body << "\"id\": " << static_cast<i32>(ach.id) << ", ";
+        body << "\"unlocked\": " << (ach.unlocked ? "true" : "false") << ", ";
+        body << "\"progress\": " << ach.progress;
+        body << "}";
+        if (i < m_Achievements.size() - 1) body << ",";
+        body << "\n";
     }
-    file << "  ],\n";
+    body << "  ],\n";
+
+    // Milestones
+    body << "  \"milestones\": [\n";
+    const auto& milestones = m_MilestoneSystem.GetMilestones();
+    for (size_t i = 0; i < milestones.size(); i++) {
+        const auto& milestone = milestones[i];
+        body << "    {";
+        body << "\"id\": " << static_cast<i32>(milestone.id) << ", ";
+        body << "\"progress\": " << milestone.progress << ", ";
+        body << "\"completed\": " << (milestone.completed ? "true" : "false") << ", ";
+        body << "\"claimed\": " << (milestone.claimed ? "true" : "false");
+        body << "}";
+        if (i < milestones.size() - 1) body << ",";
+        body << "\n";
+    }
+    body << "  ],\n";
 
     // Research Tree
-    file << "  \"research\": [\n";
+    body << "  \"research\": [\n";
     auto researchedNodes = m_ResearchTree->GetResearchedNodes();
     for (size_t i = 0; i < researchedNodes.size(); i++) {
-        file << "    " << static_cast<i32>(researchedNodes[i]->id);
-        if (i < researchedNodes.size() - 1) file << ",";
-        file << "\n";
+        body << "    " << static_cast<i32>(researchedNodes[i]->id);
+        if (i < researchedNodes.size() - 1) body << ",";
+        body << "\n";
     }
-    file << "  ],\n";
+    body << "  ],\n";
 
     // Phase 4.1: Particle Collection
-    file << "  \"particleCollection\": {\n";
-    file << "    \"discovered\": [";
+    body << "  \"particleCollection\": {\n";
+    body << "    \"discovered\": [";
     for (i32 i = 0; i < static_cast<i32>(ParticleType::COUNT); i++) {
         ParticleType type = static_cast<ParticleType>(i);
         bool discovered = m_ParticleCollection.IsDiscovered(type);
-        file << (discovered ? "true" : "false");
-        if (i < static_cast<i32>(ParticleType::COUNT) - 1) file << ", ";
+        body << (discovered ? "true" : "false");
+        if (i < static_cast<i32>(ParticleType::COUNT) - 1) body << ", ";
     }
-    file << "],\n";
-    file << "    \"equipped\": [";
+    body << "],\n";
+    body << "    \"equipped\": [";
     auto equippedParticles = m_ParticleCollection.GetEquippedParticles();
     for (size_t i = 0; i < equippedParticles.size(); i++) {
-        file << static_cast<i32>(equippedParticles[i]->type);
-        if (i < equippedParticles.size() - 1) file << ", ";
+        body << static_cast<i32>(equippedParticles[i]->type);
+        if (i < equippedParticles.size() - 1) body << ", ";
     }
-    file << "]\n";
-    file << "  },\n";
+    body << "]\n";
+    body << "  },\n";
 
     // Specialized Skills
-    m_SpecializedSkills.SaveToJson(file);
+    m_SpecializedSkills.SaveToJson(body);
 
+    std::string bodyStr = body.str();
+
+    std::ostringstream unsignedContent;
+    unsignedContent << "{\n";
+    unsignedContent << "  \"version\": 3,\n";
+    unsignedContent << bodyStr;
+    unsignedContent << "}\n";
+
+    std::string hash = ComputeSaveHash(unsignedContent.str());
+
+    file << "{\n";
+    file << "  \"version\": 3,\n";
+    file << "  \"hash\": \"" << hash << "\",\n";
+    file << bodyStr;
     file << "}\n";
 
     file.close();
@@ -2227,6 +2273,60 @@ bool GameState::Load(const std::string& filepath) {
         return false;
     }
 
+    std::stringstream buffer;
+    buffer << file.rdbuf();
+    std::string fileContent = buffer.str();
+    file.close();
+
+    i32 saveVersion = 1;
+    {
+        std::istringstream versionStream(fileContent);
+        std::string versionLine;
+        while (std::getline(versionStream, versionLine)) {
+            if (versionLine.find("\"version\"") != std::string::npos) {
+                saveVersion = static_cast<i32>(GameUtils::ParseJsonNumber(versionLine, "version"));
+                break;
+            }
+        }
+    }
+
+    if (saveVersion >= 3) {
+        std::string hashValue;
+        std::ostringstream unsignedContent;
+        std::istringstream hashStream(fileContent);
+        std::string hashLine;
+
+        while (std::getline(hashStream, hashLine)) {
+            if (hashLine.find("\"hash\"") != std::string::npos) {
+                size_t colonPos = hashLine.find(':');
+                size_t valueStart = (colonPos != std::string::npos) ? hashLine.find('"', colonPos) : std::string::npos;
+                if (valueStart != std::string::npos) {
+                    size_t hashStart = hashLine.find('"', valueStart + 1);
+                    size_t hashEnd = hashLine.find('"', hashStart + 1);
+                    if (hashStart != std::string::npos && hashEnd != std::string::npos) {
+                        hashValue = hashLine.substr(hashStart + 1, hashEnd - hashStart - 1);
+                    }
+                }
+                continue;
+            }
+
+            unsignedContent << hashLine << "\n";
+        }
+
+        if (hashValue.empty()) {
+            Log::Error("Save file missing integrity hash");
+            return false;
+        }
+
+        std::string computedHash = ComputeSaveHash(unsignedContent.str());
+        if (computedHash != hashValue) {
+            Log::Warning("Save file hash mismatch - aborting load to prevent corrupted state");
+            return false;
+        }
+    } else {
+        Log::Warning("Loading legacy save without integrity hash; validation skipped");
+    }
+
     try {
         // Simple parsing using utility functions
         std::string line;
@@ -2235,26 +2335,38 @@ bool GameState::Load(const std::string& filepath) {
         bool inResearch = false;
         bool inSpecializedSkills = false;
         bool inParticleCollection = false;  // Phase 4.1
+        bool inMilestones = false;
 
-        while (std::getline(file, line)) {
+        std::istringstream contentStream(fileContent);
+        while (std::getline(contentStream, line)) {
             // Track sections
             if (line.find("\"statistics\"") != std::string::npos) {
                 inStatistics = true;
                 inAchievements = false;
                 inResearch = false;
                 inSpecializedSkills = false;
+                inMilestones = false;
                 continue;
             } else if (line.find("\"achievements\"") != std::string::npos) {
                 inStatistics = false;
                 inAchievements = true;
                 inResearch = false;
                 inSpecializedSkills = false;
+                inMilestones = false;
+                continue;
+            } else if (line.find("\"milestones\"") != std::string::npos) {
+                inStatistics = false;
+                inAchievements = false;
+                inResearch = false;
+                inSpecializedSkills = false;
+                inMilestones = true;
                 continue;
             } else if (line.find("\"research\"") != std::string::npos) {
                 inStatistics = false;
                 inAchievements = false;
                 inResearch = true;
                 inSpecializedSkills = false;
+                inMilestones = false;
                 continue;
             } else if (line.find("\"specializedSkills\"") != std::string::npos) {
                 inStatistics = false;
@@ -2262,6 +2374,7 @@ bool GameState::Load(const std::string& filepath) {
                 inResearch = false;
                 inParticleCollection = false;  // Phase 4.1
                 inSpecializedSkills = true;
+                inMilestones = false;
                 continue;
             } else if (line.find("\"particleCollection\"") != std::string::npos) {
                 // Phase 4.1
@@ -2270,6 +2383,7 @@ bool GameState::Load(const std::string& filepath) {
                 inResearch = false;
                 inSpecializedSkills = false;
                 inParticleCollection = true;
+                inMilestones = false;
                 continue;
             } else if (line.find("}") != std::string::npos || line.find("]") != std::string::npos) {
                 if (line.find("},") == std::string::npos) {
@@ -2278,6 +2392,7 @@ bool GameState::Load(const std::string& filepath) {
                     inResearch = false;
                     inSpecializedSkills = false;
                     inParticleCollection = false;  // Phase 4.1
+                    inMilestones = false;
                 }
             }
 
@@ -2297,6 +2412,14 @@ bool GameState::Load(const std::string& filepath) {
                 if (achId >= 0 && achId < static_cast<i32>(m_Achievements.size())) {
                     m_Achievements[achId].unlocked = GameUtils::ParseJsonBool(line, "unlocked");
                     m_Achievements[achId].progress = GameUtils::ParseJsonNumber(line, "progress");
+                }
+            } else if (inMilestones) {
+                i32 milestoneId = static_cast<i32>(GameUtils::ParseJsonNumber(line, "id"));
+                auto& milestones = m_MilestoneSystem.GetMilestones();
+                if (milestoneId >= 0 && milestoneId < static_cast<i32>(milestones.size())) {
+                    milestones[milestoneId].progress = GameUtils::ParseJsonNumber(line, "progress");
+                    milestones[milestoneId].completed = GameUtils::ParseJsonBool(line, "completed");
+                    milestones[milestoneId].claimed = GameUtils::ParseJsonBool(line, "claimed");
                 }
             } else if (inResearch) {
                 // Parse research IDs (simple number per line)
@@ -2423,8 +2546,6 @@ bool GameState::Load(const std::string& filepath) {
             }
         }
 
-        file.close();
-
         // After loading, unlock available research based on current prestige level
         m_ResearchTree->UnlockAvailableResearch(m_Timeline.completedResets, m_ResearchTree->GetResearchedCount());
 
@@ -2435,7 +2556,6 @@ bool GameState::Load(const std::string& filepath) {
         return true;
     } catch (const std::exception& e) {
         Log::Errorf("Error loading save file: ", e.what());
-        file.close();
         return false;
     }
 }

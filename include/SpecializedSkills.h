@@ -2,7 +2,7 @@
 
 #include "Types.h"
 #include <string>
-#include <fstream>
+#include <ostream>
 #include <cmath>
 
 
@@ -77,7 +77,7 @@ public:
     const char* GetSkillDescription(SkillCategory category) const;
 
     // Save/Load
-    void SaveToJson(std::ofstream& file) const;
+    void SaveToJson(std::ostream& file) const;
     void LoadFromJson(const std::string& line);
 
 private:

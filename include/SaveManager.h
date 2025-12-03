@@ -66,7 +66,7 @@ public:
 
     // === Save Version ===
 
-    i32 GetCurrentSaveVersion() const { return 2; }
+    i32 GetCurrentSaveVersion() const { return 3; }
 
 private:
     // Game state reference (we don't own this)
