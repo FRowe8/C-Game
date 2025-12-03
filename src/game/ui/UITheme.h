@@ -1,5 +1,6 @@
 #pragma once
 #include "imgui.h"
+#include <algorithm>
 
 namespace UITheme {
     // --- Colors (Cyberpunk / Quantum Theme) ---
@@ -142,7 +143,7 @@ namespace UITheme {
         const float scale = CalculateScale(io.DisplaySize);
         ApplyLayoutScale(scale);
         io.FontGlobalScale = GetLayout().fontScale;
-        const float shadowAlpha = ImClamp(GetLayout().shadowSoftness / 24.0f, 0.35f, 0.90f);
+        const float shadowAlpha = std::clamp(GetLayout().shadowSoftness / 24.0f, 0.35f, 0.90f);
 
         style.WindowRounding    = GetLayout().windowRounding;
         style.ChildRounding     = GetLayout().cardRounding;
