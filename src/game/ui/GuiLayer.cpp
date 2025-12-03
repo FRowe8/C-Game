@@ -7,9 +7,12 @@
 #include "GameUtils.h"
 #include "Logger.h"
 #include "Research.h"
+#include "UITheme.h"
 #include "imgui.h"
 #include <algorithm>
 #include <cmath>
+#include <functional>
+#include <vector>
 
 namespace UI {
 
@@ -746,6 +749,106 @@ void NavigationView::RenderBoostButton(GameState* state) {
     ImGui::PopStyleColor(4);
 }
 
+namespace {
+    ImVec4 WithMultipliedAlpha(const ImVec4& color, float alpha) {
+        return ImVec4(color.x, color.y, color.z, color.w * alpha);
+    }
+
+    struct ScopedFontScale {
+        explicit ScopedFontScale(float scale) {
+            ImGui::SetWindowFontScale(scale);
+        }
+        ~ScopedFontScale() { ImGui::SetWindowFontScale(1.0f); }
+    };
+
+    void RenderTypographyText(const std::string& text, const UITheme::TypographyScale& scale, const ImVec4& color, bool wrap = false) {
+        float fontScale = scale.size / ImGui::GetFontSize();
+        ScopedFontScale scoped(fontScale);
+        ImGui::PushStyleColor(ImGuiCol_Text, color);
+        if (wrap) {
+            ImGui::TextWrapped("%s", text.c_str());
+        } else {
+            ImGui::Text("%s", text.c_str());
+        }
+        ImGui::PopStyleColor();
+    }
+
+    void RenderLevelBadge(const std::string& label) {
+        ImVec2 badgeSize(90.0f * UITheme::GetLayout().fontScale, 30.0f * UITheme::GetLayout().fontScale);
+        float xOffset = ImGui::GetContentRegionAvail().x - badgeSize.x;
+        ImGui::SetCursorPosX(ImGui::GetCursorPosX() + xOffset);
+        ImGui::PushStyleColor(ImGuiCol_Button, UITheme::ColorBadgeBg);
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, WithMultipliedAlpha(UITheme::ColorBadgeBg, 1.05f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, UITheme::ColorBadgeBg);
+        ImGui::PushStyleColor(ImGuiCol_Text, UITheme::ColorBadgeText);
+        ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, UITheme::CardRounding());
+        ImGui::Button(label.c_str(), badgeSize);
+        ImGui::PopStyleVar();
+        ImGui::PopStyleColor(4);
+    }
+
+    void RenderCard(const std::string& id, const std::function<void()>& drawContent) {
+        ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, UITheme::CardRounding());
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(UITheme::CardPadding(), UITheme::CardPadding()));
+        ImGui::PushStyleColor(ImGuiCol_ChildBg, UITheme::ColorCardBg);
+        ImGui::PushStyleColor(ImGuiCol_Border, UITheme::ColorCardBorder);
+        if (ImGui::BeginChild(id.c_str(), ImVec2(0, 0), true, ImGuiWindowFlags_None)) {
+            drawContent();
+        }
+        ImGui::EndChild();
+        ImGui::PopStyleColor(2);
+        ImGui::PopStyleVar(2);
+    }
+
+    bool RenderTouchButton(const std::string& label, const ImVec2& size, const ImVec4& color, const ImVec4& textColor, bool disabled = false) {
+        ImVec4 hoverColor = WithMultipliedAlpha(color, 1.05f);
+        ImVec4 activeColor = WithMultipliedAlpha(color, 1.1f);
+
+        if (disabled) {
+            ImGui::PushStyleVar(ImGuiStyleVar_Alpha, 0.55f);
+        }
+
+        ImGui::PushStyleColor(ImGuiCol_Button, color);
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, hoverColor);
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, activeColor);
+        ImGui::PushStyleColor(ImGuiCol_Text, textColor);
+        ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, UITheme::NavigationButtonRounding());
+        bool clicked = ImGui::Button(label.c_str(), size);
+        ImGui::PopStyleVar();
+        ImGui::PopStyleColor(4);
+
+        if (disabled) {
+            ImGui::PopStyleVar();
+        }
+
+        return clicked;
+    }
+
+    void RenderProgressBarDetailed(const std::string& id, f32 fraction, const std::string& headline, const std::string& detail) {
+        f32 clamped = std::clamp(fraction, 0.0f, 1.0f);
+        ImVec2 pos = ImGui::GetCursorScreenPos();
+        ImVec2 size(ImGui::GetContentRegionAvail().x, UITheme::ProgressThickness() * 3.8f);
+        ImVec2 end(pos.x + size.x, pos.y + size.y);
+        ImDrawList* drawList = ImGui::GetWindowDrawList();
+
+        drawList->AddRectFilled(pos, end, ImGui::GetColorU32(UITheme::ColorCardBgAlt), UITheme::CardRounding());
+        drawList->AddRectFilled(pos, ImVec2(pos.x + size.x * clamped, end.y), ImGui::GetColorU32(UITheme::ColorAccent), UITheme::CardRounding());
+        drawList->AddRect(pos, end, ImGui::GetColorU32(UITheme::ColorCardBorder), UITheme::CardRounding());
+
+        ImGui::InvisibleButton(id.c_str(), size);
+        drawList->AddText(ImVec2(pos.x + UITheme::CardPadding(), pos.y + 4.0f), ImGui::GetColorU32(UITheme::ColorText), headline.c_str());
+        drawList->AddText(ImVec2(pos.x + UITheme::CardPadding(), pos.y + size.y * 0.55f), ImGui::GetColorU32(UITheme::ColorTextDim), detail.c_str());
+    }
+
+    bool RenderInfoIcon(const std::string& id) {
+        ImVec2 size = ImVec2(UITheme::TouchMinSizeVec2().x * 0.85f, UITheme::TouchMinSizeVec2().y * 0.85f);
+        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(UITheme::TouchPadding()));
+        bool clicked = RenderTouchButton("ℹ##" + id, size, WithMultipliedAlpha(UITheme::ColorCardHeader, 0.9f), UITheme::ColorText, false);
+        ImGui::PopStyleVar();
+        return clicked;
+    }
+}
+
 // =============================================================================
 // StationView Implementation
 // =============================================================================
@@ -780,160 +883,166 @@ void StationView::RenderUnlockedStation(GameState* state, ResearchStation& stati
     f64 effectiveBonus = state->GetProductionMultiplier(QuantumResource::Qubits);
     bool canUpgrade = !state->GetChallengeManager().HasModifier(ChallengeModifier::NoUpgrades);
 
-    // Station Display Header
+    static std::vector<bool> s_InfoExpanded;
+    if (s_InfoExpanded.size() <= index) {
+        s_InfoExpanded.resize(index + 1, false);
+    }
+
     Color tierColor = state->GetStationTierColor(station.level);
-    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(tierColor.r, tierColor.g, tierColor.b, 1.0f));
-    ImGui::Text(">> %s (Level %d)", station.name.c_str(), station.level);
-    ImGui::PopStyleColor();
+    RenderCard("StationCard##" + std::to_string(index), [&]() {
+        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(UITheme::ItemSpacing(), UITheme::ItemSpacing() * 0.75f));
 
-    ImGui::TextWrapped("%s", station.description.c_str());
-    ImGui::Separator();
-
-    f64 productionRate = station.currentProduction * effectiveBonus;
-
-    // Superposition progress bar
-    char barOverlay[64];
-    f32 progress = 0.0f;
-    if (station.upgradeCost > 0.0) {
-        progress = static_cast<f32>(station.superpositionValue / (station.upgradeCost * 0.1));
-        if (progress > 1.0f) progress = 1.0f;
-    }
-
-    // Phase 3.1: Show passive collapse rate if present
-    char passiveText[32] = "";
-    if (station.passiveCollapseRate > 0.0) {
-        f64 passiveRate = station.superpositionValue * station.passiveCollapseRate;
-        snprintf(passiveText, sizeof(passiveText), " | +%s/s passive",
-                 GameUtils::FormatNumber(passiveRate, state->m_NumberFormat).c_str());
-    }
-
-    snprintf(barOverlay, sizeof(barOverlay), "Superposition: %s (%s/s%s)",
-             GameUtils::FormatNumber(station.superpositionValue, state->m_NumberFormat).c_str(),
-             GameUtils::FormatNumber(productionRate, state->m_NumberFormat).c_str(),
-             passiveText);
-
-    ImGui::ProgressBar(progress, ImVec2(-1, 0), barOverlay);
-
-    // OBSERVE Button - Purple (Phase 2.2: with particle burst)
-    Color observeColor = Color::QuantumPurple();
-    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(observeColor.r * 0.7f, observeColor.g * 0.7f, observeColor.b * 0.7f, 0.7f));
-    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(observeColor.r, observeColor.g, observeColor.b, 1.0f));
-
-    ImVec2 buttonPos = ImGui::GetCursorScreenPos();
-    ImVec2 buttonSize = ImVec2(ImGui::GetContentRegionAvail().x * 0.30f, 40.0f);
-
-    if (ImGui::Button(("OBSERVE##ObserveBtn" + std::to_string(index)).c_str(), buttonSize)) {
-        station.Observe(state);
-        Log::Infof("Observed ", station.name);
-
-        // Phase 2.2: Spawn particle burst at button center
-        Vec2 particlePos(buttonPos.x + buttonSize.x * 0.5f, buttonPos.y + buttonSize.y * 0.5f);
-        Color particleColor = (station.resourceType == QuantumResource::Qubits) ? Color::QuantumBlue() :
-                             (station.resourceType == QuantumResource::Coherence) ? Color::CoherenceGreen() :
-                             Color::EntanglementOrange();
-        state->SpawnParticleBurst(particlePos, particleColor, 10);
-
-        ImVec2 itemMin = ImGui::GetItemRectMin();
-        ImVec2 itemMax = ImGui::GetItemRectMax();
-        ImVec2 itemCenter((itemMin.x + itemMax.x) * 0.5f, (itemMin.y + itemMax.y) * 0.5f);
-        state->RegisterUIButtonFeedback("Observed", itemCenter, ToImVec4(observeColor));
-    }
-
-    // Phase 2.3: Add tooltip explaining observation mechanics
-    if (ImGui::IsItemHovered()) {
-        i32 successChance = static_cast<i32>(station.superpositionProbability * 100.0);
-        ImGui::SetTooltip(
-            "Collapse the wave function to collect resources\n"
-            "Success chance: %d%%\n"
-            "Full reward on success, partial (50-100%%) on failure",
-            successChance
-        );
-    }
-
-    ImGui::PopStyleColor(2);
-
-    // UPGRADE Button - Orange
-    ImGui::SameLine();
-    f64 effectiveUpgradeCost = station.upgradeCost * (state->GetChallengeManager().HasModifier(ChallengeModifier::ExpensiveUpgrades) ? 3.0 : 1.0);
-    bool canAffordUpgrade = currentQubits >= effectiveUpgradeCost && canUpgrade;
-    if (!canAffordUpgrade) ImGui::PushStyleVar(ImGuiStyleVar_Alpha, 0.5f);
-
-    Color upgradeColor = Color::EntanglementOrange();
-    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(upgradeColor.r * 0.7f, upgradeColor.g * 0.7f, upgradeColor.b * 0.7f, 0.7f));
-    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(upgradeColor.r, upgradeColor.g, upgradeColor.b, 1.0f));
-
-    std::string upgradeText = "Upgrade (" + GameUtils::FormatNumber(effectiveUpgradeCost, state->m_NumberFormat) + ")";
-
-    ImVec2 upgradeBtnPos = ImGui::GetCursorScreenPos();
-    ImVec2 upgradeBtnSize = ImVec2(ImGui::GetContentRegionAvail().x * 0.45f, 40.0f);
-
-    if (ImGui::Button((upgradeText + "##UpgradeBtn" + std::to_string(index)).c_str(), upgradeBtnSize) && canAffordUpgrade) {
-        f64 effectiveCost = station.upgradeCost;
-        if (state->GetChallengeManager().HasModifier(ChallengeModifier::ExpensiveUpgrades)) {
-            effectiveCost *= 3.0;
+        if (ImGui::BeginTable(("StationHeader##" + std::to_string(index)).c_str(), 2, ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_NoBordersInBody)) {
+            ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthStretch, 0.7f);
+            ImGui::TableSetupColumn("Badge", ImGuiTableColumnFlags_WidthStretch, 0.3f);
+            ImGui::TableNextRow();
+            ImGui::TableSetColumnIndex(0);
+            RenderTypographyText(station.name, UITheme::HeaderText(), ImVec4(tierColor.r, tierColor.g, tierColor.b, 1.0f));
+            ImGui::TableSetColumnIndex(1);
+            RenderLevelBadge("Level " + std::to_string(station.level));
+            ImGui::EndTable();
         }
-        if (state->SpendResource(QuantumResource::Qubits, effectiveCost)) {
-            station.Upgrade();
-            state->UpdateResearchBonuses();
-            state->GetSpecializedSkills().AddExperience(SkillCategory::Engineering, SkillXP::UPGRADE_STATION);
-            state->GetSoundManager().PlaySound(SoundEffect::UpgradeComplete);
-            Log::Infof("Upgraded ", station.name, " to level ", station.level);
 
-            // Phase 2.2: Spawn particle burst at button center
-            Vec2 particlePos(upgradeBtnPos.x + upgradeBtnSize.x * 0.5f, upgradeBtnPos.y + upgradeBtnSize.y * 0.5f);
-            state->SpawnParticleBurst(particlePos, Color::EntanglementOrange(), 15);
+        RenderTypographyText(station.description, UITheme::SubtitleText(), UITheme::ColorTextDim, true);
+
+        f64 productionRate = station.currentProduction * effectiveBonus;
+        f32 progress = 0.0f;
+        if (station.upgradeCost > 0.0) {
+            progress = static_cast<f32>(station.superpositionValue / (station.upgradeCost * 0.1));
+        }
+
+        std::string headline = "Superposition: " + GameUtils::FormatNumber(station.superpositionValue, state->m_NumberFormat);
+        std::string passiveInfo;
+        if (station.passiveCollapseRate > 0.0) {
+            f64 passiveRate = station.superpositionValue * station.passiveCollapseRate;
+            passiveInfo = " | +" + GameUtils::FormatNumber(passiveRate, state->m_NumberFormat) + "/s passive";
+        }
+        std::string detail = "Production: " + GameUtils::FormatNumber(productionRate, state->m_NumberFormat) + "/s" + passiveInfo;
+        RenderProgressBarDetailed("SuperpositionBar##" + std::to_string(index), progress, headline, detail);
+
+        ImGui::Dummy(ImVec2(0.0f, UITheme::ItemSpacing() * 0.2f));
+
+        Color observeColor = Color::QuantumPurple();
+        ImVec2 buttonPos = ImGui::GetCursorScreenPos();
+        f32 primaryWidth = ImGui::GetContentRegionAvail().x;
+        if (primaryWidth > 420.0f) {
+            primaryWidth *= 0.7f;
+        }
+        ImVec2 buttonSize(primaryWidth, std::max(UITheme::NavigationButtonHeight(), UITheme::TouchMinSize()));
+        bool observeClicked = RenderTouchButton("OBSERVE##ObserveBtn" + std::to_string(index), buttonSize,
+                                               ImVec4(observeColor.r, observeColor.g, observeColor.b, 0.85f), UITheme::ColorText);
+
+        if (ImGui::GetContentRegionAvail().x > UITheme::TouchMinSize()) {
+            ImGui::SameLine();
+        }
+        if (RenderInfoIcon("ObserveInfo##" + std::to_string(index))) {
+            s_InfoExpanded[index] = !s_InfoExpanded[index];
+        }
+
+        if (observeClicked) {
+            station.Observe(state);
+            Log::Infof("Observed ", station.name);
+
+            Vec2 particlePos(buttonPos.x + buttonSize.x * 0.5f, buttonPos.y + buttonSize.y * 0.5f);
+            Color particleColor = (station.resourceType == QuantumResource::Qubits) ? Color::QuantumBlue() :
+                                 (station.resourceType == QuantumResource::Coherence) ? Color::CoherenceGreen() :
+                                 Color::EntanglementOrange();
+            state->SpawnParticleBurst(particlePos, particleColor, 10);
 
             ImVec2 itemMin = ImGui::GetItemRectMin();
             ImVec2 itemMax = ImGui::GetItemRectMax();
             ImVec2 itemCenter((itemMin.x + itemMax.x) * 0.5f, (itemMin.y + itemMax.y) * 0.5f);
-            state->RegisterUIButtonFeedback("Upgraded", itemCenter, ToImVec4(upgradeColor));
+            state->RegisterUIButtonFeedback("Observed", itemCenter, ToImVec4(observeColor));
         }
-    }
-    ImGui::PopStyleColor(2);
-    if (!canAffordUpgrade) ImGui::PopStyleVar();
 
-    // BUY MAX Button - Green
-    ImGui::SameLine();
-    Color buyMaxColor = Color::CoherenceGreen();
-    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(buyMaxColor.r * 0.7f, buyMaxColor.g * 0.7f, buyMaxColor.b * 0.7f, 0.7f));
-    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(buyMaxColor.r, buyMaxColor.g, buyMaxColor.b, 1.0f));
+        if (s_InfoExpanded[index]) {
+            RenderTypographyText(
+                "Collapse the wave function to collect resources. Observation success depends on coherence and station upgrades.",
+                UITheme::CaptionText(), UITheme::ColorText, true);
+        }
 
-    if (ImGui::Button(("BUY MAX##BuyMaxBtn" + std::to_string(index)).c_str(), ImVec2(ImGui::GetContentRegionAvail().x, 40.0f))) {
-        f64 qubits = state->GetResource(QuantumResource::Qubits);
-        i32 upgradesBought = 0;
+        f64 effectiveUpgradeCost = station.upgradeCost * (state->GetChallengeManager().HasModifier(ChallengeModifier::ExpensiveUpgrades) ? 3.0 : 1.0);
+        bool canAffordUpgrade = currentQubits >= effectiveUpgradeCost && canUpgrade;
         bool expensiveUpgrades = state->GetChallengeManager().HasModifier(ChallengeModifier::ExpensiveUpgrades);
+        Color upgradeColor = Color::EntanglementOrange();
+        Color buyMaxColor = Color::CoherenceGreen();
 
-        while (upgradesBought < 1000) {
-            f64 effectiveCost = station.upgradeCost;
-            if (expensiveUpgrades) effectiveCost *= 3.0;
+        ImGui::Dummy(ImVec2(0.0f, UITheme::ItemSpacing() * 0.3f));
 
-            if (qubits >= effectiveCost) {
+        if (ImGui::BeginTable(("StationActions##" + std::to_string(index)).c_str(), 2, ImGuiTableFlags_SizingStretchProp)) {
+            ImGui::TableSetupColumn("Upgrade", ImGuiTableColumnFlags_WidthStretch);
+            ImGui::TableSetupColumn("BuyMax", ImGuiTableColumnFlags_WidthStretch);
+
+            ImGui::TableNextColumn();
+            std::string upgradeLabel = "Upgrade • " + GameUtils::FormatNumber(effectiveUpgradeCost, state->m_NumberFormat);
+            ImVec2 upgradeSize(ImGui::GetContentRegionAvail().x, std::max(UITheme::NavigationButtonHeight() * 0.9f, UITheme::TouchMinSize()));
+            if (RenderTouchButton(upgradeLabel + "##UpgradeBtn" + std::to_string(index), upgradeSize,
+                                  ImVec4(upgradeColor.r, upgradeColor.g, upgradeColor.b, 0.8f),
+                                  canAffordUpgrade ? UITheme::ColorText : UITheme::ColorDanger, !canAffordUpgrade)) {
+                f64 effectiveCost = station.upgradeCost;
+                if (expensiveUpgrades) {
+                    effectiveCost *= 3.0;
+                }
                 if (state->SpendResource(QuantumResource::Qubits, effectiveCost)) {
                     station.Upgrade();
+                    state->UpdateResearchBonuses();
                     state->GetSpecializedSkills().AddExperience(SkillCategory::Engineering, SkillXP::UPGRADE_STATION);
-                    qubits = state->GetResource(QuantumResource::Qubits);
-                    upgradesBought++;
-                } else {
-                    break;
+                    state->GetSoundManager().PlaySound(SoundEffect::UpgradeComplete);
+                    Log::Infof("Upgraded ", station.name, " to level ", station.level);
+
+                    Vec2 particlePos(buttonPos.x + buttonSize.x * 0.5f, buttonPos.y + buttonSize.y * 0.5f);
+                    state->SpawnParticleBurst(particlePos, Color::EntanglementOrange(), 15);
+
+                    ImVec2 itemMin = ImGui::GetItemRectMin();
+                    ImVec2 itemMax = ImGui::GetItemRectMax();
+                    ImVec2 itemCenter((itemMin.x + itemMax.x) * 0.5f, (itemMin.y + itemMax.y) * 0.5f);
+                    state->RegisterUIButtonFeedback("Upgraded", itemCenter, ToImVec4(upgradeColor));
                 }
-            } else {
-                break;
             }
+
+            ImGui::TableNextColumn();
+            std::string buyLabel = "Buy Max";
+            ImVec2 buySize(ImGui::GetContentRegionAvail().x, std::max(UITheme::NavigationButtonHeight() * 0.9f, UITheme::TouchMinSize()));
+            if (RenderTouchButton(buyLabel + "##BuyMaxBtn" + std::to_string(index), buySize,
+                                  ImVec4(buyMaxColor.r, buyMaxColor.g, buyMaxColor.b, 0.8f), UITheme::ColorText, false)) {
+                f64 qubits = state->GetResource(QuantumResource::Qubits);
+                i32 upgradesBought = 0;
+
+                while (upgradesBought < 1000) {
+                    f64 effectiveCost = station.upgradeCost;
+                    if (expensiveUpgrades) effectiveCost *= 3.0;
+
+                    if (qubits >= effectiveCost) {
+                        if (state->SpendResource(QuantumResource::Qubits, effectiveCost)) {
+                            station.Upgrade();
+                            state->GetSpecializedSkills().AddExperience(SkillCategory::Engineering, SkillXP::UPGRADE_STATION);
+                            qubits = state->GetResource(QuantumResource::Qubits);
+                            upgradesBought++;
+                        } else {
+                            break;
+                        }
+                    } else {
+                        break;
+                    }
+                }
+
+                if (upgradesBought > 0) {
+                    state->UpdateResearchBonuses();
+                    Log::Infof("Bought ", upgradesBought, " upgrades for ", station.name, " (now level ", station.level, ")");
+                    ImVec2 itemMin = ImGui::GetItemRectMin();
+                    ImVec2 itemMax = ImGui::GetItemRectMax();
+                    ImVec2 itemCenter((itemMin.x + itemMax.x) * 0.5f, (itemMin.y + itemMax.y) * 0.5f);
+                    state->RegisterUIButtonFeedback("Upgraded", itemCenter, ToImVec4(upgradeColor));
+                }
+            }
+
+            ImGui::EndTable();
         }
 
-        if (upgradesBought > 0) {
-            state->UpdateResearchBonuses();
-            Log::Infof("Bought ", upgradesBought, " upgrades for ", station.name, " (now level ", station.level, ")");
-            ImVec2 itemMin = ImGui::GetItemRectMin();
-            ImVec2 itemMax = ImGui::GetItemRectMax();
-            ImVec2 itemCenter((itemMin.x + itemMax.x) * 0.5f, (itemMin.y + itemMax.y) * 0.5f);
-            state->RegisterUIButtonFeedback("Upgraded", itemCenter, ToImVec4(upgradeColor));
-        }
-    }
-    ImGui::PopStyleColor(2);
-
-    // Auto-Upgrade Toggle
-    ImGui::Checkbox(("Auto-Upgrade##" + std::to_string(index)).c_str(), &station.autoUpgrade);
+        ImGui::Dummy(ImVec2(0.0f, UITheme::ItemSpacing() * 0.2f));
+        ImGui::Checkbox(("Auto-Upgrade##" + std::to_string(index)).c_str(), &station.autoUpgrade);
+        ImGui::PopStyleVar();
+    });
 }
 
 void StationView::RenderLockedStation(GameState* state, ResearchStation& station, size_t index) {
