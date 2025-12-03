@@ -350,10 +350,22 @@ void ResourceView::Render(GameState* state, Renderer* renderer) {
             ImGui::SameLine(0.0f, 30.0f);
             ImGui::TextColored(ToImVec4(Color(1.0f, 0.5f, 1.0f, 1.0f)), "EXOTIC MATERIALS");
             if (ImGui::IsItemHovered()) {
-                ImGui::SetTooltip("Rare materials required for Tier 3+ research\nObtained from level 41+ combat victories and Spaceship Expeditions");
+                ImGui::SetTooltip("Rare materials required for Tier 3+ research\nPrimarily recovered via Spaceship Expeditions");
             }
             ImGui::SameLine();
             ImGui::Text("%d", exoticMaterials);
+        }
+
+        // Research Data
+        i32 researchData = state->GetResearchData();
+        if (researchData > 0) {
+            ImGui::SameLine(0.0f, 30.0f);
+            ImGui::TextColored(ToImVec4(Color(0.3f, 0.9f, 1.0f, 1.0f)), "RESEARCH DATA");
+            if (ImGui::IsItemHovered()) {
+                ImGui::SetTooltip("Intel gathered from combat victories. Useful for higher-tier research projects.");
+            }
+            ImGui::SameLine();
+            ImGui::Text("%d", researchData);
         }
 
         // Singularities (if any) (Phase 2.3: with tooltip)

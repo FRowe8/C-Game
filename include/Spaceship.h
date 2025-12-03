@@ -77,6 +77,13 @@ public:
     const std::vector<ShipPart>& GetInventory() const { return m_Inventory; }
     i32 GetInventoryCount() const { return static_cast<i32>(m_Inventory.size()); }
 
+    // Expeditions
+    void Update(f64 deltaTime);
+    void StartExpedition();
+    bool IsExpeditionActive() const { return m_ExpeditionActive; }
+    f64 GetExpeditionProgress() const;
+    f64 GetExpeditionDuration() const { return m_ExpeditionDuration; }
+
     // Repair progress
     f64 GetRepairProgress() const { return m_RepairProgress; }
     void RecalculateRepairProgress();
@@ -125,8 +132,14 @@ private:
     // Game state reference (for awarding skill XP)
     GameState* m_GameState;
 
+    // Expedition state
+    bool m_ExpeditionActive;
+    f64 m_ExpeditionTimer;
+    f64 m_ExpeditionDuration;
+
     // Helper methods
     void UpdateStatistics(const ShipPart& part);
+    void CompleteExpedition();
 };
 
 // Part generation utilities

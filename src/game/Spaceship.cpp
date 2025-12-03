@@ -4,6 +4,7 @@
 #include "Renderer.h"
 #include "Logger.h"
 #include "imgui.h"
+#include <algorithm>
 #include <cstdlib>
 #include <cmath>
 
@@ -148,7 +149,8 @@ Spaceship::Spaceship()
       m_TotalCombatBonus(0.0), m_TotalDropRateBonus(0.0),
       m_TotalPartsCollected(0), m_LegendaryPartsCollected(0),
       m_SelectedInventoryIndex(-1), m_ScrollOffset(0.0f),
-      m_GameState(nullptr) {
+      m_GameState(nullptr), m_ExpeditionActive(false),
+      m_ExpeditionTimer(0.0), m_ExpeditionDuration(60.0) {
 
     // Initialize installed parts to nullptr
     for (i32 i = 0; i < static_cast<i32>(PartSlot::COUNT); i++) {
@@ -258,6 +260,9 @@ void Spaceship::RecalculateRepairProgress() {
         m_RepairProgress = 100.0;
     }
 
+    // Expeditions shorten as the ship improves
+    m_ExpeditionDuration = std::max(30.0, 60.0 - (m_RepairProgress * 0.2));
+
     // Log milestones
     static bool reached25 = false;
     static bool reached50 = false;
@@ -275,6 +280,45 @@ void Spaceship::RecalculateRepairProgress() {
         Log::Info("Ship fully repaired! Maximum efficiency achieved.");
         reached100 = true;
     }
+}
+
+void Spaceship::Update(f64 deltaTime) {
+    if (m_ExpeditionActive) {
+        m_ExpeditionTimer -= deltaTime;
+        if (m_ExpeditionTimer <= 0.0) {
+            CompleteExpedition();
+        }
+    }
+}
+
+void Spaceship::StartExpedition() {
+    if (m_ExpeditionActive || !m_GameState || !IsOperational()) {
+        return;
+    }
+
+    m_ExpeditionActive = true;
+    m_ExpeditionTimer = m_ExpeditionDuration;
+
+    Log::Info("Spaceship expedition launched to gather exotic materials");
+}
+
+f64 Spaceship::GetExpeditionProgress() const {
+    if (!m_ExpeditionActive || m_ExpeditionDuration <= 0.0) return 0.0;
+    return 1.0 - (m_ExpeditionTimer / m_ExpeditionDuration);
+}
+
+void Spaceship::CompleteExpedition() {
+    m_ExpeditionActive = false;
+    m_ExpeditionTimer = 0.0;
+
+    // Rewards scale with repair progress (more capable ship brings home more)
+    i32 exoticGain = 1 + static_cast<i32>(m_RepairProgress / 25.0);
+    if (m_GameState) {
+        m_GameState->AddExoticMaterials(exoticGain);
+        m_GameState->AddResearchData(exoticGain);
+    }
+
+    Log::Infof("Spaceship expedition complete! Brought back ", exoticGain, " exotic materials and research data.");
 }
 
 void Spaceship::RecalculateBonuses() {
@@ -337,6 +381,27 @@ void Spaceship::RenderShipPanel() {
                             "STATUS: CRITICAL DAMAGE";
     ImGui::TextColored(progressColor, "%s", statusText);
     ImGui::Spacing();
+
+    // --- Expedition Controls ---
+    ImGui::Separator();
+    ImGui::TextColored(ImVec4(1.0f, 0.7f, 0.2f, 1.0f), "EXOTIC MATERIAL EXPEDITIONS");
+    ImGui::TextWrapped("Send the ship on expeditions to recover exotic materials for advanced research tiers.");
+
+    if (!IsOperational()) {
+        ImGui::TextDisabled("Repair the ship to at least 25%% to begin expeditions.");
+    } else if (m_ExpeditionActive) {
+        f32 expeditionProgress = static_cast<f32>(GetExpeditionProgress());
+        char expeditionLabel[64];
+        snprintf(expeditionLabel, sizeof(expeditionLabel), "Expedition: %.0f%%", expeditionProgress * 100.0f);
+        ImGui::ProgressBar(expeditionProgress, ImVec2(-1.0f, 22.0f), expeditionLabel);
+        ImGui::TextDisabled("Returning soon with exotic materials and research data...");
+    } else {
+        if (ImGui::Button("Launch Expedition", ImVec2(200.0f, 32.0f))) {
+            StartExpedition();
+        }
+        ImGui::SameLine();
+        ImGui::TextDisabled("Duration: %.0fs", m_ExpeditionDuration);
+    }
 
     // --- Part Slots (2x2 Grid) ---
     ImGui::Separator();

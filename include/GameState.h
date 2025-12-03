@@ -334,6 +334,7 @@ public:
     f64 GetComboMultiplier() const;
 
     i32 GetPlayerCredits();
+    void AddPlayerCredits(i32 amount);
 
     void DeductPlayerCredits(i32 amount);
 
@@ -346,6 +347,11 @@ public:
     i32 GetExoticMaterials() const { return m_ExoticMaterials; }
     void AddExoticMaterials(i32 amount);
     bool SpendExoticMaterials(i32 amount);
+
+    // Combat Research Data
+    i32 GetResearchData() const { return m_ResearchData; }
+    void AddResearchData(i32 amount);
+    bool SpendResearchData(i32 amount);
 
     bool IsGatchaUIVisible() const {
         return m_ShowGatcha;
@@ -423,9 +429,11 @@ private:
     // Phase 3.2: Combat Integration - Credit Conversion
     f64 m_CreditProductionMultiplier; // Production bonus from converted credits (1.0 = no bonus)
     f64 m_CreditConversionRate;       // Credits per 1% production bonus (default: 100 credits = 1%)
+    f64 m_MatterConverterBuffer;      // Fractional credit buffer for continuous conversion
 
     // Phase 3.3: Mid-Game Gatekeeping - Exotic Materials
     i32 m_ExoticMaterials;            // Special materials required for Tier 3+ research (from Spaceship/Combat)
+    i32 m_ResearchData;               // Combat-sourced data used for advanced research
 
     // Game objects
     std::vector<ResearchStation> m_Stations;
