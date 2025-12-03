@@ -191,6 +191,35 @@ inline f64 CalculateUpgradeCost(f64 baseCost, i32 level, f64 multiplier) {
     return baseCost * std::pow(multiplier, level);
 }
 
+// Calculate total cost to buy k upgrades using geometric series (O(1) complexity)
+// Sum = currentCost × (multiplier^k - 1) / (multiplier - 1)
+inline f64 CalculateTotalUpgradeCost(f64 currentCost, i32 numUpgrades, f64 multiplier) {
+    if (numUpgrades <= 0) return 0.0;
+    if (multiplier <= 1.0) return currentCost * numUpgrades; // Linear case
+
+    // Geometric series sum: C × (r^k - 1) / (r - 1)
+    return currentCost * (std::pow(multiplier, numUpgrades) - 1.0) / (multiplier - 1.0);
+}
+
+// Calculate maximum number of upgrades affordable with given budget (O(1) complexity)
+// Solves: budget >= currentCost × (multiplier^k - 1) / (multiplier - 1)
+// Result: k = floor(log(budget × (multiplier - 1) / currentCost + 1) / log(multiplier))
+inline i32 CalculateMaxAffordableUpgrades(f64 budget, f64 currentCost, f64 multiplier, i32 maxCap = 10000) {
+    if (budget <= 0.0 || currentCost <= 0.0) return 0;
+    if (budget < currentCost) return 0;
+    if (multiplier <= 1.0) {
+        // Linear case: budget / currentCost
+        return Clamp(static_cast<i32>(budget / currentCost), 0, maxCap);
+    }
+
+    // Geometric series inverse: k = log(budget × (r - 1) / C + 1) / log(r)
+    f64 term = budget * (multiplier - 1.0) / currentCost + 1.0;
+    if (term <= 0.0) return 0;
+
+    i32 k = static_cast<i32>(std::floor(std::log(term) / std::log(multiplier)));
+    return Clamp(k, 0, maxCap);
+}
+
 // Parse simple JSON value (basic implementation)
 inline std::string ParseJsonString(const std::string& line, const std::string& key) {
     size_t keyPos = line.find("\"" + key + "\"");
