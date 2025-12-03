@@ -1,5 +1,5 @@
 #include "../../include/ParticleCollection.h"
-#include "../../include/Log.h"
+#include "../../include/Logger.h"
 #include <algorithm>
 #include <random>
 
@@ -298,7 +298,7 @@ void ParticleCollection::EquipParticle(ParticleType type) {
 
     // Limit to 3 equipped particles at once
     if (m_EquippedParticles.size() >= 3) {
-        Log::Warn("Cannot equip more than 3 particles! Unequip one first.");
+        Log::Warning("Cannot equip more than 3 particles! Unequip one first.");
         return;
     }
 
