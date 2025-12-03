@@ -836,11 +836,6 @@ void VisualFXManager::UpdateResourceTicks(f64 deltaTime) {
     if (m_ResourceTicks.tickTimer >= m_ResourceTicks.tickInterval) {
         m_ResourceTicks.tickTimer = 0.0f;
 
-        // Get screen dimensions for positioning
-        ImGuiIO& io = ImGui::GetIO();
-        f32 screenWidth = io.DisplaySize.x;
-        f32 screenHeight = io.DisplaySize.y;
-
         // Position ticks in the top-left area (near resource display)
         // Offset slightly so they don't overlap with UI
         f32 baseX = 150.0f;

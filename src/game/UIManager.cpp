@@ -10,6 +10,8 @@
 #include "Challenges.h"
 #include "SkillTree.h"
 #include "EnhancementSystem.h"
+#include "Platform.h"
+#include "Logger.h"
 #include <string>
 
 // NOTE: This implementation assumes the UIManager.h DrawNavButton signature
@@ -345,6 +347,21 @@ void UIManager::RenderOverlays(Renderer* renderer) {
             m_GameState->SetActiveModal(ActiveModal::Enhancement);
             m_GameState->m_ShowMoreMenu = false;
         }
+
+        auto openFeedbackLink = [this](const char* label, const char* url) {
+            if (ImGui::MenuItem(label)) {
+                if (!Platform::OpenURL(url)) {
+                    Log::Warningf("Failed to open feedback link: ", url);
+                }
+                m_GameState->m_ShowMoreMenu = false;
+            }
+        };
+
+        ImGui::Separator();
+        ImGui::TextDisabled("Community & Feedback");
+        openFeedbackLink("Discord Feedback Hub", "https://discord.gg/quantumidle");
+        openFeedbackLink("Report a Bug (GitHub)", "https://github.com/FRowe8/C-Game/issues/new/choose");
+        openFeedbackLink("Feature Survey", "https://forms.gle/quantumidle-feedback");
         ImGui::Separator();
         if (ImGui::MenuItem("Close")) {
             m_GameState->m_ShowMoreMenu = false;

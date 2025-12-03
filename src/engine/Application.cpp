@@ -5,6 +5,7 @@
 #include "Logger.h"
 #include "imgui_impl_sdl2.h"  // For ImGui SDL2 event processing
 #include "Platform.h"
+#include "SteamIntegration.h"
 #include <SDL.h>
 #include <SDL_opengl.h>
 
@@ -35,6 +36,9 @@ bool Application::Initialize() {
     Log::Infof("Initializing ", m_Config.title, "...");
     Log::Infof("Platform: ", Platform::GetPlatformName());
     Log::Infof("CPU Count: ", Platform::GetCPUCount());
+
+    // Initialize optional platform services early so subsystems can hook in
+    SteamIntegration::Initialize();
 
 #ifdef __EMSCRIPTEN__
     printf("=== EMSCRIPTEN BUILD - Starting initialization ===\n");
@@ -221,6 +225,9 @@ void Application::ProcessEvents() {
 }
 
 void Application::Update(f64 deltaTime) {
+    // Pump platform callbacks (Steam, etc.) before updating game logic
+    SteamIntegration::RunCallbacks();
+
     // Update game state
     m_GameState->Update(deltaTime, m_Input.get(), m_Renderer.get());
 
@@ -273,6 +280,8 @@ void Application::Shutdown() {
     m_GameState.reset();
     m_Input.reset();
     m_Renderer.reset();
+
+    SteamIntegration::Shutdown();
 
     if (m_GLContext) {
         SDL_GL_DeleteContext(m_GLContext);

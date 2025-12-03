@@ -33,4 +33,7 @@ DisplayInfo GetDisplayInfo();
 // File system sync (Critical for Web/Emscripten to persist to IndexedDB)
 void SyncFileSystem();
 
+// Utilities
+bool OpenURL(const std::string& url);
+
 } // namespace Platform

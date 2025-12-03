@@ -195,7 +195,7 @@
 ### Critical
 - [x] MinGW SDL2 linking issues → Fixed with proper paths
 - [x] Save/load not persisting all data → Fixed in v2 format
-- [ ] Web build asset preloading
+- [x] Web build asset preloading
 
 ### Minor
 - [ ] Particle count can cause lag on old devices

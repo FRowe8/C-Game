@@ -139,4 +139,18 @@ void SyncFileSystem() {
 #endif
 }
 
+bool OpenURL(const std::string& url) {
+#ifdef __EMSCRIPTEN__
+    EM_ASM({
+        const target = UTF8ToString($0);
+        if (typeof window !== 'undefined' && window.open) {
+            window.open(target, '_blank');
+        }
+    }, url.c_str());
+    return true;
+#else
+    return SDL_OpenURL(url.c_str()) == 0;
+#endif
+}
+
 } // namespace Platform

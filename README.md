@@ -2,7 +2,7 @@
 
 **A quantum mechanics inspired incremental idle game built with C++ and WebAssembly**
 
-🎮 **[Play Now!](https://frowe8.github.io/C-Game/)** | 📖 [How to Deploy](DEPLOY.md) | 🎯 [Marketing Strategy](MARKETING.md) | 🗺️ [Roadmap](ROADMAP.md)
+🎮 **[Play Now!](https://frowe8.github.io/C-Game/)** | 📖 [How to Deploy](DEPLOY.md) | 🎯 [Marketing Strategy](MARKETING.md) | 🗺️ [Roadmap](ROADMAP.md) | 🕑 [Release Cadence](RELEASE_CADENCE.md)
 
 ---
 
@@ -204,11 +204,20 @@ make
 # Install Emscripten SDK first
 ./build_web.sh
 
+# Validate asset preload bundle (checks for missing files)
+python3 scripts/smoke_test_web_preload.py build-web/QuantumIdle.data \
+  assets/fonts/Roboto-Regular.ttf
+
 # Serve locally
 cd build
 python3 -m http.server 8000
 # Open: http://localhost:8000/QuantumIdle.html
 ```
+
+#### Mobile CI Kickoff (Android/iOS)
+- Trigger the **Mobile Platform Readiness** workflow from GitHub Actions (manual run).
+- The workflow performs CMake configure-only passes for Android (NDK r26) and iOS (Xcode generator) so the toolchains stay green without requiring signing keys.
+- Outputs `build-android/` and `build-ios/` configuration folders you can download from the workflow artifacts for local iteration.
 
 ---
 
@@ -218,7 +227,8 @@ python3 -m http.server 8000
 C-Game/
 ├── .github/
 │   └── workflows/
-│       └── deploy.yml          # GitHub Actions deployment
+│       ├── deploy.yml          # GitHub Pages deployment
+│       └── mobile.yml          # Android/iOS configure-only readiness
 ├── include/                    # Header files
 │   ├── Types.h                 # Core type definitions
 │   ├── Application.h           # App framework
@@ -228,13 +238,15 @@ C-Game/
 │   ├── Research.h              # Research tree
 │   ├── Milestones.h            # Milestone system
 │   ├── ParticleCollection.h    # (Future) Particle collection
-│   └── GameUtils.h             # Utility functions
+│   ├── GameUtils.h             # Utility functions
+│   └── SteamIntegration.h      # Steam achievements/cloud hook layer
 ├── src/
 │   ├── Main.cpp                # Entry point
 │   ├── engine/                 # Engine implementation
 │   │   ├── Application.cpp
 │   │   ├── Renderer.cpp
 │   │   ├── Input.cpp
+│   │   ├── SteamIntegration.cpp
 │   │   └── Platform.cpp
 │   └── game/                   # Game implementation
 │       ├── GameState.cpp       # Main game logic (1900+ lines!)
@@ -244,6 +256,7 @@ C-Game/
 │   └── index.html              # Web interface template
 ├── CMakeLists.txt              # Build configuration
 ├── build_web.sh                # Web build script
+├── scripts/smoke_test_web_preload.py # Asset preload smoke test
 ├── DEPLOY.md                   # Deployment guide
 ├── MARKETING.md                # Marketing strategy
 ├── ROADMAP.md                  # Development roadmap
@@ -258,6 +271,12 @@ C-Game/
 - **Source Files**: 11 .cpp files
 - **Header Files**: 10 .h files
 - **Research Nodes**: 23
+
+## 🕹️ Platform Integrations
+
+- **Steam (stub-ready)**: `SteamIntegration` initializes on startup, queues achievement unlocks, and mirrors local saves for Steam Cloud slots once the Steamworks SDK is linked.
+- **Emscripten asset preloading**: Web builds are packaged with `--preload-file assets`, and a smoke test (`scripts/smoke_test_web_preload.py`) runs locally and in CI to ensure required assets are embedded.
+- **Mobile configure pipelines**: Manual GitHub Action (`mobile.yml`) exercises Android NDK and iOS CMake generators to keep platform toolchains warmed up without requiring signing certificates.
 - **Milestones**: 24
 - **Achievements**: 14
 - **Quantum Events**: 7
