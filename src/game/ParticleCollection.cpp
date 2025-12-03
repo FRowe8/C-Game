@@ -179,7 +179,7 @@ void ParticleCollection::Initialize() {
         ParticleRarity::Mythical, 0.0003, Color(0.2f, 0.0f, 0.3f, 1.0f),
         4.00, 2.00, 1.50);  // +400% production, +200% observation, +150% events
 
-    Logger::Info("ParticleCollection initialized with 28 particles");
+    Log::Info("ParticleCollection initialized with 28 particles");
 }
 
 void ParticleCollection::AddParticle(ParticleType type, const std::string& name, const std::string& desc,
@@ -255,11 +255,11 @@ void ParticleCollection::DiscoverParticle(ParticleType type) {
         particle->count = 1;
         m_RecentDiscoveries.push_back(type);
 
-        Logger::Infof("*** NEW PARTICLE DISCOVERED: ", particle->name, " (",
+        Log::Info("*** NEW PARTICLE DISCOVERED: ", particle->name, " (",
                    static_cast<i32>(particle->rarity), ") ***");
     } else {
         particle->count++;
-        Logger::Infof("Found another ", particle->name, "! Total: ", particle->count);
+        Log::Info("Found another ", particle->name, "! Total: ", particle->count);
     }
 }
 
@@ -298,14 +298,14 @@ void ParticleCollection::EquipParticle(ParticleType type) {
 
     // Limit to 3 equipped particles at once
     if (m_EquippedParticles.size() >= 3) {
-        Logger::Warn("Cannot equip more than 3 particles! Unequip one first.");
+        Log::Warning("Cannot equip more than 3 particles! Unequip one first.");
         return;
     }
 
     m_EquippedParticles.push_back(type);
     Particle* p = GetParticle(type);
     if (p) {
-        Logger::Infof("Equipped: ", p->name);
+        Log::Info("Equipped: ", p->name);
     }
 }
 
@@ -315,7 +315,7 @@ void ParticleCollection::UnequipParticle(ParticleType type) {
         m_EquippedParticles.erase(it);
         Particle* p = GetParticle(type);
         if (p) {
-            Logger::Infof("Unequipped: ", p->name);
+            Log::Info("Unequipped: ", p->name);
         }
     }
 }
