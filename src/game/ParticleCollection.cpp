@@ -255,11 +255,11 @@ void ParticleCollection::DiscoverParticle(ParticleType type) {
         particle->count = 1;
         m_RecentDiscoveries.push_back(type);
 
-        Log::Info("*** NEW PARTICLE DISCOVERED: ", particle->name, " (",
+        Log::Infof("*** NEW PARTICLE DISCOVERED: ", particle->name, " (",
                    static_cast<i32>(particle->rarity), ") ***");
     } else {
         particle->count++;
-        Log::Info("Found another ", particle->name, "! Total: ", particle->count);
+        Log::Infof("Found another ", particle->name, "! Total: ", particle->count);
     }
 }
 
@@ -305,7 +305,7 @@ void ParticleCollection::EquipParticle(ParticleType type) {
     m_EquippedParticles.push_back(type);
     Particle* p = GetParticle(type);
     if (p) {
-        Log::Info("Equipped: ", p->name);
+        Log::Infof("Equipped: ", p->name);
     }
 }
 
@@ -315,7 +315,7 @@ void ParticleCollection::UnequipParticle(ParticleType type) {
         m_EquippedParticles.erase(it);
         Particle* p = GetParticle(type);
         if (p) {
-            Log::Info("Unequipped: ", p->name);
+            Log::Infof("Unequipped: ", p->name);
         }
     }
 }
