@@ -219,11 +219,11 @@ GameState::GameState()
       m_QuantumEssence(0),
       m_PlayerLevel(1),
       m_PlayerXP(0.0),
-      m_LastSaveTimestamp(0),
-      m_ActiveModal(ActiveModal::None),
-      m_ShowAchievements(false), m_ShowStats(false), m_ShowResearch(false), m_ShowMilestones(false), m_ShowBuyables(false), m_ShowChallenges(false), m_ShowEssenceShop(false), m_ShowSingularityShop(false), m_ShowSpaceship(false), m_ShowCombat(false), m_ShowGatcha(false), m_ShowSkills(false), m_ShowEnhancement(false), m_ShowMoreMenu(false),
-      m_NumberFormat(GameUtils::NumberFormat::Suffix),
-      m_TotalTimePlayed(0), m_TimeSinceLastSave(0), m_TimeSinceLastPrestige(0),
+    m_LastSaveTimestamp(0),
+    m_ActiveModal(ActiveModal::None),
+    m_ShowAchievements(false), m_ShowStats(false), m_ShowResearch(false), m_ShowMilestones(false), m_ShowBuyables(false), m_ShowChallenges(false), m_ShowEssenceShop(false), m_ShowSingularityShop(false), m_ShowSpaceship(false), m_ShowCombat(false), m_ShowGatcha(false), m_ShowSkills(false), m_ShowEnhancement(false), m_ShowMoreMenu(false),
+    m_NumberFormat(GameUtils::NumberFormat::Suffix),
+    m_TotalTimePlayed(0), m_TimeSinceLastSave(0), m_TimeSinceLastPrestige(0),
       m_Coherence(100), m_MaxCoherence(100), m_CoherenceDecayRate(1.0),
       m_BoostActive(false), m_BoostTimeRemaining(0), m_BoostCooldownRemaining(0),
       m_BoostDuration(30.0), m_BoostCooldown(120.0), m_BoostMultiplier(2.0),
@@ -237,6 +237,7 @@ GameState::GameState()
         m_Resources[i] = 0;
     }
 
+    m_Telemetry.StartSession();
     m_Particles.reserve(m_MaxActiveParticles);
     m_ParticlePool.reserve(m_MaxActiveParticles);
 }
@@ -507,6 +508,7 @@ void GameState::Update(f64 deltaTime, Input* input, Renderer* renderer) {
 
     // Update statistics
     m_Statistics.UpdateSession(deltaTime);
+    m_Telemetry.AddSessionTime(deltaTime);
 
     // Track time for fastest prestige achievement
     m_TimeSinceLastPrestige += deltaTime;
@@ -2063,6 +2065,8 @@ void GameState::PerformPrestige() {
         m_Statistics.fastestPrestige = m_TimeSinceLastPrestige;
         Log::Infof("New fastest prestige record: ", GameUtils::FormatTime(m_TimeSinceLastPrestige));
     }
+    m_Statistics.totalPrestigesPerformed++;
+    m_Telemetry.RecordPrestige(m_TimeSinceLastPrestige, m_Timeline.completedResets + 1);
     m_TimeSinceLastPrestige = 0.0; // Reset timer for next run
 
     // VISUAL EFFECTS: Screen flash and particle explosion!
@@ -2950,6 +2954,33 @@ void GameState::RenderStatistics(Renderer* renderer) {
 
         ImGui::Text("Session Observations:"); ImGui::NextColumn();
         ImGui::Text("%d", m_Statistics.sessionObservations); ImGui::NextColumn();
+
+        ImGui::Columns(1);
+        ImGui::Separator();
+
+        // Live telemetry surface: session pacing and prestige health
+        ImGui::Text("--- Live Telemetry ---");
+        ImGui::Separator();
+
+        const TelemetryManager& telemetry = m_Telemetry;
+
+        ImGui::Columns(2, "TelemetryStatColumns", true);
+        ImGui::SetColumnWidth(0, 300.0f);
+
+        ImGui::Text("Current Session Length:"); ImGui::NextColumn();
+        ImGui::Text("%s", GameUtils::FormatTime(telemetry.GetSessionLengthSeconds()).c_str()); ImGui::NextColumn();
+
+        ImGui::Text("Prestiges This Session:"); ImGui::NextColumn();
+        ImGui::Text("%d", telemetry.GetSessionPrestiges()); ImGui::NextColumn();
+
+        ImGui::Text("Prestiges Per Hour:"); ImGui::NextColumn();
+        ImGui::Text("%.2f", telemetry.GetPrestigesPerHour()); ImGui::NextColumn();
+
+        ImGui::Text("Avg. Minutes Between Prestiges:"); ImGui::NextColumn();
+        ImGui::Text("%.2f", telemetry.GetAveragePrestigeIntervalMinutes()); ImGui::NextColumn();
+
+        ImGui::Text("Last Prestige Interval (seconds):"); ImGui::NextColumn();
+        ImGui::Text("%.1f", telemetry.GetLastPrestigeIntervalSeconds()); ImGui::NextColumn();
 
         ImGui::Columns(1);
         ImGui::Separator();

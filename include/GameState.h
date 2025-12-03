@@ -18,6 +18,7 @@
 #include "SpecializedSkills.h"
 #include "SoundManager.h"
 #include "ParticleCollection.h"
+#include "Telemetry.h"
 #include "imgui.h"
 #include <vector>
 #include <string>
@@ -270,6 +271,8 @@ public:
 
     // Statistics
     GameStatistics& GetStatistics() { return m_Statistics; }
+    TelemetryManager& GetTelemetry() { return m_Telemetry; }
+    const TelemetryManager& GetTelemetry() const { return m_Telemetry; }
 
     // Research Tree
     ResearchTree& GetResearchTree() { return *m_ResearchTree; }
@@ -456,6 +459,7 @@ private:
 
     // Statistics
     GameStatistics m_Statistics;
+    TelemetryManager m_Telemetry;
 
     // Research Tree
     std::unique_ptr<ResearchTree> m_ResearchTree;

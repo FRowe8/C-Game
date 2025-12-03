@@ -2,7 +2,7 @@
 
 **A quantum mechanics inspired incremental idle game built with C++ and WebAssembly**
 
-🎮 **[Play Now!](https://frowe8.github.io/C-Game/)** | 📖 [How to Deploy](DEPLOY.md) | 🎯 [Marketing Strategy](MARKETING.md) | 🗺️ [Roadmap](ROADMAP.md)
+🎮 **[Play Now!](https://frowe8.github.io/C-Game/)** | 📖 [How to Deploy](DEPLOY.md) | 🎯 [Marketing Strategy](MARKETING.md) | 🗺️ [Roadmap](ROADMAP.md) | 🕑 [Release Cadence](RELEASE_CADENCE.md)
 
 ---
 
