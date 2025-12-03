@@ -115,7 +115,7 @@ void SpecializedSkillsSystem::LevelUpSkill(SkillCategory category) {
     Log::Infof(GetSkillName(category), " skill level up! Now level ", skill.level);
 }
 
-void SpecializedSkillsSystem::SaveToJson(std::ofstream& file) const {
+void SpecializedSkillsSystem::SaveToJson(std::ostream& file) const {
     file << "  \"specializedSkills\":{\n";
     file << "    \"observation\":{\"level\":" << m_Skills[0].level << ",\"xp\":" << m_Skills[0].experience << "},\n";
     file << "    \"engineering\":{\"level\":" << m_Skills[1].level << ",\"xp\":" << m_Skills[1].experience << "},\n";
