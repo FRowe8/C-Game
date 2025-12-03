@@ -18,6 +18,7 @@
 #include "SpecializedSkills.h"
 #include "SoundManager.h"
 #include "ParticleCollection.h"
+#include "imgui.h"
 #include <vector>
 #include <string>
 #include <functional>
@@ -341,6 +342,9 @@ public:
     void ConvertCreditsToProduction(i32 credits);
     f64 GetCreditProductionMultiplier() const { return m_CreditProductionMultiplier; }
     f64 CalculateProductionBonusFromCredits(i32 credits) const;
+
+    // UI feedback hooks
+    void RegisterUIButtonFeedback(const std::string& label, const ImVec2& screenPos, const ImVec4& color);
 
     // Phase 3.3: Exotic Materials Management
     i32 GetExoticMaterials() const { return m_ExoticMaterials; }

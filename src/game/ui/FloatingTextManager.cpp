@@ -52,9 +52,10 @@ void FloatingTextManager::SpawnText(const std::string& text, const Vec2& positio
     m_Texts.emplace_back(text, position, color, lifetime);
 }
 
-void FloatingTextManager::SpawnResourceText(QuantumResource resourceType, f64 amount, const Vec2& position) {
+void FloatingTextManager::SpawnResourceText(QuantumResource resourceType, f64 amount, const Vec2& position,
+                                           GameUtils::NumberFormat format) {
     ImVec4 color = GetResourceColor(resourceType);
-    std::string text = FormatResourceText(resourceType, amount);
+    std::string text = FormatResourceText(resourceType, amount, format);
     SpawnText(text, position, color, 2.0f);
 }
 
@@ -132,9 +133,10 @@ ImVec4 FloatingTextManager::GetResourceColor(QuantumResource type) const {
     }
 }
 
-std::string FloatingTextManager::FormatResourceText(QuantumResource type, f64 amount) const {
+std::string FloatingTextManager::FormatResourceText(QuantumResource type, f64 amount,
+                                                   GameUtils::NumberFormat format) const {
     std::string prefix = (amount > 0) ? "+" : "";
-    std::string formatted = prefix + GameUtils::FormatNumber(amount);
+    std::string formatted = prefix + GameUtils::FormatNumber(amount, format);
 
     switch (type) {
         case QuantumResource::Qubits:

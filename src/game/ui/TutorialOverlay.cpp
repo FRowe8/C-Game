@@ -10,10 +10,15 @@ namespace UI {
 TutorialOverlay::TutorialOverlay()
     : m_CurrentStep(TutorialStep::Welcome)
     , m_StepStartTime(0.0f)
+    , m_TutorialCompleted(false)
 {
 }
 
 void TutorialOverlay::Update(GameState* state) {
+    if (m_TutorialCompleted) {
+        return;
+    }
+
     if (!IsActive()) {
         return;
     }
@@ -48,6 +53,7 @@ void TutorialOverlay::Update(GameState* state) {
         case TutorialStep::Completed:
             // Tutorial finished
             m_CurrentStep = TutorialStep::None;
+            m_TutorialCompleted = true;
             break;
 
         default:
@@ -89,6 +95,7 @@ void TutorialOverlay::Render(GameState* state, Renderer* renderer) {
 
 void TutorialOverlay::Skip() {
     m_CurrentStep = TutorialStep::None;
+    m_TutorialCompleted = true;
 }
 
 void TutorialOverlay::AdvanceStep() {
@@ -107,6 +114,7 @@ void TutorialOverlay::AdvanceStep() {
             break;
         case TutorialStep::Completed:
             m_CurrentStep = TutorialStep::None;
+            m_TutorialCompleted = true;
             break;
         default:
             break;

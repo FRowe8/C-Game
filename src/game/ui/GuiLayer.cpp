@@ -465,15 +465,17 @@ void NavigationView::Render(GameState* state, Renderer* renderer) {
             ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.0f);
 
             if (ImGui::Button(btn.label, ImVec2(btnWidth, btnHeight))) {
-                // Phase 4.2: Play click sound
-                state->GetSoundManager().PlaySound(SoundEffect::ButtonPress, 0.8f);
-
                 // Phase 1.2: Use state machine - toggle between modal and None
                 if (active) {
                     state->SetActiveModal(ActiveModal::None);
                 } else {
                     state->SetActiveModal(btn.modal);
                 }
+
+                // Visual/audio feedback hook
+                state->RegisterUIButtonFeedback(btn.label, ImGui::GetItemRectCenter(), ToImVec4(btn.color));
+            } else if (ImGui::IsItemHovered()) {
+                ImGui::SetTooltip("Open the %s panel", btn.label);
             }
 
             // Draw custom border/glow
@@ -819,6 +821,8 @@ void StationView::RenderUnlockedStation(GameState* state, ResearchStation& stati
                              (station.resourceType == QuantumResource::Coherence) ? Color::CoherenceGreen() :
                              Color::EntanglementOrange();
         state->SpawnParticleBurst(particlePos, particleColor, 10);
+
+        state->RegisterUIButtonFeedback("Observed", ImGui::GetItemRectCenter(), ToImVec4(observeColor));
     }
 
     // Phase 2.3: Add tooltip explaining observation mechanics
@@ -864,6 +868,8 @@ void StationView::RenderUnlockedStation(GameState* state, ResearchStation& stati
             // Phase 2.2: Spawn particle burst at button center
             Vec2 particlePos(upgradeBtnPos.x + upgradeBtnSize.x * 0.5f, upgradeBtnPos.y + upgradeBtnSize.y * 0.5f);
             state->SpawnParticleBurst(particlePos, Color::EntanglementOrange(), 15);
+
+            state->RegisterUIButtonFeedback("Upgraded", ImGui::GetItemRectCenter(), ToImVec4(upgradeColor));
         }
     }
     ImGui::PopStyleColor(2);
@@ -901,6 +907,7 @@ void StationView::RenderUnlockedStation(GameState* state, ResearchStation& stati
         if (upgradesBought > 0) {
             state->UpdateResearchBonuses();
             Log::Infof("Bought ", upgradesBought, " upgrades for ", station.name, " (now level ", station.level, ")");
+            state->RegisterUIButtonFeedback("Upgraded", ImGui::GetItemRectCenter(), ToImVec4(upgradeColor));
         }
     }
     ImGui::PopStyleColor(2);
@@ -935,6 +942,7 @@ void StationView::RenderLockedStation(GameState* state, ResearchStation& station
             station.unlocked = true;
             station.level = 0;
             Log::Infof("Unlocked: ", station.name);
+            state->RegisterUIButtonFeedback("Unlocked", ImGui::GetItemRectCenter(), ToImVec4(unlockColor));
         }
     }
     ImGui::PopStyleColor(2);

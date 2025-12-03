@@ -1918,8 +1918,22 @@ void GameState::AddResource(QuantumResource type, f64 amount, bool showFloatingT
         Vec2 position(io.DisplaySize.x * 0.5f, io.DisplaySize.y * 0.4f);
 
         // Spawn the text
-        m_GuiLayer->GetFloatingTextManager()->SpawnResourceText(type, amount, position);
+        m_GuiLayer->GetFloatingTextManager()->SpawnResourceText(type, amount, position, m_NumberFormat);
     }
+}
+
+void GameState::RegisterUIButtonFeedback(const std::string& label, const ImVec2& screenPos, const ImVec4& color) {
+    // Audio feedback
+    m_SoundManager.PlaySound(SoundEffect::ButtonPress, 0.85f);
+
+    // Visual feedback via floating text
+    if (m_GuiLayer && m_GuiLayer->GetFloatingTextManager()) {
+        Vec2 pos(screenPos.x, screenPos.y);
+        m_GuiLayer->GetFloatingTextManager()->SpawnText(label, pos, color, 1.25f);
+    }
+
+    // Hook for future particle/button effects - keeps place for particle bursts
+    m_ParticleCollection.CheckForDiscoveries(0.0);
 }
 
 bool GameState::SpendResource(QuantumResource type, f64 amount) {
@@ -2110,10 +2124,13 @@ bool GameState::Save(const std::string& filepath) {
 
     // Tutorial progress
     i32 tutorialStep = 0;
+    bool tutorialCompleted = false;
     if (m_GuiLayer && m_GuiLayer->GetTutorialOverlay()) {
         tutorialStep = static_cast<i32>(m_GuiLayer->GetTutorialOverlay()->GetCurrentStep());
+        tutorialCompleted = m_GuiLayer->GetTutorialOverlay()->IsCompleted();
     }
     file << "  \"tutorialStep\": " << tutorialStep << ",\n";
+    file << "  \"tutorialCompleted\": " << (tutorialCompleted ? "true" : "false") << ",\n";
 
     // Resources
     file << "  \"resources\": [" << m_Resources[0] << ", " << m_Resources[1] << ", " << m_Resources[2] << "],\n";
@@ -2371,6 +2388,11 @@ bool GameState::Load(const std::string& filepath) {
                     i32 tutorialStep = static_cast<i32>(GameUtils::ParseJsonNumber(line, "tutorialStep"));
                     if (m_GuiLayer && m_GuiLayer->GetTutorialOverlay()) {
                         m_GuiLayer->GetTutorialOverlay()->SetCurrentStep(static_cast<UI::TutorialStep>(tutorialStep));
+                    }
+                } else if (line.find("\"tutorialCompleted\"") != std::string::npos) {
+                    bool tutorialCompleted = GameUtils::ParseJsonBool(line, "tutorialCompleted");
+                    if (tutorialCompleted && m_GuiLayer && m_GuiLayer->GetTutorialOverlay()) {
+                        m_GuiLayer->GetTutorialOverlay()->SetCurrentStep(UI::TutorialStep::None);
                     }
                 } else if (line.find("\"resources\"") != std::string::npos) {
                     // Parse resources array

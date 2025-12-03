@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Types.h"
+#include "GameUtils.h"
 #include "imgui.h"
 #include <vector>
 #include <string>
@@ -60,8 +61,10 @@ public:
      * @param resourceType Type of resource (for color selection)
      * @param amount Amount gained
      * @param position Screen position
+     * @param format Number format to use when rendering the amount
      */
-    void SpawnResourceText(QuantumResource resourceType, f64 amount, const Vec2& position);
+    void SpawnResourceText(QuantumResource resourceType, f64 amount, const Vec2& position,
+                           GameUtils::NumberFormat format = GameUtils::NumberFormat::Suffix);
 
     /**
      * Update all active floating texts
@@ -91,7 +94,7 @@ private:
     /**
      * Format resource text with appropriate units
      */
-    std::string FormatResourceText(QuantumResource type, f64 amount) const;
+    std::string FormatResourceText(QuantumResource type, f64 amount, GameUtils::NumberFormat format) const;
 };
 
 } // namespace UI

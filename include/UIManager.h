@@ -35,6 +35,7 @@ private:
 
 
     // --- Helpers ---
+    std::string FormatValue(double value) const;
     void DrawResourceCounter(const char* label, double value, const ImVec4& color) const;
     static bool DrawNavButton(const char* label, bool isActive, const ImVec4& activeColor, float width, float height);
 };

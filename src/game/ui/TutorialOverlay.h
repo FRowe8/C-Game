@@ -72,7 +72,17 @@ public:
     /**
      * Set current tutorial step (used when loading from save)
      */
-    void SetCurrentStep(TutorialStep step) { m_CurrentStep = step; }
+    void SetCurrentStep(TutorialStep step) {
+        m_CurrentStep = step;
+        if (step == TutorialStep::Completed || step == TutorialStep::None) {
+            m_TutorialCompleted = true;
+        }
+    }
+
+    /**
+     * Whether the tutorial was fully completed or skipped
+     */
+    bool IsCompleted() const { return m_TutorialCompleted; }
 
     /**
      * Skip tutorial entirely
@@ -93,6 +103,7 @@ public:
 private:
     TutorialStep m_CurrentStep;
     float m_StepStartTime; // Time when current step started (for animations)
+    bool m_TutorialCompleted; // Persisted state for save/load
 
     // Step-specific rendering
     void RenderWelcomeStep(GameState* state);
