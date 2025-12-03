@@ -17,6 +17,7 @@
 #include "FeatureUnlockManager.h"
 #include "SpecializedSkills.h"
 #include "SoundManager.h"
+#include "ParticleCollection.h"
 #include <vector>
 #include <string>
 #include <functional>
@@ -48,6 +49,7 @@ namespace UI {
     class EnhancementView;
     class SpecializedSkillsView;
     class TutorialOverlay;
+    class CollectionView;
 }
 
 // Research station that generates resources
@@ -216,6 +218,7 @@ enum class ActiveModal {
     Skills,
     Enhancement,
     SpecializedSkills,  // Activity-based progression system
+    Collection,         // Phase 4.1: Particle collection system
     MoreMenu
 };
 
@@ -312,6 +315,9 @@ public:
 
     // Enhancement System
     EnhancementSystem& GetEnhancementSystem() { return m_EnhancementSystem; }
+
+    // Phase 4.1: Particle Collection System
+    ParticleCollection& GetParticleCollection() { return m_ParticleCollection; }
 
     // Specialized Skills System
     SpecializedSkillsSystem& GetSpecializedSkills() { return m_SpecializedSkills; }
@@ -479,6 +485,9 @@ private:
 
     // Feature Unlock Manager
     FeatureUnlockManager m_UnlockManager;
+
+    // Phase 4.1: Particle Collection System
+    ParticleCollection m_ParticleCollection;
 
     // Specialized Skills System
     SpecializedSkillsSystem m_SpecializedSkills;

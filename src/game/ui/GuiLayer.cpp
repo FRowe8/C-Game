@@ -42,6 +42,7 @@ void GuiLayer::Initialize() {
     m_SkillTreeView = std::make_unique<SkillTreeView>();
     m_EnhancementView = std::make_unique<EnhancementView>();
     m_SpecializedSkillsView = std::make_unique<SpecializedSkillsView>();
+    m_CollectionView = std::make_unique<CollectionView>();  // Phase 4.1
 
     // Tutorial System
     m_TutorialOverlay = std::make_unique<TutorialOverlay>();
@@ -132,6 +133,10 @@ void GuiLayer::Render(GameState* state, Renderer* renderer) {
 
         case ActiveModal::SpecializedSkills:
             m_SpecializedSkillsView->Render(state, renderer);
+            break;
+
+        case ActiveModal::Collection:  // Phase 4.1
+            m_CollectionView->Render(state, renderer);
             break;
 
         case ActiveModal::MoreMenu:
@@ -435,13 +440,14 @@ void NavigationView::Render(GameState* state, Renderer* renderer) {
             {"RESEARCH", ActiveModal::Research, Color::QuantumPurple()},
             {"STATS", ActiveModal::Statistics, Color::EntanglementOrange()},
             {"MILESTONES", ActiveModal::Milestones, Color::NeonPink()},
+            {"COLLECTION", ActiveModal::Collection, Color::CoherenceGreen()},  // Phase 4.1
         };
 
         ImGui::SetCursorPos(ImVec2(currentX, btnY));
 
         ActiveModal currentModal = state->GetActiveModal();
 
-        for (int i = 0; i < 6; i++) {
+        for (int i = 0; i < 7; i++) {  // Phase 4.1: Updated from 6 to 7 buttons
             auto& btn = navButtons[i];
 
             if (currentX + btnWidth + spacing + 200.0f + 80.0f + 35.0f > screenWidth) {
@@ -1031,6 +1037,222 @@ void EnhancementView::Render(GameState* state, Renderer* renderer) {
 void SpecializedSkillsView::Render(GameState* state, Renderer* renderer) {
     // TODO: Extract from GameState::RenderSpecializedSkills
     state->RenderSpecializedSkills(renderer);
+}
+
+// ============================================================================
+// Phase 4.1: Particle Collection View
+// ============================================================================
+
+void CollectionView::Render(GameState* state, Renderer* renderer) {
+    (void)renderer; // ImGui-only view
+
+    ParticleCollection& collection = state->GetParticleCollection();
+
+    // Render collection stats at the top
+    RenderCollectionStats(state);
+
+    ImGui::Separator();
+    ImGui::Spacing();
+
+    // Render equipped particles section
+    RenderEquippedParticles(state);
+
+    ImGui::Separator();
+    ImGui::Spacing();
+
+    // Render particle grid (28 particles in a 7x4 grid)
+    ImGui::Text("Discovered Particles");
+    ImGui::Spacing();
+
+    const i32 cols = 7;
+    const i32 rows = 4;
+    const f32 slotSize = 100.0f;
+
+    for (i32 row = 0; row < rows; row++) {
+        for (i32 col = 0; col < cols; col++) {
+            i32 index = row * cols + col;
+            if (index >= static_cast<i32>(ParticleType::COUNT)) break;
+
+            ParticleType type = static_cast<ParticleType>(index);
+            Particle* particle = collection.GetParticle(type);
+            bool discovered = collection.IsDiscovered(type);
+
+            RenderParticleSlot(state, particle, discovered);
+
+            if (col < cols - 1) {
+                ImGui::SameLine();
+            }
+        }
+    }
+}
+
+void CollectionView::RenderCollectionStats(GameState* state) {
+    ParticleCollection& collection = state->GetParticleCollection();
+
+    i32 discovered = collection.GetDiscoveredCount();
+    i32 total = collection.GetTotalParticles();
+    f64 percentage = collection.GetCompletionPercentage();
+
+    ImGui::Text("Particle Collection");
+    ImGui::SameLine();
+    ImGui::TextColored(ImVec4(0.0f, 1.0f, 1.0f, 1.0f), "(%d / %d) - %.1f%%", discovered, total, percentage);
+
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("Discover particles by observing research stations\n0.5%% chance per observation");
+    }
+
+    // Show active bonuses from equipped particles
+    f64 prodBonus = collection.GetTotalProductionBonus() * 100.0;
+    f64 obsBonus = collection.GetTotalObservationBonus() * 100.0;
+
+    if (prodBonus > 0.0 || obsBonus > 0.0) {
+        ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.5f, 1.0f), "Active Bonuses:");
+        if (prodBonus > 0.0) {
+            ImGui::Text("  +%.1f%% Production", prodBonus);
+        }
+        if (obsBonus > 0.0) {
+            ImGui::Text("  +%.1f%% Observation Rewards", obsBonus);
+        }
+    }
+}
+
+void CollectionView::RenderEquippedParticles(GameState* state) {
+    ParticleCollection& collection = state->GetParticleCollection();
+    auto equipped = collection.GetEquippedParticles();
+
+    ImGui::Text("Equipped Particles (Max 3)");
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("Equipped particles provide passive bonuses to production and observation");
+    }
+    ImGui::Spacing();
+
+    if (equipped.empty()) {
+        ImGui::TextColored(ImVec4(0.7f, 0.7f, 0.7f, 1.0f), "No particles equipped");
+    } else {
+        for (Particle* p : equipped) {
+            ImVec4 color = ToImVec4(p->particleColor);
+            ImGui::PushStyleColor(ImGuiCol_Button, color);
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(color.x * 1.2f, color.y * 1.2f, color.z * 1.2f, color.w));
+            ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(color.x * 0.8f, color.y * 0.8f, color.z * 0.8f, color.w));
+
+            std::string buttonLabel = p->name + "##equipped_" + std::to_string(static_cast<i32>(p->type));
+            if (ImGui::Button(buttonLabel.c_str(), ImVec2(150, 30))) {
+                collection.UnequipParticle(p->type);
+            }
+
+            ImGui::PopStyleColor(3);
+
+            if (ImGui::IsItemHovered()) {
+                ImGui::BeginTooltip();
+                ImGui::Text("%s", p->name.c_str());
+                ImGui::Separator();
+                ImGui::TextWrapped("%s", p->description.c_str());
+                ImGui::Spacing();
+                if (p->productionBonus > 0.0) {
+                    ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.5f, 1.0f), "+%.1f%% Production", p->productionBonus * 100.0);
+                }
+                if (p->observationBonus > 0.0) {
+                    ImGui::TextColored(ImVec4(0.5f, 0.5f, 1.0f, 1.0f), "+%.1f%% Observation", p->observationBonus * 100.0);
+                }
+                ImGui::Spacing();
+                ImGui::TextColored(ImVec4(1.0f, 0.3f, 0.3f, 1.0f), "Click to unequip");
+                ImGui::EndTooltip();
+            }
+
+            ImGui::SameLine();
+        }
+    }
+
+    ImGui::Spacing();
+}
+
+void CollectionView::RenderParticleSlot(GameState* state, Particle* particle, bool discovered) {
+    if (!particle) return;
+
+    ParticleCollection& collection = state->GetParticleCollection();
+    const f32 slotSize = 90.0f;
+
+    ImVec4 slotColor;
+    if (!discovered) {
+        // Undiscovered - dark gray
+        slotColor = ImVec4(0.2f, 0.2f, 0.2f, 1.0f);
+    } else {
+        // Discovered - use particle color
+        slotColor = ToImVec4(particle->particleColor);
+    }
+
+    // Dim the color if not equipped
+    bool isEquipped = collection.IsEquipped(particle->type);
+    if (!isEquipped && discovered) {
+        slotColor.w = 0.7f; // Slightly transparent
+    }
+
+    ImGui::PushStyleColor(ImGuiCol_Button, slotColor);
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(slotColor.x * 1.3f, slotColor.y * 1.3f, slotColor.z * 1.3f, 1.0f));
+    ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(slotColor.x * 0.8f, slotColor.y * 0.8f, slotColor.z * 0.8f, 1.0f));
+
+    std::string label = discovered ? particle->name : "???";
+    std::string buttonId = "##particle_" + std::to_string(static_cast<i32>(particle->type));
+
+    if (ImGui::Button((label + buttonId).c_str(), ImVec2(slotSize, slotSize))) {
+        if (discovered) {
+            if (isEquipped) {
+                collection.UnequipParticle(particle->type);
+            } else {
+                collection.EquipParticle(particle->type);
+            }
+        }
+    }
+
+    ImGui::PopStyleColor(3);
+
+    // Tooltip on hover
+    if (ImGui::IsItemHovered()) {
+        if (discovered) {
+            ImGui::BeginTooltip();
+            ImGui::PushTextWrapPos(300.0f);
+
+            // Name and rarity
+            const char* rarityNames[] = {"Common", "Uncommon", "Rare", "Exotic", "Legendary", "Mythical"};
+            ImVec4 rarityColors[] = {
+                ImVec4(0.7f, 0.7f, 0.7f, 1.0f), // Common
+                ImVec4(0.3f, 1.0f, 0.3f, 1.0f), // Uncommon
+                ImVec4(0.3f, 0.5f, 1.0f, 1.0f), // Rare
+                ImVec4(0.8f, 0.3f, 1.0f, 1.0f), // Exotic
+                ImVec4(1.0f, 0.6f, 0.0f, 1.0f), // Legendary
+                ImVec4(1.0f, 0.0f, 0.5f, 1.0f)  // Mythical
+            };
+
+            ImGui::Text("%s", particle->name.c_str());
+            ImGui::SameLine();
+            i32 rarityIndex = static_cast<i32>(particle->rarity);
+            ImGui::TextColored(rarityColors[rarityIndex], "[%s]", rarityNames[rarityIndex]);
+
+            ImGui::Separator();
+            ImGui::TextWrapped("%s", particle->description.c_str());
+            ImGui::Spacing();
+
+            // Bonuses
+            if (particle->productionBonus > 0.0) {
+                ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.5f, 1.0f), "+%.1f%% Production", particle->productionBonus * 100.0);
+            }
+            if (particle->observationBonus > 0.0) {
+                ImGui::TextColored(ImVec4(0.5f, 0.5f, 1.0f, 1.0f), "+%.1f%% Observation", particle->observationBonus * 100.0);
+            }
+
+            ImGui::Spacing();
+            if (isEquipped) {
+                ImGui::TextColored(ImVec4(1.0f, 1.0f, 0.0f, 1.0f), "[EQUIPPED] Click to unequip");
+            } else {
+                ImGui::TextColored(ImVec4(0.5f, 1.0f, 0.5f, 1.0f), "Click to equip");
+            }
+
+            ImGui::PopTextWrapPos();
+            ImGui::EndTooltip();
+        } else {
+            ImGui::SetTooltip("Not yet discovered\nKeep observing to find new particles!");
+        }
+    }
 }
 
 } // namespace UI

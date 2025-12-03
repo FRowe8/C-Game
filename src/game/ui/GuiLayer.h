@@ -242,6 +242,24 @@ public:
 };
 
 /**
+ * Particle Collection View
+ * Renders the particle collection modal window with a grid of discovered particles
+ * Phase 4.1: Display all 28 particles, discovery status, and equip management
+ */
+class CollectionView : public IView {
+public:
+    CollectionView() = default;
+    ~CollectionView() override = default;
+
+    void Render(GameState* state, Renderer* renderer) override;
+
+private:
+    void RenderParticleSlot(GameState* state, Particle* particle, bool discovered);
+    void RenderEquippedParticles(GameState* state);
+    void RenderCollectionStats(GameState* state);
+};
+
+/**
  * Tutorial Overlay
  * Renders step-based tutorial system for new players
  */
@@ -318,6 +336,7 @@ private:
     std::unique_ptr<SkillTreeView> m_SkillTreeView;
     std::unique_ptr<EnhancementView> m_EnhancementView;
     std::unique_ptr<SpecializedSkillsView> m_SpecializedSkillsView;
+    std::unique_ptr<CollectionView> m_CollectionView;  // Phase 4.1
 
     // Tutorial System (overlays everything when active)
     std::unique_ptr<TutorialOverlay> m_TutorialOverlay;

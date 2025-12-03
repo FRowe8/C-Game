@@ -100,6 +100,10 @@ void ResearchStation::Observe(GameState* state) {
         observeBonus = activeEvent->multiplier;
     }
 
+    // Phase 4.1: Apply particle collection observation bonus
+    f64 particleObservationBonus = state->GetParticleCollection().GetTotalObservationBonus();
+    observeBonus *= (1.0 + particleObservationBonus);
+
     if (roll < superpositionProbability) {
         // Success - full value
         collapsedValue *= 1.0 * observeBonus;
@@ -135,6 +139,12 @@ void ResearchStation::Observe(GameState* state) {
 
     // Award Observation skill XP
     state->GetSpecializedSkills().AddExperience(SkillCategory::Observation, SkillXP::OBSERVE_STATION);
+
+    // Phase 4.1: Particle discovery chance! (0.5% chance on each observation)
+    if (state->GetParticleCollection().TryFindParticle()) {
+        // Particle discovered! TryFindParticle() handles logging and notifications
+        state->GetSoundManager().PlaySound(SoundEffect::AchievementUnlock); // Celebratory sound
+    }
 
     // Ship part drop chance! (20% base chance + bonus from ship's drop rate bonus)
     f64 partDropChance = 0.20; // 20% base chance
@@ -344,6 +354,10 @@ void GameState::Initialize() {
 
     // Initialize specialized skills system
     m_SpecializedSkills.Initialize();
+
+    // Phase 4.1: Initialize particle collection system
+    m_ParticleCollection.Initialize();
+    Log::Info("Particle collection system initialized");
 
     // Initialize sound manager
     m_SoundManager.Initialize();
@@ -1084,6 +1098,10 @@ f64 GameState::GetProductionMultiplier(QuantumResource type) const {
     // if (m_ChallengeManager.IsProductionHalved()) {
     //     multiplier *= 0.5;
     // }
+
+    // Phase 4.1: Particle Collection Production Bonus
+    f64 particleBonus = m_ParticleCollection.GetTotalProductionBonus();
+    multiplier *= (1.0 + particleBonus);
 
     return multiplier;
 }
