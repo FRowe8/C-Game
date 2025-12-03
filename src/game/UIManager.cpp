@@ -73,30 +73,38 @@ void UIManager::RenderTopBar() {
         ImVec2 p1 = ImVec2(p0.x + viewport->Size.x, p0.y + 2.0f);
         drawList->AddRectFilled(p0, p1, ImGui::GetColorU32(UITheme::ColorAccent));
 
-        // Resources Columns
-        ImGui::Columns(5, "ResCols", false);
+        const ImVec2 cellPadding(UITheme::FramePadding().x * 0.6f, UITheme::FramePadding().y * 0.45f);
+        ImGui::PushStyleVar(ImGuiStyleVar_CellPadding, cellPadding);
+        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(UITheme::ItemSpacing() * 0.4f, UITheme::ItemSpacing() * 0.4f));
 
-        // 1. Qubits
-        DrawResourceCounter("Qubits", m_GameState->GetResource(QuantumResource::Qubits), ToImVec4(Color::QuantumBlue()));
-        ImGui::NextColumn();
+        if (ImGui::BeginTable("ResTable", 5, ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_NoBordersInBody)) {
+            ImGui::TableSetupColumn("Q", ImGuiTableColumnFlags_WidthFixed, UITheme::TouchMinSize());
+            ImGui::TableSetupColumn("C", ImGuiTableColumnFlags_WidthFixed, UITheme::TouchMinSize());
+            ImGui::TableSetupColumn("E", ImGuiTableColumnFlags_WidthFixed, UITheme::TouchMinSize());
+            ImGui::TableSetupColumn("P", ImGuiTableColumnFlags_WidthFixed, UITheme::TouchMinSize());
+            ImGui::TableSetupColumn("S", ImGuiTableColumnFlags_WidthFixed, UITheme::TouchMinSize());
 
-        // 2. Coherence (Use actual values)
-        DrawResourceCounter("Coherence", m_GameState->m_Coherence, ToImVec4(Color::CoherenceGreen()));
-        ImGui::NextColumn();
+            ImGui::TableNextRow(ImGuiTableRowFlags_None, UITheme::TouchMinSize());
 
-        // 3. Entanglement
-        DrawResourceCounter("Entanglement", m_GameState->GetResource(QuantumResource::Entanglement), ToImVec4(Color::EntanglementOrange()));
-        ImGui::NextColumn();
+            ImGui::TableSetColumnIndex(0);
+            DrawResourceCounter("[Q]", m_GameState->GetResource(QuantumResource::Qubits), ToImVec4(Color::QuantumBlue()));
 
-        // 4. Photons
-        DrawResourceCounter("Photons", m_GameState->GetTimeline().photons, UITheme::ColorPrimary);
-        ImGui::NextColumn();
+            ImGui::TableSetColumnIndex(1);
+            DrawResourceCounter("[C]", m_GameState->m_Coherence, ToImVec4(Color::CoherenceGreen()));
 
-        // 5. Singularities
-        DrawResourceCounter("Singularities", m_GameState->GetTimeline().singularities, UITheme::ColorAccent);
-        ImGui::NextColumn();
+            ImGui::TableSetColumnIndex(2);
+            DrawResourceCounter("[E]", m_GameState->GetResource(QuantumResource::Entanglement), ToImVec4(Color::EntanglementOrange()));
 
-        ImGui::Columns(1);
+            ImGui::TableSetColumnIndex(3);
+            DrawResourceCounter("[P]", m_GameState->GetTimeline().photons, UITheme::ColorPrimary);
+
+            ImGui::TableSetColumnIndex(4);
+            DrawResourceCounter("[S]", m_GameState->GetTimeline().singularities, UITheme::ColorAccent);
+
+            ImGui::EndTable();
+        }
+
+        ImGui::PopStyleVar(2);
     }
     ImGui::End();
     ImGui::PopStyleVar();
@@ -385,21 +393,39 @@ std::string UIManager::FormatValue(double value) const {
 }
 
 void UIManager::DrawResourceCounter(const char* label, double value, const ImVec4& color) const {
+    const float desiredHeight = UITheme::TouchMinSize();
+    const float labelHeight = ImGui::GetTextLineHeight();
+    const float verticalOffset = ImMax(0.0f, (desiredHeight - labelHeight) * 0.5f);
+    const ImVec2 badgePadding(UITheme::FramePadding().x * 0.35f, UITheme::FramePadding().y * 0.25f);
+
+    ImVec2 startScreenPos = ImGui::GetCursorScreenPos();
+    float columnWidth = ImGui::GetColumnWidth();
+
+    ImVec2 bgMin = ImVec2(startScreenPos.x - badgePadding.x, startScreenPos.y);
+    ImVec2 bgMax = ImVec2(startScreenPos.x + columnWidth - badgePadding.x, startScreenPos.y + desiredHeight + badgePadding.y);
+
+    ImDrawList* drawList = ImGui::GetWindowDrawList();
+    drawList->AddRectFilled(bgMin, bgMax, ImGui::GetColorU32(ImVec4(UITheme::ColorCardBg.x, UITheme::ColorCardBg.y, UITheme::ColorCardBg.z, 0.9f)), UITheme::CardRounding());
+    drawList->AddRect(bgMin, bgMax, ImGui::GetColorU32(UITheme::ColorCardBorder), UITheme::CardRounding(), 0, UITheme::BorderThickness() * 0.75f);
+
     ImGui::BeginGroup();
-    ImGui::PushStyleColor(ImGuiCol_Text, UITheme::ColorTextDim);
+    ImGui::SetCursorScreenPos(ImVec2(startScreenPos.x, startScreenPos.y + verticalOffset));
+
+    ImGui::PushStyleColor(ImGuiCol_Text, color);
     ImGui::Text("%s", label);
     ImGui::PopStyleColor();
 
-    ImGui::PushStyleColor(ImGuiCol_Text, color);
-    ImGui::SetWindowFontScale(1.2f);
+    ImGui::SameLine(0.0f, UITheme::ItemSpacing() * 0.35f);
+    ImGui::AlignTextToFramePadding();
+    ImGui::PushStyleColor(ImGuiCol_Text, UITheme::ColorText);
     ImGui::Text("%s", FormatValue(value).c_str());
-    ImGui::SetWindowFontScale(1.0f);
     ImGui::PopStyleColor();
+
+    ImGui::EndGroup();
 
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
         ImGui::SetTooltip("%s\nCurrent: %s", label, FormatValue(value).c_str());
     }
-    ImGui::EndGroup();
 }
 
 bool UIManager::DrawNavButton(const char* label, bool isActive, const ImVec4& activeColor, float width, float height) {
