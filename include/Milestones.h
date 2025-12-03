@@ -97,5 +97,6 @@ private:
     std::vector<MilestoneID> m_RecentCompletions;
 
     void AddMilestone(MilestoneID id, const std::string& name, const std::string& desc,
-                      f64 target, f64 qReward, f64 pReward, f64 prodBonus = 0.0);
+                      f64 target, f64 qReward, f64 pReward, f64 prodBonus = 0.0,
+                      f64 singularityReward = 0.0, const std::string& targetLabel = "");
 };

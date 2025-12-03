@@ -350,10 +350,22 @@ void ResourceView::Render(GameState* state, Renderer* renderer) {
             ImGui::SameLine(0.0f, 30.0f);
             ImGui::TextColored(ToImVec4(Color(1.0f, 0.5f, 1.0f, 1.0f)), "EXOTIC MATERIALS");
             if (ImGui::IsItemHovered()) {
-                ImGui::SetTooltip("Rare materials required for Tier 3+ research\nObtained from level 41+ combat victories and Spaceship Expeditions");
+                ImGui::SetTooltip("Rare materials required for Tier 3+ research\nPrimarily recovered via Spaceship Expeditions");
             }
             ImGui::SameLine();
             ImGui::Text("%d", exoticMaterials);
+        }
+
+        // Research Data
+        i32 researchData = state->GetResearchData();
+        if (researchData > 0) {
+            ImGui::SameLine(0.0f, 30.0f);
+            ImGui::TextColored(ToImVec4(Color(0.3f, 0.9f, 1.0f, 1.0f)), "RESEARCH DATA");
+            if (ImGui::IsItemHovered()) {
+                ImGui::SetTooltip("Intel gathered from combat victories. Useful for higher-tier research projects.");
+            }
+            ImGui::SameLine();
+            ImGui::Text("%d", researchData);
         }
 
         // Singularities (if any) (Phase 2.3: with tooltip)
@@ -1118,8 +1130,10 @@ void CollectionView::RenderCollectionStats(GameState* state) {
     // Show active bonuses from equipped particles
     f64 prodBonus = collection.GetTotalProductionBonus() * 100.0;
     f64 obsBonus = collection.GetTotalObservationBonus() * 100.0;
+    f64 discoveryProd = collection.GetDiscoveryProductionBonus() * 100.0;
+    f64 discoveryObs = collection.GetDiscoveryObservationBonus() * 100.0;
 
-    if (prodBonus > 0.0 || obsBonus > 0.0) {
+    if (prodBonus > 0.0 || obsBonus > 0.0 || discoveryProd > 0.0 || discoveryObs > 0.0) {
         ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.5f, 1.0f), "Active Bonuses:");
         if (prodBonus > 0.0) {
             ImGui::Text("  +%.1f%% Production", prodBonus);
@@ -1127,6 +1141,28 @@ void CollectionView::RenderCollectionStats(GameState* state) {
         if (obsBonus > 0.0) {
             ImGui::Text("  +%.1f%% Observation Rewards", obsBonus);
         }
+        if (discoveryProd > 0.0) {
+            ImGui::Text("  +%.1f%% Production (Discovery Tree)", discoveryProd);
+        }
+        if (discoveryObs > 0.0) {
+            ImGui::Text("  +%.1f%% Observation (Discovery Tree)", discoveryObs);
+        }
+    }
+
+    ImGui::Spacing();
+    ImGui::Text("Equipment Slots: %d", collection.GetMaxEquipmentSlots());
+    ImGui::Spacing();
+
+    // Discovery tree progress
+    ImGui::Text("Discovery Tree");
+    ImGui::Separator();
+    for (const auto& tier : collection.GetDiscoveryTiers()) {
+        f32 progress = static_cast<f32>(discovered) / static_cast<f32>(tier.requiredDiscoveries);
+        progress = progress > 1.0f ? 1.0f : progress;
+        std::string overlay = std::to_string(discovered) + " / " + std::to_string(tier.requiredDiscoveries);
+        ImGui::ProgressBar(progress, ImVec2(-1, 0), overlay.c_str());
+        ImGui::SameLine();
+        ImGui::Text("%s (+%.0f%% Prod, +%.0f%% Obs)", tier.name.c_str(), tier.productionBonus * 100.0, tier.observationBonus * 100.0);
     }
 }
 
@@ -1134,7 +1170,7 @@ void CollectionView::RenderEquippedParticles(GameState* state) {
     ParticleCollection& collection = state->GetParticleCollection();
     auto equipped = collection.GetEquippedParticles();
 
-    ImGui::Text("Equipped Particles (Max 3)");
+    ImGui::Text("Equipped Particles (Max %d)", collection.GetMaxEquipmentSlots());
     if (ImGui::IsItemHovered()) {
         ImGui::SetTooltip("Equipped particles provide passive bonuses to production and observation");
     }

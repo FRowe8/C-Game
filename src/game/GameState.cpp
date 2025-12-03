@@ -120,6 +120,7 @@ void ResearchStation::Observe(GameState* state) {
     // Phase 4.1: Apply particle collection observation bonus
     f64 particleObservationBonus = state->GetParticleCollection().GetTotalObservationBonus();
     observeBonus *= (1.0 + particleObservationBonus);
+    observeBonus *= (1.0 + state->GetParticleCollection().GetDiscoveryObservationBonus());
 
     if (roll < superpositionProbability) {
         // Success - full value
@@ -224,12 +225,14 @@ void ResearchStation::Update(f64 deltaTime) {
 
 // GameState implementation
 GameState::GameState()
-    : m_CurrentEvent(nullptr), m_TimeSinceLastEvent(0), m_EventCooldown(120.0),
-      m_QuantumEssence(0),
-      m_PlayerCredits(0),
+    : m_PlayerCredits(0),
       m_CreditProductionMultiplier(1.0),  // Phase 3.2: No bonus by default
       m_CreditConversionRate(100.0),      // Phase 3.2: 100 credits = 1% production
+      m_MatterConverterBuffer(0.0),
       m_ExoticMaterials(0),               // Phase 3.3: Start with 0 exotic materials
+      m_ResearchData(0),
+      m_CurrentEvent(nullptr), m_TimeSinceLastEvent(0), m_EventCooldown(120.0),
+      m_QuantumEssence(0),
       m_PlayerLevel(1),
       m_PlayerXP(0.0),
       m_LastSaveTimestamp(0),
@@ -249,6 +252,9 @@ GameState::GameState()
     for (int i = 0; i < 3; i++) {
         m_Resources[i] = 0;
     }
+
+    m_Particles.reserve(m_MaxActiveParticles);
+    m_ParticlePool.reserve(m_MaxActiveParticles);
 }
 
 GameState::~GameState() {
@@ -524,6 +530,9 @@ void GameState::Update(f64 deltaTime, Input* input, Renderer* renderer) {
     // Update stations
     UpdateStations(deltaTime);
 
+    // Update spaceship expeditions
+    m_Spaceship.Update(deltaTime);
+
     // Auto-research if enabled (automatically purchase research when affordable)
     auto availableResearch = m_ResearchTree->GetAvailableResearch(m_Timeline.completedResets); // CORRECT
     for (const ResearchNode* node : availableResearch) {
@@ -674,10 +683,6 @@ void GameState::UpdateStations(f64 deltaTime) {
     // Check if Auto-Observer research is unlocked
     bool hasAutoObserver = m_ResearchTree->IsResearched(ResearchID::AutoObserver);
 
-    // Check if manual observation is disabled by challenge
-    bool canManuallyObserve = !m_ChallengeManager.HasModifier(ChallengeModifier::NoObserve);
-    (void)canManuallyObserve; // Reserved for future use
-
     f64 currentQubits = GetResource(QuantumResource::Qubits);
     bool canUpgrade = !m_ChallengeManager.HasModifier(ChallengeModifier::NoUpgrades);
 
@@ -696,6 +701,16 @@ void GameState::UpdateStations(f64 deltaTime) {
             if (collapsed > 0.0 && superpositionAfter < superpositionBefore) {
                 // Award resources from passive collapse (no floating text to avoid spam)
                 AddResource(station.resourceType, collapsed, false);
+            }
+        }
+
+        // Matter Converter: automatically trade combat credits into production multipliers
+        if (station.name == "Matter Converter" && station.level > 0) {
+            m_MatterConverterBuffer += deltaTime * static_cast<f64>(station.level * 10);
+            i32 creditsToConvert = std::min(static_cast<i32>(m_MatterConverterBuffer), m_PlayerCredits);
+            if (creditsToConvert > 0) {
+                m_MatterConverterBuffer -= creditsToConvert;
+                ConvertCreditsToProduction(creditsToConvert);
             }
         }
 
@@ -1181,6 +1196,14 @@ f64 GameState::GetProductionMultiplier(QuantumResource type) const {
     f64 particleBonus = m_ParticleCollection.GetTotalProductionBonus();
     multiplier *= (1.0 + particleBonus);
 
+    // Discovery tree passive bonuses
+    multiplier *= (1.0 + m_ParticleCollection.GetDiscoveryProductionBonus());
+
+    // Challenge modifiers
+    if (m_ChallengeManager.HasModifier(ChallengeModifier::HalfProduction)) {
+        multiplier *= 0.5;
+    }
+
     return multiplier;
 }
 
@@ -1369,6 +1392,7 @@ void GameState::RenderStationsContent() {
     f64 currentQubits = GetResource(QuantumResource::Qubits);
     f64 effectiveBonus = GetProductionMultiplier(QuantumResource::Qubits);
     bool canUpgrade = !m_ChallengeManager.HasModifier(ChallengeModifier::NoUpgrades);
+    bool canManuallyObserve = !m_ChallengeManager.HasModifier(ChallengeModifier::NoObserve);
 
     // Iterate through all stations
     for (size_t i = 0; i < m_Stations.size(); i++) {
@@ -1405,13 +1429,20 @@ void GameState::RenderStationsContent() {
 
             // OBSERVE Button - Purple
             Color observeColor = Color::QuantumPurple();
+            if (!canManuallyObserve) ImGui::PushStyleVar(ImGuiStyleVar_Alpha, 0.5f);
             ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(observeColor.r * 0.7f, observeColor.g * 0.7f, observeColor.b * 0.7f, 0.7f));
             ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(observeColor.r, observeColor.g, observeColor.b, 1.0f));
-            if (ImGui::Button(("OBSERVE##ObserveBtn" + std::to_string(i)).c_str(), ImVec2(ImGui::GetContentRegionAvail().x * 0.30f, 40.0f))) {
+            if (ImGui::Button(("OBSERVE##ObserveBtn" + std::to_string(i)).c_str(), ImVec2(ImGui::GetContentRegionAvail().x * 0.30f, 40.0f)) && canManuallyObserve) {
                 station.Observe(this);
                 Log::Infof("Observed ", station.name);
             }
             ImGui::PopStyleColor(2);
+            if (!canManuallyObserve) {
+                ImGui::PopStyleVar();
+                if (ImGui::IsItemHovered()) {
+                    ImGui::SetTooltip("Manual observation disabled during this challenge");
+                }
+            }
 
             // UPGRADE Button - Orange
             ImGui::SameLine();
@@ -1857,7 +1888,6 @@ void GameState::RenderUI(Renderer* renderer) {
             // Button list setup (remains unchanged)
             f32 itemWidth = menuWidth - 20.0f;
             f32 itemHeight = 60.0f;
-            f32 itemSpacing = 10.0f;
 
             struct MoreButton {
                 const char* label;
@@ -1970,6 +2000,19 @@ i32 GameState::GetPlayerCredits() {
     // Note: Use 'const' if the declaration in GameState.h uses it.
     // Assuming m_PlayerCredits is the private member:
     return m_PlayerCredits;
+}
+
+void GameState::AddPlayerCredits(i32 amount) {
+    if (amount <= 0) return;
+    m_PlayerCredits += amount;
+
+    if (m_GuiLayer && m_GuiLayer->GetFloatingTextManager()) {
+        ImGuiIO& io = ImGui::GetIO();
+        Vec2 position(io.DisplaySize.x * 0.6f, io.DisplaySize.y * 0.25f);
+        ImVec4 color(0.8f, 0.8f, 0.2f, 1.0f);
+        std::string text = "+" + std::to_string(amount) + " Credits";
+        m_GuiLayer->GetFloatingTextManager()->SpawnText(text, position, color, 1.8f);
+    }
 }
 
 void GameState::AddEssence(f64 amount) {
@@ -2149,15 +2192,17 @@ bool GameState::Save(const std::string& filepath) {
     body << "  \"tutorialCompleted\": " << (tutorialCompleted ? "true" : "false") << ",\n";
 
     // Resources
-    body << "  \"resources\": [" << m_Resources[0] << ", " << m_Resources[1] << ", " << m_Resources[2] << "],\n";
-    body << "  \"coherence\": " << m_Coherence << ",\n";
+    file << "  \"resources\": [" << m_Resources[0] << ", " << m_Resources[1] << ", " << m_Resources[2] << "],\n";
+    file << "  \"coherence\": " << m_Coherence << ",\n";
+    file << "  \"playerCredits\": " << m_PlayerCredits << ",\n";
 
     // Prestige
     body << "  \"photons\": " << m_Timeline.photons << ",\n";
     body << "  \"resets\": " << m_Timeline.completedResets << ",\n";
 
     // Phase 3.3: Exotic Materials
-    body << "  \"exoticMaterials\": " << m_ExoticMaterials << ",\n";
+    file << "  \"exoticMaterials\": " << m_ExoticMaterials << ",\n";
+    file << "  \"researchData\": " << m_ResearchData << ",\n";
 
     // Time
     body << "  \"timePlayed\": " << m_TotalTimePlayed << ",\n";
@@ -2532,6 +2577,8 @@ bool GameState::Load(const std::string& filepath) {
                     }
                 } else if (line.find("\"coherence\"") != std::string::npos) {
                     m_Coherence = GameUtils::ParseJsonNumber(line, "coherence");
+                } else if (line.find("\"playerCredits\"") != std::string::npos) {
+                    m_PlayerCredits = static_cast<i32>(GameUtils::ParseJsonNumber(line, "playerCredits"));
                 } else if (line.find("\"photons\"") != std::string::npos) {
                     m_Timeline.photons = GameUtils::ParseJsonNumber(line, "photons");
                     m_Timeline.photonBonus = 1.0 + (m_Timeline.photons * 0.1);
@@ -2540,6 +2587,8 @@ bool GameState::Load(const std::string& filepath) {
                 } else if (line.find("\"exoticMaterials\"") != std::string::npos) {
                     // Phase 3.3: Load Exotic Materials
                     m_ExoticMaterials = static_cast<i32>(GameUtils::ParseJsonNumber(line, "exoticMaterials"));
+                } else if (line.find("\"researchData\"") != std::string::npos) {
+                    m_ResearchData = static_cast<i32>(GameUtils::ParseJsonNumber(line, "researchData"));
                 } else if (line.find("\"timePlayed\"") != std::string::npos) {
                     m_TotalTimePlayed = GameUtils::ParseJsonNumber(line, "timePlayed");
                 }
@@ -2804,6 +2853,10 @@ void GameState::CalculateOfflineProgress() {
 // Particle System Implementation
 void GameState::SpawnParticle(const Vec2& position, const Color& color, f64 lifetime) {
     Particle p;
+    if (!m_ParticlePool.empty()) {
+        p = std::move(m_ParticlePool.back());
+        m_ParticlePool.pop_back();
+    }
     p.position = position;
     p.velocity = Vec2(
         static_cast<f32>(GameUtils::RandomRange(-50.0, 50.0)),
@@ -2813,6 +2866,13 @@ void GameState::SpawnParticle(const Vec2& position, const Color& color, f64 life
     p.lifetime = 0.0f;
     p.maxLifetime = static_cast<f32>(lifetime);
     m_Particles.push_back(p);
+
+    // Enforce active particle budget
+    while (m_Particles.size() > m_MaxActiveParticles) {
+        m_ParticlePool.push_back(std::move(m_Particles.front()));
+        m_Particles.front() = std::move(m_Particles.back());
+        m_Particles.pop_back();
+    }
 }
 
 void GameState::SpawnParticleBurst(const Vec2& position, const Color& color, i32 count) {
@@ -2822,7 +2882,9 @@ void GameState::SpawnParticleBurst(const Vec2& position, const Color& color, i32
 }
 
 void GameState::UpdateParticles(f64 deltaTime) {
-    // Update and remove dead particles
+    // Update and recycle dead or culled particles
+    const ImVec2 displaySize = ImGui::GetIO().DisplaySize;
+    const f32 cullPadding = 16.0f; // Prevent rendering just off-screen
     auto it = m_Particles.begin();
     while (it != m_Particles.end()) {
         it->lifetime += static_cast<f32>(deltaTime);
@@ -2836,17 +2898,21 @@ void GameState::UpdateParticles(f64 deltaTime) {
         f32 alpha = 1.0f - (it->lifetime / it->maxLifetime);
         it->color.a = alpha;
 
-        // Remove if dead
-        if (it->lifetime >= it->maxLifetime) {
-            it = m_Particles.erase(it);
+        const f32 maxParticleSize = 6.0f; // Matches rendering size ramp
+        const bool expired = it->lifetime >= it->maxLifetime;
+        const bool offscreen =
+            (it->position.x < -cullPadding - maxParticleSize) ||
+            (it->position.x > displaySize.x + cullPadding + maxParticleSize) ||
+            (it->position.y < -cullPadding - maxParticleSize) ||
+            (it->position.y > displaySize.y + cullPadding + maxParticleSize);
+
+        if (expired || offscreen) {
+            m_ParticlePool.push_back(std::move(*it));
+            *it = std::move(m_Particles.back());
+            m_Particles.pop_back();
         } else {
             ++it;
         }
-    }
-
-    // Limit particle count to prevent lag
-    if (m_Particles.size() > 500) {
-        m_Particles.erase(m_Particles.begin(), m_Particles.begin() + 100);
     }
 }
 
@@ -3058,7 +3124,6 @@ void GameState::RenderActiveEvent(Renderer* renderer) {
                      ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse)) {
 
         // Get window draw list for manual drawing (white border is drawn by ImGuiCol_Border)
-        ImDrawList* draw_list = ImGui::GetWindowDrawList();
 
         // --- 3. Event Name ---
         ImGui::TextColored(ImVec4(1.0f, 1.0f, 1.0f, 1.0f), "⚡ %s", m_CurrentEvent->name.c_str());
@@ -3342,7 +3407,7 @@ void GameState::RenderResearchTree(Renderer* renderer) {
                     completedCount++;
 
                     // Display in two columns
-                    if (completedCount % 2 == 1 && completedCount < researchedNodes.size()) {
+                    if (completedCount % 2 == 1 && static_cast<size_t>(completedCount) < researchedNodes.size()) {
                         ImGui::SameLine(nodeWidth / 2.0f);
                     } else if (completedCount % 2 == 0) {
                         // New line for next pair
@@ -4231,7 +4296,6 @@ void GameState::RenderSingularityShop(Renderer* renderer) {
 
             f32 upgradeWidth = ImGui::GetContentRegionAvail().x;
             f32 upgradeHeight = 100.0f;
-            f32 upgradeSpacing = 10.0f;
 
             auto& upgrades = m_SingularityShopManager.GetUpgrades();
 
@@ -4427,11 +4491,19 @@ void GameState::SpawnQuantumAnomaly() {
 
 void GameState::UpdateQuantumAnomalies(f64 deltaTime) {
     // Update existing anomalies
+    const ImVec2 displaySize = ImGui::GetIO().DisplaySize;
+    const f32 cullPadding = 32.0f;
     for (auto it = m_Anomalies.begin(); it != m_Anomalies.end();) {
         it->lifetime += deltaTime;
 
+        const bool offscreen =
+            (it->position.x + it->radius < -cullPadding) ||
+            (it->position.x - it->radius > displaySize.x + cullPadding) ||
+            (it->position.y + it->radius < -cullPadding) ||
+            (it->position.y - it->radius > displaySize.y + cullPadding);
+
         // Remove if expired or clicked
-        if (it->lifetime >= it->maxLifetime || it->clicked) {
+        if (it->lifetime >= it->maxLifetime || it->clicked || offscreen) {
             if (it->lifetime >= it->maxLifetime && !it->clicked) {
                 Log::Info("Quantum Anomaly expired...");
             }
@@ -4660,7 +4732,14 @@ void GameState::EndCombat() {
     if (m_CombatSystem.GetState() == CombatState::Victory) {
         // Award credits (as Qubits)
         AddResource(QuantumResource::Qubits, static_cast<f64>(m_CombatSystem.GetCreditsEarned()));
-        
+
+        // Track raw credits for conversion systems
+        AddPlayerCredits(m_CombatSystem.GetCreditsEarned());
+
+        // Award research data from combat intel
+        i32 researchData = std::max(1, m_PlayerLevel / 5);
+        AddResearchData(researchData);
+
         // Award XP
         AddXP(static_cast<f64>(m_CombatSystem.GetXPEarned()));
 
@@ -4674,12 +4753,6 @@ void GameState::EndCombat() {
         i32 techScraps = 2 + (m_PlayerLevel / 5); // 2-22 scraps
         i32 nanoAlloy = (m_PlayerLevel >= 10) ? (1 + m_PlayerLevel / 10) : 0; // 0-11 alloy
         i32 quantumCore = (m_PlayerLevel >= 30) ? (m_PlayerLevel / 30) : 0; // 0-3 cores
-
-        // Phase 3.3: Award Exotic Materials for Tier 3+ enemies (level 41+)
-        if (m_PlayerLevel >= 41) {
-            i32 exoticMaterials = 1 + ((m_PlayerLevel - 41) / 10); // 1 at level 41, 2 at 51, etc.
-            AddExoticMaterials(exoticMaterials);
-        }
 
         m_EnhancementSystem.AddMaterial(MaterialType::TechScraps, techScraps);
         if (nanoAlloy > 0) m_EnhancementSystem.AddMaterial(MaterialType::NanoAlloy, nanoAlloy);
@@ -4783,10 +4856,6 @@ void GameState::RenderCombat(Renderer* renderer) {
 
     // Get the ImGui draw list for the current *active* window (which is the one created by RenderCombatUI)
     // NOTE: This must be called *after* RenderCombatUI is run to get the correct context.
-    ImDrawList* draw_list = ImGui::GetWindowDrawList();
-
-    // We are getting the content region available within the main combat window
-    ImVec2 p = ImGui::GetCursorScreenPos();
 
     // Define XP bar size (must match the layout chosen in RenderCombatUI if applicable)
     // Since CombatSystem uses a large window, we'll draw the XP bar directly to the screen background
@@ -4858,6 +4927,26 @@ void GameState::AddExoticMaterials(i32 amount) {
             m_GuiLayer->GetFloatingTextManager()->SpawnText(text, position, color, 2.5f);
         }
     }
+}
+
+void GameState::AddResearchData(i32 amount) {
+    if (amount <= 0) return;
+    m_ResearchData += amount;
+
+    if (m_GuiLayer && m_GuiLayer->GetFloatingTextManager()) {
+        ImGuiIO& io = ImGui::GetIO();
+        Vec2 position(io.DisplaySize.x * 0.55f, io.DisplaySize.y * 0.28f);
+        ImVec4 color(0.3f, 0.9f, 1.0f, 1.0f);
+        std::string text = "+" + std::to_string(amount) + " Research Data";
+        m_GuiLayer->GetFloatingTextManager()->SpawnText(text, position, color, 1.6f);
+    }
+}
+
+bool GameState::SpendResearchData(i32 amount) {
+    if (amount <= 0) return true;
+    if (m_ResearchData < amount) return false;
+    m_ResearchData -= amount;
+    return true;
 }
 
 bool GameState::SpendExoticMaterials(i32 amount) {
