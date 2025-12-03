@@ -339,6 +339,18 @@ void ResourceView::Render(GameState* state, Renderer* renderer) {
         ImGui::SameLine();
         ImGui::Text("%s", GameUtils::FormatNumber(photons, fmt).c_str());
 
+        // Phase 3.3: Exotic Materials (required for Tier 3+ research)
+        i32 exoticMaterials = state->GetExoticMaterials();
+        if (exoticMaterials > 0 || photons > 5) { // Show if player has any, or if they're mid-game (5+ photons)
+            ImGui::SameLine(0.0f, 30.0f);
+            ImGui::TextColored(ToImVec4(Color(1.0f, 0.5f, 1.0f, 1.0f)), "EXOTIC MATERIALS");
+            if (ImGui::IsItemHovered()) {
+                ImGui::SetTooltip("Rare materials required for Tier 3+ research\nObtained from level 41+ combat victories and Spaceship Expeditions");
+            }
+            ImGui::SameLine();
+            ImGui::Text("%d", exoticMaterials);
+        }
+
         // Singularities (if any) (Phase 2.3: with tooltip)
         if (singularities > 0) {
             ImGui::SameLine(0.0f, 30.0f);
