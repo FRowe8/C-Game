@@ -363,16 +363,26 @@ void UIManager::RenderOverlays(Renderer* renderer) {
 
 // --- Helpers ---
 
+std::string UIManager::FormatValue(double value) const {
+    return GameUtils::FormatNumber(value, m_GameState->m_NumberFormat);
+}
+
 void UIManager::DrawResourceCounter(const char* label, double value, const ImVec4& color) const {
+    ImGui::BeginGroup();
     ImGui::PushStyleColor(ImGuiCol_Text, UITheme::ColorTextDim);
     ImGui::Text("%s", label);
     ImGui::PopStyleColor();
 
     ImGui::PushStyleColor(ImGuiCol_Text, color);
     ImGui::SetWindowFontScale(1.2f);
-    ImGui::Text("%s", GameUtils::FormatNumber(value, m_GameState->m_NumberFormat).c_str());
+    ImGui::Text("%s", FormatValue(value).c_str());
     ImGui::SetWindowFontScale(1.0f);
     ImGui::PopStyleColor();
+
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+        ImGui::SetTooltip("%s\nCurrent: %s", label, FormatValue(value).c_str());
+    }
+    ImGui::EndGroup();
 }
 
 bool UIManager::DrawNavButton(const char* label, bool isActive, const ImVec4& activeColor, float width, float height) {
