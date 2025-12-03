@@ -2971,6 +2971,7 @@ void GameState::RenderResearchTree(Renderer* renderer) {
                         if (node->coherenceCost > 0) costText += GameUtils::FormatNumber(node->coherenceCost, m_NumberFormat) + " Coherence | ";
                         if (node->entanglementCost > 0) costText += GameUtils::FormatNumber(node->entanglementCost, m_NumberFormat) + " Entanglement | ";
                         if (node->photonCost > 0) costText += std::to_string(node->photonCost) + " Photons";
+                        if (node->exoticMaterialsCost > 0) costText += " | " + std::to_string(node->exoticMaterialsCost) + " Exotic Materials";
 
                         Color costColor = canAfford ? Color::CoherenceGreen() : Color::QuantumPurple();
                         ImGui::TextColored(ToImVec4(costColor), "%s", costText.c_str());
