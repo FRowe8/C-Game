@@ -212,7 +212,9 @@ GameState::GameState()
       m_PlayerCredits(0),
       m_CreditProductionMultiplier(1.0),  // Phase 3.2: No bonus by default
       m_CreditConversionRate(100.0),      // Phase 3.2: 100 credits = 1% production
+      m_MatterConverterBuffer(0.0),
       m_ExoticMaterials(0),               // Phase 3.3: Start with 0 exotic materials
+      m_ResearchData(0),
       m_PlayerLevel(1),
       m_PlayerXP(0.0),
       m_LastSaveTimestamp(0),
@@ -507,6 +509,9 @@ void GameState::Update(f64 deltaTime, Input* input, Renderer* renderer) {
     // Update stations
     UpdateStations(deltaTime);
 
+    // Update spaceship expeditions
+    m_Spaceship.Update(deltaTime);
+
     // Auto-research if enabled (automatically purchase research when affordable)
     auto availableResearch = m_ResearchTree->GetAvailableResearch(m_Timeline.completedResets); // CORRECT
     for (const ResearchNode* node : availableResearch) {
@@ -679,6 +684,16 @@ void GameState::UpdateStations(f64 deltaTime) {
             if (collapsed > 0.0 && superpositionAfter < superpositionBefore) {
                 // Award resources from passive collapse (no floating text to avoid spam)
                 AddResource(station.resourceType, collapsed, false);
+            }
+        }
+
+        // Matter Converter: automatically trade combat credits into production multipliers
+        if (station.name == "Matter Converter" && station.level > 0) {
+            m_MatterConverterBuffer += deltaTime * static_cast<f64>(station.level * 10);
+            i32 creditsToConvert = std::min(static_cast<i32>(m_MatterConverterBuffer), m_PlayerCredits);
+            if (creditsToConvert > 0) {
+                m_MatterConverterBuffer -= creditsToConvert;
+                ConvertCreditsToProduction(creditsToConvert);
             }
         }
 
@@ -1955,6 +1970,19 @@ i32 GameState::GetPlayerCredits() {
     return m_PlayerCredits;
 }
 
+void GameState::AddPlayerCredits(i32 amount) {
+    if (amount <= 0) return;
+    m_PlayerCredits += amount;
+
+    if (m_GuiLayer && m_GuiLayer->GetFloatingTextManager()) {
+        ImGuiIO& io = ImGui::GetIO();
+        Vec2 position(io.DisplaySize.x * 0.6f, io.DisplaySize.y * 0.25f);
+        ImVec4 color(0.8f, 0.8f, 0.2f, 1.0f);
+        std::string text = "+" + std::to_string(amount) + " Credits";
+        m_GuiLayer->GetFloatingTextManager()->SpawnText(text, position, color, 1.8f);
+    }
+}
+
 void GameState::AddEssence(f64 amount) {
     m_QuantumEssence += amount;
     Log::Infof("Gained ", static_cast<i32>(amount), " Quantum Essence! Total: ", static_cast<i32>(m_QuantumEssence));
@@ -2135,6 +2163,7 @@ bool GameState::Save(const std::string& filepath) {
     // Resources
     file << "  \"resources\": [" << m_Resources[0] << ", " << m_Resources[1] << ", " << m_Resources[2] << "],\n";
     file << "  \"coherence\": " << m_Coherence << ",\n";
+    file << "  \"playerCredits\": " << m_PlayerCredits << ",\n";
 
     // Prestige
     file << "  \"photons\": " << m_Timeline.photons << ",\n";
@@ -2142,6 +2171,7 @@ bool GameState::Save(const std::string& filepath) {
 
     // Phase 3.3: Exotic Materials
     file << "  \"exoticMaterials\": " << m_ExoticMaterials << ",\n";
+    file << "  \"researchData\": " << m_ResearchData << ",\n";
 
     // Time
     file << "  \"timePlayed\": " << m_TotalTimePlayed << ",\n";
@@ -2409,6 +2439,8 @@ bool GameState::Load(const std::string& filepath) {
                     }
                 } else if (line.find("\"coherence\"") != std::string::npos) {
                     m_Coherence = GameUtils::ParseJsonNumber(line, "coherence");
+                } else if (line.find("\"playerCredits\"") != std::string::npos) {
+                    m_PlayerCredits = static_cast<i32>(GameUtils::ParseJsonNumber(line, "playerCredits"));
                 } else if (line.find("\"photons\"") != std::string::npos) {
                     m_Timeline.photons = GameUtils::ParseJsonNumber(line, "photons");
                     m_Timeline.photonBonus = 1.0 + (m_Timeline.photons * 0.1);
@@ -2417,6 +2449,8 @@ bool GameState::Load(const std::string& filepath) {
                 } else if (line.find("\"exoticMaterials\"") != std::string::npos) {
                     // Phase 3.3: Load Exotic Materials
                     m_ExoticMaterials = static_cast<i32>(GameUtils::ParseJsonNumber(line, "exoticMaterials"));
+                } else if (line.find("\"researchData\"") != std::string::npos) {
+                    m_ResearchData = static_cast<i32>(GameUtils::ParseJsonNumber(line, "researchData"));
                 } else if (line.find("\"timePlayed\"") != std::string::npos) {
                     m_TotalTimePlayed = GameUtils::ParseJsonNumber(line, "timePlayed");
                 }
@@ -4540,7 +4574,14 @@ void GameState::EndCombat() {
     if (m_CombatSystem.GetState() == CombatState::Victory) {
         // Award credits (as Qubits)
         AddResource(QuantumResource::Qubits, static_cast<f64>(m_CombatSystem.GetCreditsEarned()));
-        
+
+        // Track raw credits for conversion systems
+        AddPlayerCredits(m_CombatSystem.GetCreditsEarned());
+
+        // Award research data from combat intel
+        i32 researchData = std::max(1, m_PlayerLevel / 5);
+        AddResearchData(researchData);
+
         // Award XP
         AddXP(static_cast<f64>(m_CombatSystem.GetXPEarned()));
 
@@ -4554,12 +4595,6 @@ void GameState::EndCombat() {
         i32 techScraps = 2 + (m_PlayerLevel / 5); // 2-22 scraps
         i32 nanoAlloy = (m_PlayerLevel >= 10) ? (1 + m_PlayerLevel / 10) : 0; // 0-11 alloy
         i32 quantumCore = (m_PlayerLevel >= 30) ? (m_PlayerLevel / 30) : 0; // 0-3 cores
-
-        // Phase 3.3: Award Exotic Materials for Tier 3+ enemies (level 41+)
-        if (m_PlayerLevel >= 41) {
-            i32 exoticMaterials = 1 + ((m_PlayerLevel - 41) / 10); // 1 at level 41, 2 at 51, etc.
-            AddExoticMaterials(exoticMaterials);
-        }
 
         m_EnhancementSystem.AddMaterial(MaterialType::TechScraps, techScraps);
         if (nanoAlloy > 0) m_EnhancementSystem.AddMaterial(MaterialType::NanoAlloy, nanoAlloy);
@@ -4738,6 +4773,26 @@ void GameState::AddExoticMaterials(i32 amount) {
             m_GuiLayer->GetFloatingTextManager()->SpawnText(text, position, color, 2.5f);
         }
     }
+}
+
+void GameState::AddResearchData(i32 amount) {
+    if (amount <= 0) return;
+    m_ResearchData += amount;
+
+    if (m_GuiLayer && m_GuiLayer->GetFloatingTextManager()) {
+        ImGuiIO& io = ImGui::GetIO();
+        Vec2 position(io.DisplaySize.x * 0.55f, io.DisplaySize.y * 0.28f);
+        ImVec4 color(0.3f, 0.9f, 1.0f, 1.0f);
+        std::string text = "+" + std::to_string(amount) + " Research Data";
+        m_GuiLayer->GetFloatingTextManager()->SpawnText(text, position, color, 1.6f);
+    }
+}
+
+bool GameState::SpendResearchData(i32 amount) {
+    if (amount <= 0) return true;
+    if (m_ResearchData < amount) return false;
+    m_ResearchData -= amount;
+    return true;
 }
 
 bool GameState::SpendExoticMaterials(i32 amount) {
