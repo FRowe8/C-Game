@@ -9,10 +9,13 @@ Milestone::Milestone()
     , progress(0.0)
     , target(1.0)
     , completed(false)
+    , claimed(false)
     , qubitReward(0.0)
     , photonReward(0.0)
     , permanentProductionBonus(0.0)
+    , rewardSingularities(0.0)
     , unlocksFeature(false)
+    , featureName("")
 {
 }
 
@@ -32,28 +35,36 @@ void MilestoneSystem::Initialize()
         1000.0,
         500.0,      // 500 qubits reward
         1.0,        // 1 photon
-        5.0);       // +5% permanent production
+        5.0,
+        0.0,
+        "qubits");       // +5% permanent production
 
     AddMilestone(MilestoneID::FirstMillion, "Quantum Millionaire",
         "Accumulate 1,000,000 qubits",
         1000000.0,
         50000.0,    // 50K qubits
         5.0,        // 5 photons
-        10.0);      // +10% permanent production
+        10.0,
+        1.0,
+        "qubits");      // +10% permanent production
 
     AddMilestone(MilestoneID::FirstBillion, "Billion Qubit Club",
         "Accumulate 1,000,000,000 qubits",
         1000000000.0,
         5000000.0,  // 5M qubits
         25.0,       // 25 photons
-        25.0);      // +25% permanent production
+        25.0,
+        2.0,
+        "qubits");      // +25% permanent production
 
     AddMilestone(MilestoneID::FirstTrillion, "Quantum Trillionaire",
         "Accumulate 1,000,000,000,000 qubits - you're unstoppable!",
         1000000000000.0,
         100000000.0, // 100M qubits
         100.0,       // 100 photons
-        50.0);       // +50% permanent production
+        50.0,
+        5.0,
+        "qubits");       // +50% permanent production
 
     // Station Milestones - Infrastructure goals
     AddMilestone(MilestoneID::FiveStations, "Research Network",
@@ -61,28 +72,36 @@ void MilestoneSystem::Initialize()
         5.0,
         1000.0,     // 1K qubits
         2.0,        // 2 photons
-        5.0);       // +5% production
+        5.0,
+        1.0,
+        "stations");       // +5% production
 
     AddMilestone(MilestoneID::TenStations, "Quantum Empire",
         "Own 10 research stations",
         10.0,
         10000.0,    // 10K qubits
         10.0,       // 10 photons
-        15.0);      // +15% production
+        15.0,
+        2.0,
+        "stations");      // +15% production
 
     AddMilestone(MilestoneID::MaxedStation, "Perfection Achieved",
         "Upgrade a station to level 100",
         100.0,
         50000.0,    // 50K qubits
         20.0,       // 20 photons
-        20.0);      // +20% production
+        20.0,
+        2.0,
+        "station levels");      // +20% production
 
     AddMilestone(MilestoneID::AllStationsMaxed, "Ultimate Infrastructure",
         "Max out ALL stations to level 100",
         100.0,      // Will check all stations
         1000000.0,  // 1M qubits
         100.0,      // 100 photons
-        100.0);     // +100% production!
+        100.0,
+        5.0,
+        "station levels");     // +100% production!
 
     // Prestige Milestones - Dedication goals
     AddMilestone(MilestoneID::FirstPrestige, "Quantum Leap",
@@ -90,28 +109,36 @@ void MilestoneSystem::Initialize()
         1.0,
         0.0,        // No qubit reward (already got photons)
         5.0,        // 5 bonus photons
-        10.0);      // +10% production
+        10.0,
+        1.0,
+        "prestiges");      // +10% production
 
     AddMilestone(MilestoneID::TenPrestiges, "Dimension Hopper",
         "Complete 10 prestiges",
         10.0,
         0.0,
         25.0,       // 25 photons
-        20.0);      // +20% production
+        20.0,
+        2.0,
+        "prestiges");      // +20% production
 
     AddMilestone(MilestoneID::FiftyPrestiges, "Multiverse Veteran",
         "Complete 50 prestiges",
         50.0,
         0.0,
         100.0,      // 100 photons
-        50.0);      // +50% production
+        50.0,
+        5.0,
+        "prestiges");      // +50% production
 
     AddMilestone(MilestoneID::HundredPhotons, "Photon Hoarder",
         "Accumulate 100 total photons",
         100.0,
         0.0,
         50.0,       // 50 bonus photons
-        30.0);      // +30% production
+        30.0,
+        3.0,
+        "photons");      // +30% production
 
     // Time Milestones - Commitment goals
     AddMilestone(MilestoneID::OneHourPlayed, "Time Traveler",
@@ -119,21 +146,27 @@ void MilestoneSystem::Initialize()
         3600.0,     // 1 hour in seconds
         5000.0,     // 5K qubits
         5.0,        // 5 photons
-        5.0);       // +5% production
+        5.0,
+        0.5,
+        "seconds played");       // +5% production
 
     AddMilestone(MilestoneID::OneDayPlayed, "Daily Researcher",
         "Play for 24 hours (total playtime)",
         86400.0,    // 24 hours
         100000.0,   // 100K qubits
         50.0,       // 50 photons
-        25.0);      // +25% production
+        25.0,
+        1.0,
+        "seconds played");      // +25% production
 
     AddMilestone(MilestoneID::OneWeekPlayed, "Quantum Devotee",
         "Play for 1 week (total playtime)",
         604800.0,   // 1 week
         10000000.0, // 10M qubits
         200.0,      // 200 photons
-        75.0);      // +75% production
+        75.0,
+        2.0,
+        "seconds played");      // +75% production
 
     // Achievement Milestones
     AddMilestone(MilestoneID::HalfAchievements, "Achievement Hunter",
@@ -141,14 +174,18 @@ void MilestoneSystem::Initialize()
         0.5,        // 50% (will multiply by total count)
         25000.0,    // 25K qubits
         15.0,       // 15 photons
-        15.0);      // +15% production
+        15.0,
+        1.0,
+        "completion");      // +15% production
 
     AddMilestone(MilestoneID::AllAchievements, "Completionist",
         "Unlock ALL achievements",
         1.0,        // 100%
         500000.0,   // 500K qubits
         100.0,      // 100 photons
-        50.0);      // +50% production
+        50.0,
+        3.0,
+        "completion");      // +50% production
 
     // Research Milestones
     AddMilestone(MilestoneID::FirstResearch, "Quantum Scholar",
@@ -156,7 +193,9 @@ void MilestoneSystem::Initialize()
         1.0,
         1000.0,     // 1K qubits
         2.0,        // 2 photons
-        5.0);       // +5% production
+        5.0,
+        0.5,
+        "research");       // +5% production
 
     AddMilestone(MilestoneID::TenResearch, "Research Master",
         "Complete 10 research projects",
@@ -198,7 +237,8 @@ void MilestoneSystem::Initialize()
 }
 
 void MilestoneSystem::AddMilestone(MilestoneID id, const std::string& name, const std::string& desc,
-                                   f64 target, f64 qReward, f64 pReward, f64 prodBonus)
+                                   f64 target, f64 qReward, f64 pReward, f64 prodBonus,
+                                   f64 singularityReward, const std::string& targetLabel)
 {
     Milestone m;
     m.id = id;
@@ -207,9 +247,12 @@ void MilestoneSystem::AddMilestone(MilestoneID id, const std::string& name, cons
     m.target = target;
     m.progress = 0.0;
     m.completed = false;
+    m.claimed = false;
     m.qubitReward = qReward;
     m.photonReward = pReward;
     m.permanentProductionBonus = prodBonus;
+    m.rewardSingularities = singularityReward;
+    m.featureName = targetLabel;
 
     // Generate reward description
     std::string rewards = "Rewards: ";
@@ -223,6 +266,12 @@ void MilestoneSystem::AddMilestone(MilestoneID id, const std::string& name, cons
     if (pReward > 0) {
         if (hasReward) rewards += ", ";
         rewards += std::to_string(static_cast<i32>(pReward)) + " photons";
+        hasReward = true;
+    }
+
+    if (singularityReward > 0) {
+        if (hasReward) rewards += ", ";
+        rewards += std::to_string(static_cast<i32>(singularityReward)) + " singularities";
         hasReward = true;
     }
 
@@ -350,8 +399,11 @@ void MilestoneSystem::CompleteMilestone(MilestoneID id, GameState* state)
     }
 
     if (milestone->photonReward > 0) {
-        // Add to photon count (would need GameState API)
-        // state->AddPhotons(milestone->photonReward);
+        state->AddPhotons(milestone->photonReward);
+    }
+
+    if (milestone->rewardSingularities > 0) {
+        state->GetTimeline().singularities += milestone->rewardSingularities;
     }
 
     Log::Info("Milestone completed: " + milestone->name);

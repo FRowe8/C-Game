@@ -29,6 +29,7 @@ Particle::Particle()
 
 ParticleCollection::ParticleCollection()
     : m_TimeSinceLastCheck(0.0)
+    , m_MaxEquipmentSlots(2)
 {
 }
 
@@ -36,6 +37,14 @@ void ParticleCollection::Initialize() {
     m_Particles.clear();
     m_EquippedParticles.clear();
     m_RecentDiscoveries.clear();
+    m_DiscoveryTiers.clear();
+    m_MaxEquipmentSlots = 2;
+
+    // Discovery tree tiers (unlocked by collecting particles)
+    m_DiscoveryTiers.push_back({5, 0.05, 0.05, "Foundations"});       // +5%/+5% after 5 discoveries
+    m_DiscoveryTiers.push_back({12, 0.10, 0.10, "Quantum Insights"});  // +10%/+10%
+    m_DiscoveryTiers.push_back({20, 0.20, 0.15, "Exotic Mastery"});   // +20%/+15%
+    m_DiscoveryTiers.push_back({28, 0.35, 0.25, "Mythical Lore"});    // +35%/+25%
 
     // ===== COMMON PARTICLES (4) =====
     // Easy to find, small bonuses
@@ -257,6 +266,7 @@ void ParticleCollection::DiscoverParticle(ParticleType type) {
 
         Log::Infof("*** NEW PARTICLE DISCOVERED: ", particle->name, " (",
                    static_cast<i32>(particle->rarity), ") ***");
+        UpdateEquipmentSlots();
     } else {
         particle->count++;
         Log::Infof("Found another ", particle->name, "! Total: ", particle->count);
@@ -297,8 +307,8 @@ void ParticleCollection::EquipParticle(ParticleType type) {
     if (IsEquipped(type)) return;
 
     // Limit to 3 equipped particles at once
-    if (m_EquippedParticles.size() >= 3) {
-        Log::Warning("Cannot equip more than 3 particles! Unequip one first.");
+    if (m_EquippedParticles.size() >= static_cast<size_t>(m_MaxEquipmentSlots)) {
+        Log::Warningf("Cannot equip more than ", m_MaxEquipmentSlots, " particles! Unequip one first.");
         return;
     }
 
@@ -419,4 +429,38 @@ std::vector<ParticleType> ParticleCollection::GetRecentDiscoveries() {
 
 void ParticleCollection::ClearRecentDiscoveries() {
     m_RecentDiscoveries.clear();
+}
+
+f64 ParticleCollection::GetDiscoveryProductionBonus() const {
+    f64 bonus = 0.0;
+    i32 discovered = GetDiscoveredCount();
+    for (const auto& tier : m_DiscoveryTiers) {
+        if (discovered >= tier.requiredDiscoveries) {
+            bonus += tier.productionBonus;
+        }
+    }
+    return bonus;
+}
+
+f64 ParticleCollection::GetDiscoveryObservationBonus() const {
+    f64 bonus = 0.0;
+    i32 discovered = GetDiscoveredCount();
+    for (const auto& tier : m_DiscoveryTiers) {
+        if (discovered >= tier.requiredDiscoveries) {
+            bonus += tier.observationBonus;
+        }
+    }
+    return bonus;
+}
+
+void ParticleCollection::UpdateEquipmentSlots() {
+    // Base slots = 2, gain one at 10 and 20 discoveries (capped by tiers)
+    i32 discovered = GetDiscoveredCount();
+    i32 targetSlots = 2;
+    if (discovered >= 10) targetSlots++;
+    if (discovered >= 20) targetSlots++;
+
+    if (targetSlots > m_MaxEquipmentSlots) {
+        m_MaxEquipmentSlots = targetSlots;
+    }
 }
