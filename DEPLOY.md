@@ -127,6 +127,10 @@ Before deploying, test the web build locally:
 # Build with Emscripten (requires Emscripten SDK)
 ./build_web.sh
 
+# Verify assets were preloaded into the data bundle
+python3 scripts/smoke_test_web_preload.py build-web/QuantumIdle.data \
+  assets/fonts/Roboto-Regular.ttf
+
 # Serve locally
 cd build
 python3 -m http.server 8000

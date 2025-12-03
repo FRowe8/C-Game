@@ -568,6 +568,8 @@ private:
         f32 maxLifetime;
     };
     std::vector<Particle> m_Particles;
+    std::vector<Particle> m_ParticlePool;
+    size_t m_MaxActiveParticles = 500;
 
     // Quantum Anomaly System (clickable orbs for active gameplay)
     struct QuantumAnomaly {

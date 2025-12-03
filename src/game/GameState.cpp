@@ -5,6 +5,7 @@
 #include "Logger.h"
 #include "Platform.h"
 #include "GameUtils.h"
+#include "SteamIntegration.h"
 #include "imgui.h"
 #include <fstream>
 #include <cstring>
@@ -208,14 +209,14 @@ void ResearchStation::Update(f64 deltaTime) {
 
 // GameState implementation
 GameState::GameState()
-    : m_CurrentEvent(nullptr), m_TimeSinceLastEvent(0), m_EventCooldown(120.0),
-      m_QuantumEssence(0),
-      m_PlayerCredits(0),
+    : m_PlayerCredits(0),
       m_CreditProductionMultiplier(1.0),  // Phase 3.2: No bonus by default
       m_CreditConversionRate(100.0),      // Phase 3.2: 100 credits = 1% production
       m_MatterConverterBuffer(0.0),
       m_ExoticMaterials(0),               // Phase 3.3: Start with 0 exotic materials
       m_ResearchData(0),
+      m_CurrentEvent(nullptr), m_TimeSinceLastEvent(0), m_EventCooldown(120.0),
+      m_QuantumEssence(0),
       m_PlayerLevel(1),
       m_PlayerXP(0.0),
     m_LastSaveTimestamp(0),
@@ -237,6 +238,8 @@ GameState::GameState()
     }
 
     m_Telemetry.StartSession();
+    m_Particles.reserve(m_MaxActiveParticles);
+    m_ParticlePool.reserve(m_MaxActiveParticles);
 }
 
 GameState::~GameState() {
@@ -665,9 +668,6 @@ void GameState::UpdateStations(f64 deltaTime) {
 
     // Check if Auto-Observer research is unlocked
     bool hasAutoObserver = m_ResearchTree->IsResearched(ResearchID::AutoObserver);
-
-    // Check if manual observation is disabled by challenge
-    bool canManuallyObserve = !m_ChallengeManager.HasModifier(ChallengeModifier::NoObserve);
 
     f64 currentQubits = GetResource(QuantumResource::Qubits);
     bool canUpgrade = !m_ChallengeManager.HasModifier(ChallengeModifier::NoUpgrades);
@@ -1378,6 +1378,7 @@ void GameState::RenderStationsContent() {
     f64 currentQubits = GetResource(QuantumResource::Qubits);
     f64 effectiveBonus = GetProductionMultiplier(QuantumResource::Qubits);
     bool canUpgrade = !m_ChallengeManager.HasModifier(ChallengeModifier::NoUpgrades);
+    bool canManuallyObserve = !m_ChallengeManager.HasModifier(ChallengeModifier::NoObserve);
 
     // Iterate through all stations
     for (size_t i = 0; i < m_Stations.size(); i++) {
@@ -1873,7 +1874,6 @@ void GameState::RenderUI(Renderer* renderer) {
             // Button list setup (remains unchanged)
             f32 itemWidth = menuWidth - 20.0f;
             f32 itemHeight = 60.0f;
-            f32 itemSpacing = 10.0f;
 
             struct MoreButton {
                 const char* label;
@@ -2268,6 +2268,9 @@ bool GameState::Save(const std::string& filepath) {
 
     file.close();
     Log::Debugf("Game saved to ", filepath);
+
+    // Mirror to Steam Cloud when available
+    SteamIntegration::MirrorSaveToCloud(filepath, "default");
     return true;
 }
 
@@ -2588,6 +2591,9 @@ void GameState::UnlockAchievement(AchievementID id) {
     AddEssence(essenceReward);
 
     Log::Infof("Achievement Unlocked: ", ach->name);
+
+    // Propagate unlock to Steam where available
+    SteamIntegration::UnlockAchievement(ach->name);
 }
 
 Achievement* GameState::GetAchievement(AchievementID id) {
@@ -2738,6 +2744,10 @@ void GameState::CalculateOfflineProgress() {
 // Particle System Implementation
 void GameState::SpawnParticle(const Vec2& position, const Color& color, f64 lifetime) {
     Particle p;
+    if (!m_ParticlePool.empty()) {
+        p = std::move(m_ParticlePool.back());
+        m_ParticlePool.pop_back();
+    }
     p.position = position;
     p.velocity = Vec2(
         static_cast<f32>(GameUtils::RandomRange(-50.0, 50.0)),
@@ -2747,6 +2757,13 @@ void GameState::SpawnParticle(const Vec2& position, const Color& color, f64 life
     p.lifetime = 0.0f;
     p.maxLifetime = static_cast<f32>(lifetime);
     m_Particles.push_back(p);
+
+    // Enforce active particle budget
+    while (m_Particles.size() > m_MaxActiveParticles) {
+        m_ParticlePool.push_back(std::move(m_Particles.front()));
+        m_Particles.front() = std::move(m_Particles.back());
+        m_Particles.pop_back();
+    }
 }
 
 void GameState::SpawnParticleBurst(const Vec2& position, const Color& color, i32 count) {
@@ -2756,7 +2773,9 @@ void GameState::SpawnParticleBurst(const Vec2& position, const Color& color, i32
 }
 
 void GameState::UpdateParticles(f64 deltaTime) {
-    // Update and remove dead particles
+    // Update and recycle dead or culled particles
+    const ImVec2 displaySize = ImGui::GetIO().DisplaySize;
+    const f32 cullPadding = 16.0f; // Prevent rendering just off-screen
     auto it = m_Particles.begin();
     while (it != m_Particles.end()) {
         it->lifetime += static_cast<f32>(deltaTime);
@@ -2770,17 +2789,21 @@ void GameState::UpdateParticles(f64 deltaTime) {
         f32 alpha = 1.0f - (it->lifetime / it->maxLifetime);
         it->color.a = alpha;
 
-        // Remove if dead
-        if (it->lifetime >= it->maxLifetime) {
-            it = m_Particles.erase(it);
+        const f32 maxParticleSize = 6.0f; // Matches rendering size ramp
+        const bool expired = it->lifetime >= it->maxLifetime;
+        const bool offscreen =
+            (it->position.x < -cullPadding - maxParticleSize) ||
+            (it->position.x > displaySize.x + cullPadding + maxParticleSize) ||
+            (it->position.y < -cullPadding - maxParticleSize) ||
+            (it->position.y > displaySize.y + cullPadding + maxParticleSize);
+
+        if (expired || offscreen) {
+            m_ParticlePool.push_back(std::move(*it));
+            *it = std::move(m_Particles.back());
+            m_Particles.pop_back();
         } else {
             ++it;
         }
-    }
-
-    // Limit particle count to prevent lag
-    if (m_Particles.size() > 500) {
-        m_Particles.erase(m_Particles.begin(), m_Particles.begin() + 100);
     }
 }
 
@@ -3019,7 +3042,6 @@ void GameState::RenderActiveEvent(Renderer* renderer) {
                      ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse)) {
 
         // Get window draw list for manual drawing (white border is drawn by ImGuiCol_Border)
-        ImDrawList* draw_list = ImGui::GetWindowDrawList();
 
         // --- 3. Event Name ---
         ImGui::TextColored(ImVec4(1.0f, 1.0f, 1.0f, 1.0f), "⚡ %s", m_CurrentEvent->name.c_str());
@@ -3303,7 +3325,7 @@ void GameState::RenderResearchTree(Renderer* renderer) {
                     completedCount++;
 
                     // Display in two columns
-                    if (completedCount % 2 == 1 && completedCount < researchedNodes.size()) {
+                    if (completedCount % 2 == 1 && static_cast<size_t>(completedCount) < researchedNodes.size()) {
                         ImGui::SameLine(nodeWidth / 2.0f);
                     } else if (completedCount % 2 == 0) {
                         // New line for next pair
@@ -4192,7 +4214,6 @@ void GameState::RenderSingularityShop(Renderer* renderer) {
 
             f32 upgradeWidth = ImGui::GetContentRegionAvail().x;
             f32 upgradeHeight = 100.0f;
-            f32 upgradeSpacing = 10.0f;
 
             auto& upgrades = m_SingularityShopManager.GetUpgrades();
 
@@ -4388,11 +4409,19 @@ void GameState::SpawnQuantumAnomaly() {
 
 void GameState::UpdateQuantumAnomalies(f64 deltaTime) {
     // Update existing anomalies
+    const ImVec2 displaySize = ImGui::GetIO().DisplaySize;
+    const f32 cullPadding = 32.0f;
     for (auto it = m_Anomalies.begin(); it != m_Anomalies.end();) {
         it->lifetime += deltaTime;
 
+        const bool offscreen =
+            (it->position.x + it->radius < -cullPadding) ||
+            (it->position.x - it->radius > displaySize.x + cullPadding) ||
+            (it->position.y + it->radius < -cullPadding) ||
+            (it->position.y - it->radius > displaySize.y + cullPadding);
+
         // Remove if expired or clicked
-        if (it->lifetime >= it->maxLifetime || it->clicked) {
+        if (it->lifetime >= it->maxLifetime || it->clicked || offscreen) {
             if (it->lifetime >= it->maxLifetime && !it->clicked) {
                 Log::Info("Quantum Anomaly expired...");
             }
@@ -4745,10 +4774,6 @@ void GameState::RenderCombat(Renderer* renderer) {
 
     // Get the ImGui draw list for the current *active* window (which is the one created by RenderCombatUI)
     // NOTE: This must be called *after* RenderCombatUI is run to get the correct context.
-    ImDrawList* draw_list = ImGui::GetWindowDrawList();
-
-    // We are getting the content region available within the main combat window
-    ImVec2 p = ImGui::GetCursorScreenPos();
 
     // Define XP bar size (must match the layout chosen in RenderCombatUI if applicable)
     // Since CombatSystem uses a large window, we'll draw the XP bar directly to the screen background

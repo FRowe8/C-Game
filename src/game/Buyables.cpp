@@ -28,7 +28,7 @@ void BuyableManager::CreateProductionMultipliers(GameState* gameState) {
     BuyableUpgrade quantumAccelerator;
     quantumAccelerator.id = "quantum_accelerator";
     quantumAccelerator.name = "Quantum Accelerator";
-    quantumAccelerator.description = "Doubles qubit production rate";
+    quantumAccelerator.description = "Calibrate the tachyon emitters. It hums aggressively. (Production x2)";
     quantumAccelerator.baseCost = 25000.0; // Increased from 5000
     quantumAccelerator.costMultiplier = 2.5; // Gets expensive quickly
     quantumAccelerator.maxPurchases = -1; // Infinite
@@ -42,7 +42,7 @@ void BuyableManager::CreateProductionMultipliers(GameState* gameState) {
     BuyableUpgrade coherenceAmplifier;
     coherenceAmplifier.id = "coherence_amplifier";
     coherenceAmplifier.name = "Coherence Amplifier";
-    coherenceAmplifier.description = "Doubles coherence gain from observations";
+    coherenceAmplifier.description = "Phase-lock the resonance coils so coherence spills out of every monitor.";
     coherenceAmplifier.baseCost = 500.0; // Increased from 100
     coherenceAmplifier.costMultiplier = 3.0; // Very expensive scaling
     coherenceAmplifier.maxPurchases = -1; // Infinite
@@ -56,7 +56,7 @@ void BuyableManager::CreateProductionMultipliers(GameState* gameState) {
     BuyableUpgrade entanglementBooster;
     entanglementBooster.id = "entanglement_booster";
     entanglementBooster.name = "Entanglement Booster";
-    entanglementBooster.description = "Doubles entanglement production";
+    entanglementBooster.description = "Weave a lattice of paired qubits—tug one node, the whole network answers (Entanglement x2).";
     entanglementBooster.baseCost = 1000.0; // Increased from 50
     entanglementBooster.costMultiplier = 2.8;
     entanglementBooster.maxPurchases = -1; // Infinite

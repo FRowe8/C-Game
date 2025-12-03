@@ -31,8 +31,7 @@ GatchaSystem::GatchaSystem()
       m_TotalSummons(0), m_LegendaryPulls(0),
       m_IsAnimating(false), m_AnimationTimer(0.0),
       m_CurrentRevealIndex(0),
-      m_SelectedBanner(SummonBanner::Basic),
-      m_ScrollOffset(0.0f) {
+      m_SelectedBanner(SummonBanner::Basic) {
 
     // Seed the random number generator if not done globally
     // srand(static_cast<unsigned int>(time(NULL)));

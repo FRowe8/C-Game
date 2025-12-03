@@ -3,6 +3,7 @@
 #include "Renderer.h"
 #include "Logger.h"
 #include "imgui.h" // ADDED: Necessary for all ImGui calls
+#include <array>
 #include <cstdlib>
 #include <cmath>
 #include <sstream> // Using std::stringstream for complex text formatting
@@ -48,7 +49,7 @@ void Enemy::GenerateStats() {
             m_Attack = 8.0 * levelScale * tierMultiplier;
             m_Defense = 3.0 * levelScale * tierMultiplier;
             m_Speed = 20.0 + (m_Level * 0.5); // Fast
-            m_Description = "A nimble scout ship";
+            m_Description = "A jittery entropy ghost flickers between sensor sweeps.";
             break;
 
         case EnemyType::Fighter:
@@ -56,7 +57,7 @@ void Enemy::GenerateStats() {
             m_Attack = 15.0 * levelScale * tierMultiplier;
             m_Defense = 8.0 * levelScale * tierMultiplier;
             m_Speed = 15.0 + (m_Level * 0.3);
-            m_Description = "A balanced combat vessel";
+            m_Description = "A decoherence field that unravels ordered states on contact.";
             break;
 
         case EnemyType::Cruiser:
@@ -64,7 +65,7 @@ void Enemy::GenerateStats() {
             m_Attack = 12.0 * levelScale * tierMultiplier;
             m_Defense = 15.0 * levelScale * tierMultiplier;
             m_Speed = 10.0 + (m_Level * 0.2); // Slow
-            m_Description = "A heavily armored cruiser";
+            m_Description = "A patient Maxwell's Demon siphoning heat from your systems.";
             break;
 
         case EnemyType::Battleship:
@@ -72,7 +73,7 @@ void Enemy::GenerateStats() {
             m_Attack = 25.0 * levelScale * tierMultiplier;
             m_Defense = 20.0 * levelScale * tierMultiplier;
             m_Speed = 8.0 + (m_Level * 0.15); // Very slow
-            m_Description = "A massive warship";
+            m_Description = "A hulking entropy engine dragging reality toward heat death.";
             break;
 
         case EnemyType::Boss:
@@ -80,7 +81,7 @@ void Enemy::GenerateStats() {
             m_Attack = 40.0 * levelScale * tierMultiplier;
             m_Defense = 30.0 * levelScale * tierMultiplier;
             m_Speed = 12.0 + (m_Level * 0.2);
-            m_Description = "A legendary commander";
+            m_Description = "A prime architect of disorder; even light bends to avoid it.";
             break;
     }
 
@@ -92,31 +93,42 @@ void Enemy::GenerateStats() {
 }
 
 void Enemy::GenerateName() {
-    const char* prefixes[] = {
-        "Rogue", "Hostile", "Corrupted", "Ancient", "Void",
-        "Quantum", "Plasma", "Dark", "Crimson", "Shadow"
+    static const std::array<const char*, 4> scoutNames = {
+        "Entropy Ghost", "Probability Wisp", "Quantum Shade", "Vacuum Echo"
+    };
+    static const std::array<const char*, 4> fighterNames = {
+        "Decoherence Field", "Phase Snarl", "Superposition Butcher", "Wavebreaker"
+    };
+    static const std::array<const char*, 4> cruiserNames = {
+        "Maxwell's Demon", "Heat Siphon", "Entropy Broker", "Second Law Marshal"
+    };
+    static const std::array<const char*, 4> battleshipNames = {
+        "Thermal Leviathan", "Entropy Titan", "Oblivion Carrier", "Blackbody Juggernaut"
+    };
+    static const std::array<const char*, 4> bossNames = {
+        "Maxwell's Demon Prime", "Entropy Ghost King", "Decoherence Singularity", "Heat-Death Herald"
     };
 
-    const char* suffixes[] = {
-        "Raider", "Marauder", "Destroyer", "Annihilator", "Reaver",
-        "Hunter", "Enforcer", "Sentinel", "Guardian", "Warlord"
+    auto pickName = [](const auto& names) {
+        return std::string(names[rand() % names.size()]);
     };
 
-    i32 prefixIndex = rand() % 10;
-    i32 suffixIndex = rand() % 10;
-
-    // Boss gets special title
-    if (m_Type == EnemyType::Boss) {
-        const char* bossTitles[] = {
-            "Admiral", "Commander", "Overlord", "Tyrant", "Archon",
-            "Lord", "Emperor", "Master", "Supreme Leader", "Dreadnought"
-        };
-        i32 titleIndex = rand() % 10;
-        m_Name = std::string(bossTitles[titleIndex]) + " " +
-                 std::string(prefixes[prefixIndex]);
-    } else {
-        m_Name = std::string(prefixes[prefixIndex]) + " " +
-                 std::string(suffixes[suffixIndex]);
+    switch (m_Type) {
+        case EnemyType::Scout:
+            m_Name = pickName(scoutNames);
+            break;
+        case EnemyType::Fighter:
+            m_Name = pickName(fighterNames);
+            break;
+        case EnemyType::Cruiser:
+            m_Name = pickName(cruiserNames);
+            break;
+        case EnemyType::Battleship:
+            m_Name = pickName(battleshipNames);
+            break;
+        case EnemyType::Boss:
+            m_Name = pickName(bossNames);
+            break;
     }
 }
 
