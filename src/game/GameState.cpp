@@ -236,11 +236,14 @@ GameState::GameState()
       m_QuantumEssence(0),
       m_PlayerLevel(1),
       m_PlayerXP(0.0),
-    m_LastSaveTimestamp(0),
-    m_ActiveModal(ActiveModal::None),
-    m_ShowAchievements(false), m_ShowStats(false), m_ShowResearch(false), m_ShowMilestones(false), m_ShowBuyables(false), m_ShowChallenges(false), m_ShowEssenceShop(false), m_ShowSingularityShop(false), m_ShowSpaceship(false), m_ShowCombat(false), m_ShowGatcha(false), m_ShowSkills(false), m_ShowEnhancement(false), m_ShowMoreMenu(false),
-    m_NumberFormat(GameUtils::NumberFormat::Suffix),
-    m_TotalTimePlayed(0), m_TimeSinceLastSave(0), m_TimeSinceLastPrestige(0),
+      m_LastSaveTimestamp(0),
+      m_GameMode(GameMode::None),
+      m_ShowMoreMenu(false),
+      m_ShowAchievements(false), m_ShowStats(false), m_ShowResearch(false), m_ShowMilestones(false), m_ShowBuyables(false),
+      m_ShowChallenges(false), m_ShowEssenceShop(false), m_ShowSingularityShop(false), m_ShowSpaceship(false), m_ShowCombat(false),
+      m_ShowGatcha(false), m_ShowSkills(false), m_ShowEnhancement(false),
+      m_NumberFormat(GameUtils::NumberFormat::Suffix),
+      m_TotalTimePlayed(0), m_TimeSinceLastSave(0), m_TimeSinceLastPrestige(0),
       m_Coherence(100), m_MaxCoherence(100), m_CoherenceDecayRate(1.0),
       m_BoostActive(false), m_BoostTimeRemaining(0), m_BoostCooldownRemaining(0),
       m_BoostDuration(30.0), m_BoostCooldown(120.0), m_BoostMultiplier(2.0),
@@ -771,35 +774,35 @@ void GameState::UpdateDynamicMusic() {
     // Determine which music track should be playing based on current modal
     MusicTrack targetTrack = MusicTrack::MainTheme;  // Default
 
-    switch (m_ActiveModal) {
-        case ActiveModal::None:
+    switch (m_GameMode) {
+        case GameMode::None:
             // Idle/stations gameplay
             targetTrack = MusicTrack::MainTheme;
             break;
 
-        case ActiveModal::Combat:
+        case GameMode::Combat:
             // Combat mode
             targetTrack = MusicTrack::CombatTheme;
             break;
 
-        case ActiveModal::Research:
-        case ActiveModal::Skills:
-        case ActiveModal::SpecializedSkills:
+        case GameMode::Research:
+        case GameMode::Skills:
+        case GameMode::SpecializedSkills:
             // Research/skill trees
             targetTrack = MusicTrack::ResearchTheme;
             break;
 
-        case ActiveModal::EssenceShop:
-        case ActiveModal::SingularityShop:
-        case ActiveModal::Buyables:
+        case GameMode::EssenceShop:
+        case GameMode::SingularityShop:
+        case GameMode::Buyables:
             // Shops
             targetTrack = MusicTrack::ShopTheme;
             break;
 
-        case ActiveModal::Statistics:
-        case ActiveModal::Achievements:
-        case ActiveModal::Milestones:
-        case ActiveModal::Collection:
+        case GameMode::Statistics:
+        case GameMode::Achievements:
+        case GameMode::Milestones:
+        case GameMode::Collection:
             // Calm menus
             targetTrack = MusicTrack::AmbientCalm;
             break;
@@ -817,27 +820,30 @@ void GameState::UpdateDynamicMusic() {
 }
 
 void GameState::UpdateUI(Input* input) {
-    Vec2 mousePos = input->GetMousePosition();
-    bool mousePressed = input->IsMouseButtonPressed(MouseButton::Left);
+    ImGuiIO& io = ImGui::GetIO();
 
-    // ESC key to close any open modal (Highest priority)
-    const int KEY_ESC = 41; // SDL_SCANCODE_ESCAPE
-    if (input->IsKeyPressed(KEY_ESC)) {
-        // Close any open modal and return to base state
-        if (m_ActiveModal != ActiveModal::None) {
-            SetActiveModal(ActiveModal::None);
-        }
+    // Pointer state (mouse or first touch)
+    Vec2 pointerPos = input->GetMousePosition();
+    bool pointerPressed = input->IsMouseButtonPressed(MouseButton::Left);
+
+    const auto& touches = input->GetTouches();
+    if (!touches.empty()) {
+        pointerPos = touches.front().position;
+        pointerPressed = true;
     }
 
-    // --- REMOVED: Custom scrolling logic (m_ScrollOffset) is removed as RenderStations now uses native ImGui scrolling. ---
+    // ESC key to close any open modal
+    const int KEY_ESC = 41; // SDL_SCANCODE_ESCAPE
+    if (input->IsKeyPressed(KEY_ESC)) {
+        m_ShowMoreMenu = false;
+        SetGameMode(GameMode::None);
+    }
 
-    // Phase 1.3: Get ImGui input capture state early
-    ImGuiIO& io = ImGui::GetIO();
     bool uiCapturingMouse = io.WantCaptureMouse;
+    bool uiCapturingKeyboard = io.WantCaptureKeyboard;
 
-    // Handle unlock notification clicks (click to dismiss)
-    // Note: These are rendered as ImGui windows, so this check is redundant but kept for clarity
-    if (mousePressed && m_UnlockManager.HasActiveNotification()) {
+    // Dismiss unlock notifications when UI is not consuming the pointer
+    if (pointerPressed && !uiCapturingMouse && m_UnlockManager.HasActiveNotification()) {
         f32 screenWidth = static_cast<f32>(input->GetWindowWidth());
         f32 notifWidth = 400.0f;
         f32 notifHeight = 100.0f;
@@ -845,323 +851,49 @@ void GameState::UpdateUI(Input* input) {
         f32 notifY = 100.0f;
 
         Rect notifRect(notifX, notifY, notifWidth, notifHeight);
-        if (notifRect.Contains(Vec2(mousePos.x, mousePos.y))) {
-            m_UnlockManager.DismissNotification(0); // Dismiss the first (topmost) notification
-            return; // Don't process other clicks this frame
+        if (notifRect.Contains(pointerPos)) {
+            m_UnlockManager.DismissNotification(0);
+            return;
         }
     }
 
-    // --- Keyboard shortcuts - exclusive modal activation ---
-    const int KEY_A = 4;
-    const int KEY_B = 5;
-    const int KEY_C = 6;
-    const int KEY_E = 8;
-    const int KEY_F = 9;
-    const int KEY_H = 11;
-    const int KEY_M = 13;
-    const int KEY_R = 15;
-    const int KEY_S = 16;
+    // Keyboard shortcuts for quick navigation (ignored when UI owns the keyboard)
+    if (!uiCapturingKeyboard) {
+        const int KEY_A = 4;
+        const int KEY_B = 5;
+        const int KEY_C = 6;
+        const int KEY_E = 8;
+        const int KEY_F = 9;
+        const int KEY_H = 11;
+        const int KEY_M = 13;
+        const int KEY_R = 15;
+        const int KEY_S = 16;
 
-    if (input->IsKeyPressed(KEY_A)) {
-        SetActiveModal(m_ActiveModal == ActiveModal::Achievements ? ActiveModal::None : ActiveModal::Achievements);
-    }
-    if (input->IsKeyPressed(KEY_S)) {
-        SetActiveModal(m_ActiveModal == ActiveModal::Statistics ? ActiveModal::None : ActiveModal::Statistics);
-    }
-    if (input->IsKeyPressed(KEY_R)) {
-        SetActiveModal(m_ActiveModal == ActiveModal::Research ? ActiveModal::None : ActiveModal::Research);
-    }
-    if (input->IsKeyPressed(KEY_M)) {
-        SetActiveModal(m_ActiveModal == ActiveModal::Milestones ? ActiveModal::None : ActiveModal::Milestones);
-    }
-    if (input->IsKeyPressed(KEY_B)) {
-        SetActiveModal(m_ActiveModal == ActiveModal::Buyables ? ActiveModal::None : ActiveModal::Buyables);
-    }
-    if (input->IsKeyPressed(KEY_C)) {
-        SetActiveModal(m_ActiveModal == ActiveModal::Challenges ? ActiveModal::None : ActiveModal::Challenges);
-    }
-    if (input->IsKeyPressed(KEY_E)) {
-        SetActiveModal(m_ActiveModal == ActiveModal::EssenceShop ? ActiveModal::None : ActiveModal::EssenceShop);
-    }
-    if (input->IsKeyPressed(KEY_H)) {
-        SetActiveModal(m_ActiveModal == ActiveModal::Spaceship ? ActiveModal::None : ActiveModal::Spaceship);
-    }
-    if (input->IsKeyPressed(KEY_F)) {
-        // Toggle number format between Suffix and Scientific
-        m_NumberFormat = (m_NumberFormat == GameUtils::NumberFormat::Suffix)
-            ? GameUtils::NumberFormat::Scientific
-            : GameUtils::NumberFormat::Suffix;
-        Log::Info("Number format toggled");
-    }
-    // The ESC check here is redundant due to the high-priority check above.
-    /*
-    if (input->IsKeyPressed(KEY_ESCAPE)) {
-        // ... all flags set to false ...
-    }
-    */
-    // --- REMOVED: Manual close button checks for popups (handled by ImGui) ---
+        auto toggleMode = [&](GameMode mode) {
+            SetGameMode(m_GameMode == mode ? GameMode::None : mode);
+        };
 
-    // Handle Quantum Anomaly clicks (active gameplay)
-    // ONLY if UI is not capturing the mouse (prevents click-through on modals)
-    if (mousePressed && !uiCapturingMouse) {
-        ClickQuantumAnomaly(mousePos);
-    }
+        if (input->IsKeyPressed(KEY_A)) toggleMode(GameMode::Achievements);
+        if (input->IsKeyPressed(KEY_S)) toggleMode(GameMode::Statistics);
+        if (input->IsKeyPressed(KEY_R)) toggleMode(GameMode::Research);
+        if (input->IsKeyPressed(KEY_M)) toggleMode(GameMode::Milestones);
+        if (input->IsKeyPressed(KEY_B)) toggleMode(GameMode::Buyables);
+        if (input->IsKeyPressed(KEY_C)) toggleMode(GameMode::Challenges);
+        if (input->IsKeyPressed(KEY_E)) toggleMode(GameMode::EssenceShop);
+        if (input->IsKeyPressed(KEY_H)) toggleMode(GameMode::Spaceship);
 
-    // Handle navigation bar button clicks (only if no popup consumed the click)
-    // The following logic is left as it handles the non-ImGui button click areas
-    // that determine which popup to open.
-
-    if (mousePressed && !uiCapturingMouse) {
-        f32 navY = 100.0f;
-        f32 navHeight = 80.0f;
-        f32 btnWidth = 180.0f;
-        f32 btnHeight = 60.0f;
-        f32 btnY = navY + (navHeight - btnHeight) * 0.5f;
-        f32 spacing = 10.0f;
-        f32 startX = 15.0f;
-
-        bool handled = false; // Reset local handled flag for this block
-
-        // Check each navigation button (new order: BUYABLES, CHALLENGES, ESSENCE, RESEARCH, STATS, MILESTONES)
-        for (int i = 0; i < 6; i++) {
-            f32 x = startX + i * (btnWidth + spacing);
-
-            // Check if button would go off screen
-            if (x + btnWidth > 1280.0f - 200.0f) {
-                break;
-            }
-
-            Rect btnRect(x, btnY, btnWidth, btnHeight);
-
-            if (btnRect.Contains(mousePos)) {
-                // Toggle the corresponding panel (new order)
-                if (i == 0) m_ShowBuyables = !m_ShowBuyables;
-                else if (i == 1) m_ShowChallenges = !m_ShowChallenges;
-                else if (i == 2) m_ShowEssenceShop = !m_ShowEssenceShop;
-                else if (i == 3) m_ShowResearch = !m_ShowResearch;
-                else if (i == 4) m_ShowStats = !m_ShowStats;
-                else if (i == 5) m_ShowMilestones = !m_ShowMilestones;
-                handled = true;
-                break;  // Only handle one click per frame
-            }
-        }
-
-        // Check MORE menu button
-        if (!handled) {
-            f32 boostBtnWidth = 200.0f;
-            f32 moreBtnWidth = 80.0f;
-            f32 moreBtnX = 1280.0f - boostBtnWidth - moreBtnWidth - 35.0f;
-            Rect moreBtnRect(moreBtnX, btnY, moreBtnWidth, btnHeight);
-
-            if (moreBtnRect.Contains(mousePos)) {
-                m_ShowMoreMenu = !m_ShowMoreMenu;
-                handled = true;
-            }
-        }
-
-        // Handle MORE menu popup clicks
-        if (!handled && m_ShowMoreMenu) {
-            f32 menuWidth = 250.0f;
-            f32 menuHeight = 490.0f;
-            f32 moreBtnWidth = 80.0f;
-            f32 boostBtnWidth = 200.0f;
-            f32 moreBtnX = 1280.0f - boostBtnWidth - moreBtnWidth - 35.0f;
-            f32 menuX = moreBtnX;
-            f32 menuY = navY + navHeight + 5.0f;
-
-            f32 itemHeight = 60.0f;
-            f32 itemY = menuY + 10.0f;
-
-            // Achievements button
-            Rect achievementsRect(menuX + 10.0f, itemY, menuWidth - 20.0f, itemHeight);
-            if (achievementsRect.Contains(mousePos)) {
-                m_ShowAchievements = !m_ShowAchievements;
-                m_ShowMoreMenu = false; // Close menu after selection
-                handled = true;
-            }
-
-            // Singularity button
-            itemY += itemHeight + 10.0f;
-            Rect singularityRect(menuX + 10.0f, itemY, menuWidth - 20.0f, itemHeight);
-            if (singularityRect.Contains(mousePos)) {
-                m_ShowSingularityShop = !m_ShowSingularityShop;
-                m_ShowMoreMenu = false; // Close menu after selection
-                handled = true;
-            }
-
-            // Ship button
-            itemY += itemHeight + 10.0f;
-            Rect shipRect(menuX + 10.0f, itemY, menuWidth - 20.0f, itemHeight);
-            if (shipRect.Contains(mousePos)) {
-                m_ShowSpaceship = !m_ShowSpaceship;
-                m_ShowMoreMenu = false; // Close menu after selection
-                handled = true;
-            }
-
-            // Battle button
-            itemY += itemHeight + 10.0f;
-            Rect battleRect(menuX + 10.0f, itemY, menuWidth - 20.0f, itemHeight);
-            if (battleRect.Contains(mousePos)) {
-                // Start combat and show combat screen
-                StartRandomCombat();
-                m_ShowCombat = true;
-                m_ShowMoreMenu = false; // Close menu after selection
-                handled = true;
-            }
-
-            // Summon button
-            itemY += itemHeight + 10.0f;
-            Rect summonRect(menuX + 10.0f, itemY, menuWidth - 20.0f, itemHeight);
-            if (summonRect.Contains(mousePos)) {
-                m_ShowGatcha = !m_ShowGatcha;
-                m_ShowMoreMenu = false; // Close menu after selection
-                handled = true;
-            }
-
-            // Skills button
-            itemY += itemHeight + 10.0f;
-            Rect skillsRect(menuX + 10.0f, itemY, menuWidth - 20.0f, itemHeight);
-            if (skillsRect.Contains(mousePos)) {
-                m_ShowSkills = !m_ShowSkills;
-                m_ShowMoreMenu = false; // Close menu after selection
-                handled = true;
-            }
-
-            // Enhancement button
-            itemY += itemHeight + 10.0f;
-            Rect enhanceRect(menuX + 10.0f, itemY, menuWidth - 20.0f, itemHeight);
-            if (enhanceRect.Contains(mousePos)) {
-                m_ShowEnhancement = !m_ShowEnhancement;
-                m_ShowMoreMenu = false; // Close menu after selection
-                handled = true;
-            }
-
-            // Click outside menu closes it
-            Rect menuBg(menuX, menuY, menuWidth, menuHeight);
-            if (!handled && !menuBg.Contains(mousePos)) {
-                m_ShowMoreMenu = false;
-            }
+        if (input->IsKeyPressed(KEY_F)) {
+            m_NumberFormat = (m_NumberFormat == GameUtils::NumberFormat::Suffix)
+                ? GameUtils::NumberFormat::Scientific
+                : GameUtils::NumberFormat::Suffix;
+            Log::Info("Number format toggled");
         }
     }
 
-    // Handle boost button click
-    if (mousePressed) {
-        // Boost button (from RenderUI) - Updated to match new sizes
-        f32 boostBtnWidth = 200.0f;
-        f32 boostBtnHeight = 60.0f;
-        f32 navY = 100.0f;
-        f32 navHeight = 80.0f;
-        f32 boostBtnX = 1280.0f - boostBtnWidth - 25.0f;
-        f32 boostBtnY = navY + (navHeight - boostBtnHeight) * 0.5f;
-        Rect boostBtnRect(boostBtnX, boostBtnY, boostBtnWidth, boostBtnHeight);
-
-        // Check if boost is allowed (not disabled by challenge)
-        bool canBoost = !m_ChallengeManager.HasModifier(ChallengeModifier::NoBoost);
-        if (boostBtnRect.Contains(mousePos) && !m_BoostActive && m_BoostCooldownRemaining <= 0 && canBoost) {
-            // Activate boost!
-            m_BoostActive = true;
-            m_BoostTimeRemaining = m_BoostDuration;
-            Log::Infof("Boost activated! 2x production for ", m_BoostDuration, " seconds!");
-        }
+    // Handle Quantum Anomaly clicks only when UI is not capturing the pointer
+    if (pointerPressed && !uiCapturingMouse) {
+        ClickQuantumAnomaly(pointerPos);
     }
-
-    // Handle auto-upgrade toggle button clicks
-    if (mousePressed) {
-        f32 startY = 190.0f;
-        f32 stationHeight = 180.0f;
-        f32 margin = 25.0f;
-
-        for (size_t i = 0; i < m_Stations.size(); i++) {
-            auto& station = m_Stations[i];
-            // Since we removed m_ScrollOffset, we need to rely on the correct ImGui positioning
-            // However, since this logic is outside ImGui::Begin/End, we cannot rely on ImGui for positioning.
-            // This is a known architectural mix that requires a full UI migration.
-            // We will remove the m_ScrollOffset and keep the rest of the logic as the best effort manual click handler.
-
-            if (!station.unlocked) continue; // Only unlocked stations have auto-upgrade toggle
-
-            f32 y = startY + i * (stationHeight + margin); // Removed m_ScrollOffset.y
-
-            // Skip if off-screen (basic approximation)
-            if (y + stationHeight < 100.0f || y > 720.0f) continue;
-
-            // Auto toggle button position (must match render position)
-            f32 stationWidth = 1280.0f - 60.0f;
-            f32 autoToggleSize = 60.0f;
-            f32 autoToggleX = 30.0f + stationWidth - autoToggleSize - 10.0f;
-            f32 autoToggleY = y + 10.0f;
-            Rect autoToggleRect(autoToggleX, autoToggleY, autoToggleSize, 25.0f);
-
-            if (autoToggleRect.Contains(mousePos)) {
-                station.autoUpgrade = !station.autoUpgrade;
-                Log::Infof(station.name, " auto-upgrade: ", station.autoUpgrade ? "ON" : "OFF");
-                break; // Only handle one click per frame
-            }
-        }
-    }
-
-    // Note: Button updates removed - all buttons now handled by ImGui in RenderStationsContent()
-
-    // Handle auto-prestige threshold adjustment button clicks
-    if (mousePressed && m_ResearchTree->IsResearched(ResearchID::AutoPrestige)) {
-        // Calculate button positions (must match RenderStations rendering)
-        f32 stationHeight = 180.0f;
-        f32 margin = 25.0f;
-        f32 startY = 190.0f;
-        // Removed m_ScrollOffset.y from prestigeY calculation
-        f32 prestigeY = startY + m_Stations.size() * (stationHeight + margin) + 20.0f;
-        f32 autoPrestigeY = prestigeY + 70.0f;
-
-        f32 btnW = 50.0f;
-        f32 btnH = 30.0f;
-        f32 btnSpacing = 10.0f;
-        f32 startX = 500.0f;
-
-        Rect minusTenRect(startX, autoPrestigeY + 5.0f, btnW, btnH);
-        Rect minusOneRect(startX + btnW + btnSpacing, autoPrestigeY + 5.0f, btnW, btnH);
-        Rect plusOneRect(startX + (btnW + btnSpacing) * 2, autoPrestigeY + 5.0f, btnW, btnH);
-        Rect plusTenRect(startX + (btnW + btnSpacing) * 3, autoPrestigeY + 5.0f, btnW, btnH);
-
-        if (minusTenRect.Contains(mousePos)) {
-            m_AutoPrestigeThreshold = std::max(1.0, m_AutoPrestigeThreshold - 10.0);
-            Log::Infof("Auto-prestige threshold: ", m_AutoPrestigeThreshold);
-        } else if (minusOneRect.Contains(mousePos)) {
-            m_AutoPrestigeThreshold = std::max(1.0, m_AutoPrestigeThreshold - 1.0);
-            Log::Infof("Auto-prestige threshold: ", m_AutoPrestigeThreshold);
-        } else if (plusOneRect.Contains(mousePos)) {
-            m_AutoPrestigeThreshold += 1.0;
-            Log::Infof("Auto-prestige threshold: ", m_AutoPrestigeThreshold);
-        } else if (plusTenRect.Contains(mousePos)) {
-            m_AutoPrestigeThreshold += 10.0;
-            Log::Infof("Auto-prestige threshold: ", m_AutoPrestigeThreshold);
-        }
-    }
-
-    // Handle singularity collapse button clicks
-    if (mousePressed) {
-        // Calculate button position (must match RenderStations rendering)
-        f32 stationHeight = 180.0f;
-        f32 margin = 25.0f;
-        f32 startY = 190.0f;
-        // Removed m_ScrollOffset.y from prestigeY calculation
-        f32 prestigeY = startY + m_Stations.size() * (stationHeight + margin) + 20.0f;
-
-        f32 collapseY = prestigeY + 115.0f;
-        if (!m_ResearchTree->IsResearched(ResearchID::AutoPrestige)) {
-            collapseY = prestigeY + 70.0f;
-        }
-
-        Rect collapseBtn(30.0f, collapseY, static_cast<f32>(1280.0f) - 60.0f, 60.0f);
-
-        if (collapseBtn.Contains(mousePos)) {
-            if (CalculateSingularitiesOnCollapse() > 0) {
-                PerformCollapse();
-            } else {
-                Log::Info("Not enough photons for collapse (need 10,000)");
-            }
-        }
-    }
-
 }
 
 
@@ -1299,6 +1031,27 @@ void GameState::Render(Renderer* renderer) {
         RenderResources(renderer);
         RenderUI(renderer);
     }
+
+    // If a window was closed via ImGui's close button, return to the base mode
+    auto resetModeIfClosed = [&](GameMode mode, bool openFlag) {
+        if (!openFlag && m_GameMode == mode) {
+            SetGameMode(GameMode::None);
+        }
+    };
+
+    resetModeIfClosed(GameMode::Achievements, m_ShowAchievements);
+    resetModeIfClosed(GameMode::Statistics, m_ShowStats);
+    resetModeIfClosed(GameMode::Research, m_ShowResearch);
+    resetModeIfClosed(GameMode::Milestones, m_ShowMilestones);
+    resetModeIfClosed(GameMode::Buyables, m_ShowBuyables);
+    resetModeIfClosed(GameMode::Challenges, m_ShowChallenges);
+    resetModeIfClosed(GameMode::EssenceShop, m_ShowEssenceShop);
+    resetModeIfClosed(GameMode::SingularityShop, m_ShowSingularityShop);
+    resetModeIfClosed(GameMode::Spaceship, m_ShowSpaceship);
+    resetModeIfClosed(GameMode::Combat, m_ShowCombat);
+    resetModeIfClosed(GameMode::Gatcha, m_ShowGatcha);
+    resetModeIfClosed(GameMode::Skills, m_ShowSkills);
+    resetModeIfClosed(GameMode::Enhancement, m_ShowEnhancement);
 
     // Prestige flash effect (screen overlay, on top of everything)
     if (m_PrestigeFlashActive) {
@@ -2032,24 +1785,28 @@ bool GameState::SpendEssence(f64 amount) {
 }
 
 // Modal Window Management - ensures only one modal is active at a time
-void GameState::SetActiveModal(ActiveModal modal) {
-    m_ActiveModal = modal;
+void GameState::SetGameMode(GameMode mode) {
+    m_GameMode = mode;
 
-    // Synchronize legacy bool flags
-    m_ShowAchievements = (modal == ActiveModal::Achievements);
-    m_ShowStats = (modal == ActiveModal::Statistics);
-    m_ShowResearch = (modal == ActiveModal::Research);
-    m_ShowMilestones = (modal == ActiveModal::Milestones);
-    m_ShowBuyables = (modal == ActiveModal::Buyables);
-    m_ShowChallenges = (modal == ActiveModal::Challenges);
-    m_ShowEssenceShop = (modal == ActiveModal::EssenceShop);
-    m_ShowSingularityShop = (modal == ActiveModal::SingularityShop);
-    m_ShowSpaceship = (modal == ActiveModal::Spaceship);
-    m_ShowCombat = (modal == ActiveModal::Combat);
-    m_ShowGatcha = (modal == ActiveModal::Gatcha);
-    m_ShowSkills = (modal == ActiveModal::Skills);
-    m_ShowEnhancement = (modal == ActiveModal::Enhancement);
-    m_ShowMoreMenu = (modal == ActiveModal::MoreMenu);
+    // Closing the more menu whenever we switch away from it keeps navigation predictable
+    if (mode != GameMode::MoreMenu) {
+        m_ShowMoreMenu = false;
+    }
+
+    // Synchronize legacy bool flags for ImGui window open/close handling
+    m_ShowAchievements = (mode == GameMode::Achievements);
+    m_ShowStats = (mode == GameMode::Statistics);
+    m_ShowResearch = (mode == GameMode::Research);
+    m_ShowMilestones = (mode == GameMode::Milestones);
+    m_ShowBuyables = (mode == GameMode::Buyables);
+    m_ShowChallenges = (mode == GameMode::Challenges);
+    m_ShowEssenceShop = (mode == GameMode::EssenceShop);
+    m_ShowSingularityShop = (mode == GameMode::SingularityShop);
+    m_ShowSpaceship = (mode == GameMode::Spaceship);
+    m_ShowCombat = (mode == GameMode::Combat);
+    m_ShowGatcha = (mode == GameMode::Gatcha);
+    m_ShowSkills = (mode == GameMode::Skills);
+    m_ShowEnhancement = (mode == GameMode::Enhancement);
 }
 
 f64 GameState::CalculatePhotonsOnPrestige() const {
