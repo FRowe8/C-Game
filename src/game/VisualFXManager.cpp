@@ -32,6 +32,9 @@ void VisualFXManager::Initialize() {
     m_PrestigeFlashActive = false;
     m_ScreenShakeActive = false;
 
+    m_Particles.reserve(m_MaxActiveParticles);
+    m_ParticlePool.reserve(m_MaxActiveParticles);
+
     // Initialize resource tick display
     m_ResourceTicks.qubitRate = 0.0;
     m_ResourceTicks.coherenceRate = 0.0;
@@ -63,6 +66,10 @@ void VisualFXManager::SpawnParticle(const Vec2& position, const Color& color, f6
     if (!m_ParticlesEnabled) return;
 
     Particle p;
+    if (!m_ParticlePool.empty()) {
+        p = std::move(m_ParticlePool.back());
+        m_ParticlePool.pop_back();
+    }
     p.position = position;
     p.velocity = Vec2(
         static_cast<f32>(GameUtils::RandomRange(-50.0, 50.0)),
@@ -72,6 +79,12 @@ void VisualFXManager::SpawnParticle(const Vec2& position, const Color& color, f6
     p.lifetime = 0.0f;
     p.maxLifetime = static_cast<f32>(lifetime);
     m_Particles.push_back(p);
+
+    while (m_Particles.size() > m_MaxActiveParticles) {
+        m_ParticlePool.push_back(std::move(m_Particles.front()));
+        m_Particles.front() = std::move(m_Particles.back());
+        m_Particles.pop_back();
+    }
 }
 
 void VisualFXManager::SpawnParticleBurst(const Vec2& position, const Color& color, i32 count) {
@@ -83,7 +96,9 @@ void VisualFXManager::SpawnParticleBurst(const Vec2& position, const Color& colo
 }
 
 void VisualFXManager::UpdateParticles(f64 deltaTime) {
-    // Update and remove dead particles
+    // Update and recycle dead or off-screen particles
+    const ImVec2 displaySize = ImGui::GetIO().DisplaySize;
+    const f32 cullPadding = 16.0f;
     auto it = m_Particles.begin();
     while (it != m_Particles.end()) {
         it->lifetime += static_cast<f32>(deltaTime);
@@ -97,17 +112,21 @@ void VisualFXManager::UpdateParticles(f64 deltaTime) {
         f32 alpha = 1.0f - (it->lifetime / it->maxLifetime);
         it->color.a = alpha;
 
-        // Remove if dead
-        if (it->lifetime >= it->maxLifetime) {
-            it = m_Particles.erase(it);
+        const f32 maxParticleSize = (3.0f + 3.0f) * m_ParticleScale; // matches render growth
+        const bool expired = it->lifetime >= it->maxLifetime;
+        const bool offscreen =
+            (it->position.x < -cullPadding - maxParticleSize) ||
+            (it->position.x > displaySize.x + cullPadding + maxParticleSize) ||
+            (it->position.y < -cullPadding - maxParticleSize) ||
+            (it->position.y > displaySize.y + cullPadding + maxParticleSize);
+
+        if (expired || offscreen) {
+            m_ParticlePool.push_back(std::move(*it));
+            *it = std::move(m_Particles.back());
+            m_Particles.pop_back();
         } else {
             ++it;
         }
-    }
-
-    // Limit particle count to prevent lag
-    if (m_Particles.size() > 500) {
-        m_Particles.erase(m_Particles.begin(), m_Particles.begin() + 100);
     }
 }
 
@@ -206,11 +225,19 @@ f64 VisualFXManager::ClickQuantumAnomaly(const Vec2& clickPos) {
 
 void VisualFXManager::UpdateAnomalies(f64 deltaTime) {
     // Update existing anomalies
+    const ImVec2 displaySize = ImGui::GetIO().DisplaySize;
+    const f32 cullPadding = 32.0f;
     for (auto it = m_Anomalies.begin(); it != m_Anomalies.end();) {
         it->lifetime += deltaTime;
 
+        const bool offscreen =
+            (it->position.x + it->radius < -cullPadding) ||
+            (it->position.x - it->radius > displaySize.x + cullPadding) ||
+            (it->position.y + it->radius < -cullPadding) ||
+            (it->position.y - it->radius > displaySize.y + cullPadding);
+
         // Remove if expired or clicked
-        if (it->lifetime >= it->maxLifetime || it->clicked) {
+        if (it->lifetime >= it->maxLifetime || it->clicked || offscreen) {
             // If expired without clicking, it's a miss
             if (!it->clicked) {
                 Log::Debug("Anomaly expired without being clicked");
