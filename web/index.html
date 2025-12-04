@@ -18,6 +18,34 @@
             --safe-bottom: max(env(safe-area-inset-bottom, 0px), 12px);
             --safe-left: max(env(safe-area-inset-left, 0px), 12px);
             --safe-right: max(env(safe-area-inset-right, 0px), 12px);
+
+            /* Layout tokens */
+            --space-1: 4px;
+            --space-2: 8px;
+            --space-3: 12px;
+            --space-4: 16px;
+            --space-5: 24px;
+            --space-6: 32px;
+            --space-7: 40px;
+            --gutter: clamp(12px, 3vw, 28px);
+
+            /* Sizing */
+            --content-max: 1280px;
+            --panel-radius: 16px;
+
+            /* Typography scale */
+            --font-xs: clamp(0.75rem, 1vw, 0.85rem);
+            --font-sm: clamp(0.85rem, 1.2vw, 0.95rem);
+            --font-md: clamp(0.95rem, 1.6vw, 1.1rem);
+            --font-lg: clamp(1.05rem, 2vw, 1.25rem);
+            --font-xl: clamp(1.4rem, 4vw, 2.2rem);
+
+            /* Breakpoints */
+            --bp-sm: 480px;
+            --bp-md: 768px;
+            --bp-lg: 1024px;
+            --bp-xl: 1280px;
+
             --panel-glow: 0 10px 40px rgba(0, 0, 0, 0.5);
             --glass-bg: rgba(0, 0, 0, 0.35);
         }
@@ -34,10 +62,72 @@
             padding: var(--safe-top) var(--safe-right) var(--safe-bottom) var(--safe-left);
         }
 
+        /* Base layout wrappers */
+        .ui-shell {
+            min-height: 100vh;
+        }
+
+        .content-shell {
+            width: 100%;
+            max-width: var(--content-max);
+            margin: 0 auto;
+            padding: 0 var(--gutter);
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-4);
+        }
+
+        .stack {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-3);
+        }
+
+        .cluster {
+            display: flex;
+            align-items: center;
+            gap: var(--space-3);
+            flex-wrap: wrap;
+        }
+
+        .ui-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: var(--space-4);
+        }
+
+        .game-grid {
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        }
+
+        .ui-surface {
+            background: var(--glass-bg);
+            border: 1px solid rgba(94, 243, 255, 0.2);
+            border-radius: var(--panel-radius);
+            padding: var(--space-5);
+            box-shadow: var(--panel-glow);
+        }
+
+        .eyebrow {
+            letter-spacing: 0.4px;
+            font-size: var(--font-xs);
+            color: #5ef3ff;
+            opacity: 0.9;
+            text-transform: uppercase;
+        }
+
+        .text-scale {
+            font-size: var(--font-md);
+            line-height: 1.6;
+        }
+
+        .muted {
+            color: rgba(255, 255, 255, 0.82);
+        }
+
         /* Header */
         #header {
             background: rgba(0, 0, 0, 0.3);
-            padding: 10px 20px;
             text-align: center;
             backdrop-filter: blur(10px);
             border-bottom: 2px solid rgba(94, 243, 255, 0.3);
@@ -45,7 +135,7 @@
         }
 
         #header h1 {
-            font-size: clamp(1.2rem, 4vw, 2rem);
+            font-size: var(--font-xl);
             background: linear-gradient(90deg, #5ef3ff, #a855f7, #5ef3ff);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
@@ -60,10 +150,9 @@
         }
 
         #header p {
-            font-size: clamp(0.7rem, 2vw, 0.9rem);
+            font-size: var(--font-sm);
             color: #5ef3ff;
             opacity: 0.8;
-            margin-top: 5px;
         }
 
         /* Main Game Container */
@@ -73,9 +162,8 @@
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            padding: 10px;
             min-height: 0;
-            gap: 12px;
+            gap: var(--space-3);
         }
 
         /* Canvas Container */
@@ -89,7 +177,7 @@
             align-items: center;
             justify-content: center;
             background: rgba(0, 0, 0, 0.2);
-            border-radius: 10px;
+            border-radius: var(--panel-radius);
             border: 2px solid rgba(94, 243, 255, 0.2);
             box-shadow: var(--panel-glow);
             overflow: hidden;
@@ -139,7 +227,7 @@
 
         #loading-text {
             margin-top: 20px;
-            font-size: clamp(0.9rem, 2.5vw, 1.1rem);
+            font-size: var(--font-md);
             color: #5ef3ff;
             animation: pulse 1.5s ease-in-out infinite;
         }
@@ -170,16 +258,11 @@
         /* Footer Controls */
         #controls {
             background: rgba(0, 0, 0, 0.3);
-            padding: 10px 20px;
             text-align: center;
             backdrop-filter: blur(10px);
             border-top: 2px solid rgba(94, 243, 255, 0.3);
             flex-shrink: 0;
-            display: flex;
-            flex-wrap: wrap;
-            align-items: center;
             justify-content: center;
-            gap: 10px;
         }
 
         #mobile-enhancements {
@@ -347,13 +430,13 @@
         .btn {
             background: linear-gradient(135deg, #5ef3ff, #a855f7);
             border: none;
-            padding: 8px 16px;
+            padding: var(--space-2) var(--space-4);
             border-radius: 6px;
             color: white;
             font-weight: bold;
             cursor: pointer;
             transition: transform 0.2s, box-shadow 0.2s;
-            font-size: clamp(0.8rem, 2vw, 0.9rem);
+            font-size: var(--font-sm);
         }
 
         .btn:hover {
@@ -367,26 +450,30 @@
 
         /* Mobile Optimizations */
         @media (max-width: 768px) {
-            #header {
-                padding: 8px 15px;
+            .content-shell {
+                padding: 0 var(--space-3);
+                gap: var(--space-3);
+            }
+
+            .ui-surface {
+                padding: var(--space-4);
             }
 
             #game-container {
-                padding: 5px;
+                gap: var(--space-2);
             }
 
             #controls {
-                padding: 8px 10px;
-                gap: 5px;
+                gap: var(--space-2);
             }
 
             .btn {
-                padding: 6px 12px;
-                font-size: 0.8rem;
+                padding: var(--space-2) var(--space-3);
+                font-size: var(--font-xs);
             }
 
             .touch-btn {
-                padding: 12px 10px;
+                padding: var(--space-3) var(--space-3);
             }
         }
 
@@ -399,9 +486,9 @@
                 left: 50%;
                 transform: translateX(-50%);
                 background: rgba(0, 0, 0, 0.8);
-                padding: 5px 15px;
+                padding: var(--space-2) var(--space-4);
                 border-radius: 20px;
-                font-size: 0.8rem;
+                font-size: var(--font-xs);
                 z-index: 10;
                 animation: fadeIn 0.5s;
             }
@@ -418,32 +505,49 @@
         }
     </style>
 </head>
-<body>
-    <div id="header">
-        <h1>⚛️ Quantum Idle</h1>
-        <p>Harness the power of quantum mechanics</p>
-    </div>
-
-    <div id="game-container">
-        <div id="canvas-container">
-            <canvas id="canvas" class="emscripten" oncontextmenu="event.preventDefault()" tabindex=-1></canvas>
-
-            <div id="loading">
-                <div class="loader"></div>
-                <div id="loading-text">Initializing Quantum State...</div>
-                <div id="progress-bar">
-                    <div id="progress-fill"></div>
-                </div>
-            </div>
+<body class="ui-shell">
+    <div class="content-shell">
+        <div id="header" class="ui-surface stack text-scale">
+            <div class="eyebrow">Quantum Idle</div>
+            <h1>⚛️ Quantum Idle</h1>
+            <p>Harness the power of quantum mechanics</p>
         </div>
 
-    <div id="controls">
-        <button class="btn" onclick="toggleFullscreen()">🖥️ Fullscreen</button>
-        <button class="btn" onclick="resetGame()">🔄 New Game</button>
-        <button class="btn" onclick="showHelp()">❓ Help</button>
-    </div>
+        <div class="ui-grid game-grid" aria-label="Core game layout">
+            <section id="tutorial-screen" class="ui-surface stack text-scale" aria-label="Tutorial">
+                <div class="eyebrow">Tutorial</div>
+                <p class="muted">Guided tips and onboarding steps will slot into this panel.</p>
+            </section>
 
-    <div id="output"></div>
+            <section id="resources-screen" class="ui-surface stack text-scale" aria-label="Resources">
+                <div class="eyebrow">Resources</div>
+                <p class="muted">Shared resource summaries live here to mirror in-game panels.</p>
+            </section>
+
+            <section id="game-container" class="ui-surface stack text-scale" aria-label="Main game HUD">
+                <div class="eyebrow">Main HUD</div>
+                <div id="canvas-container">
+                    <canvas id="canvas" class="emscripten" oncontextmenu="event.preventDefault()" tabindex=-1></canvas>
+
+                    <div id="loading">
+                        <div class="loader"></div>
+                        <div id="loading-text">Initializing Quantum State...</div>
+                        <div id="progress-bar">
+                            <div id="progress-fill"></div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <div id="controls" class="ui-surface cluster text-scale" aria-label="Core controls">
+            <button class="btn" onclick="toggleFullscreen()">🖥️ Fullscreen</button>
+            <button class="btn" onclick="resetGame()">🔄 New Game</button>
+            <button class="btn" onclick="showHelp()">❓ Help</button>
+        </div>
+
+        <div id="output"></div>
+    </div>
 
     <script type='text/javascript'>
         console.log("=== HTML SCRIPT LOADED ===");
