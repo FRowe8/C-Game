@@ -13,6 +13,29 @@
             box-sizing: border-box;
         }
 
+        :focus-visible {
+            outline: 3px solid #5ef3ff;
+            outline-offset: 3px;
+        }
+
+        .skip-link {
+            position: absolute;
+            left: -999px;
+            top: -999px;
+            background: #0f3460;
+            color: #fff;
+            padding: var(--space-2) var(--space-4);
+            border-radius: 10px;
+            border: 1px solid rgba(94, 243, 255, 0.6);
+            text-decoration: none;
+            z-index: 9999;
+        }
+
+        .skip-link:focus-visible {
+            left: var(--safe-left);
+            top: var(--safe-top);
+        }
+
         :root {
             --safe-top: max(env(safe-area-inset-top, 0px), 12px);
             --safe-bottom: max(env(safe-area-inset-bottom, 0px), 12px);
@@ -338,6 +361,12 @@
             font-size: 0.85rem;
         }
 
+        .chip.active {
+            background: linear-gradient(135deg, rgba(94, 243, 255, 0.2), rgba(168, 85, 247, 0.4));
+            color: #0f1022;
+            border-color: rgba(94, 243, 255, 0.65);
+        }
+
         .tab-bar {
             display: flex;
             gap: 8px;
@@ -439,6 +468,11 @@
             font-size: var(--font-sm);
         }
 
+        .btn.ghost {
+            background: rgba(94, 243, 255, 0.08);
+            border: 1px solid rgba(94, 243, 255, 0.35);
+        }
+
         .btn:hover {
             transform: translateY(-2px);
             box-shadow: 0 5px 15px rgba(94, 243, 255, 0.4);
@@ -499,6 +533,37 @@
             to { opacity: 1; }
         }
 
+        .toast-region {
+            position: fixed;
+            bottom: var(--space-4);
+            right: var(--space-4);
+            background: rgba(0, 0, 0, 0.85);
+            border: 1px solid rgba(94, 243, 255, 0.6);
+            padding: var(--space-3) var(--space-4);
+            border-radius: 12px;
+            box-shadow: 0 12px 35px rgba(0, 0, 0, 0.4);
+            opacity: 0;
+            transform: translateY(18px);
+            transition: opacity 0.25s ease, transform 0.25s ease;
+            pointer-events: none;
+            max-width: 320px;
+        }
+
+        .toast-region.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .toast-region {
+                transition: none;
+            }
+        }
+
+        body.reduced-motion .toast-region {
+            transition: none;
+        }
+
         /* Output/Console */
         #output {
             display: none; /* Hide by default */
@@ -506,6 +571,7 @@
     </style>
 </head>
 <body class="ui-shell">
+    <a class="skip-link" href="#game-container" aria-label="Skip to main game canvas">Skip to main game</a>
     <div class="content-shell">
         <div id="header" class="ui-surface stack text-scale">
             <div class="eyebrow">Quantum Idle</div>
@@ -514,20 +580,51 @@
         </div>
 
         <div class="ui-grid game-grid" aria-label="Core game layout">
-            <section id="tutorial-screen" class="ui-surface stack text-scale" aria-label="Tutorial">
-                <div class="eyebrow">Tutorial</div>
+            <section id="tutorial-screen" class="ui-surface stack text-scale" role="region" aria-labelledby="tutorial-heading" tabindex="-1">
+                <div class="cluster" style="justify-content: space-between; align-items: flex-start;">
+                    <div>
+                        <div class="eyebrow">Tutorial</div>
+                        <h2 id="tutorial-heading">Guided onboarding</h2>
+                    </div>
+                    <button class="btn ghost" id="skip-tutorial" aria-label="Skip tutorial and focus the game">Skip tutorial</button>
+                </div>
                 <p class="muted">Guided tips and onboarding steps will slot into this panel.</p>
+                <div class="stack" role="group" aria-label="Tutorial steps">
+                    <div class="drag-strip" id="tutorial-steps" role="listbox" aria-label="Tutorial step list">
+                        <button class="chip" role="option" aria-selected="true" data-step="0" tabindex="0">Intro to Quantum Idle</button>
+                        <button class="chip" role="option" aria-selected="false" data-step="1" tabindex="-1">Observe a state</button>
+                        <button class="chip" role="option" aria-selected="false" data-step="2" tabindex="-1">Collect resources</button>
+                        <button class="chip" role="option" aria-selected="false" data-step="3" tabindex="-1">Prepare to prestige</button>
+                    </div>
+                    <div class="stack" aria-live="polite" aria-atomic="true" id="tutorial-copy">
+                        <p class="muted">Use the arrow keys to move through these steps and the Enter key to activate them.</p>
+                        <p id="tutorial-status" class="muted">Step 1 of 4 selected.</p>
+                    </div>
+                </div>
+                <div class="cluster">
+                    <button class="btn" id="complete-tutorial" aria-label="Close tutorial and continue">Close tutorial</button>
+                    <a class="btn ghost" href="#resources-screen" aria-label="Jump to resources panel">Skip to resources</a>
+                </div>
             </section>
 
-            <section id="resources-screen" class="ui-surface stack text-scale" aria-label="Resources">
-                <div class="eyebrow">Resources</div>
+            <section id="resources-screen" class="ui-surface stack text-scale" role="region" aria-labelledby="resources-heading" tabindex="-1">
+                <div class="cluster" style="justify-content: space-between; align-items: flex-start;">
+                    <div>
+                        <div class="eyebrow">Resources</div>
+                        <h2 id="resources-heading">Resource summary</h2>
+                    </div>
+                    <button class="btn ghost" id="collect-resources" aria-label="Collect visible resources">Collect resources</button>
+                </div>
                 <p class="muted">Shared resource summaries live here to mirror in-game panels.</p>
+                <div class="stack" role="status" aria-live="polite" aria-atomic="true">
+                    <p class="muted" id="resource-feedback">No collection attempted yet.</p>
+                </div>
             </section>
 
             <section id="game-container" class="ui-surface stack text-scale" aria-label="Main game HUD">
                 <div class="eyebrow">Main HUD</div>
                 <div id="canvas-container">
-                    <canvas id="canvas" class="emscripten" oncontextmenu="event.preventDefault()" tabindex=-1></canvas>
+                    <canvas id="canvas" class="emscripten" oncontextmenu="event.preventDefault()" tabindex="-1" aria-label="Quantum Idle game canvas" role="img"></canvas>
 
                     <div id="loading">
                         <div class="loader"></div>
@@ -547,6 +644,7 @@
         </div>
 
         <div id="output"></div>
+        <div id="toast-region" class="toast-region" role="status" aria-live="polite" aria-atomic="true"></div>
     </div>
 
     <script type='text/javascript'>
@@ -714,6 +812,92 @@
             e.preventDefault();
         });
 
+        const tutorialSection = document.getElementById('tutorial-screen');
+        const tutorialStatus = document.getElementById('tutorial-status');
+        const tutorialSteps = Array.from(document.querySelectorAll('#tutorial-steps [data-step]'));
+        const tutorialCopy = document.getElementById('tutorial-copy');
+        const skipTutorialBtn = document.getElementById('skip-tutorial');
+        const completeTutorialBtn = document.getElementById('complete-tutorial');
+        const resourcesSection = document.getElementById('resources-screen');
+        const collectResourcesBtn = document.getElementById('collect-resources');
+        const resourceFeedback = document.getElementById('resource-feedback');
+        const toastRegion = document.getElementById('toast-region');
+        let toastTimeout;
+
+        const prefersReducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches || document.body.classList.contains('reduced-motion');
+
+        const showToast = (message) => {
+            if (!toastRegion) return;
+            toastRegion.textContent = message;
+            toastRegion.classList.add('visible');
+            clearTimeout(toastTimeout);
+            const duration = prefersReducedMotion() ? 2000 : 3500;
+            toastTimeout = setTimeout(() => toastRegion.classList.remove('visible'), duration);
+        };
+
+        const setActiveTutorialStep = (index) => {
+            if (!tutorialSteps.length) return;
+            const clampedIndex = (index + tutorialSteps.length) % tutorialSteps.length;
+            tutorialSteps.forEach((btn, i) => {
+                const isActive = i === clampedIndex;
+                btn.setAttribute('aria-selected', isActive.toString());
+                btn.tabIndex = isActive ? 0 : -1;
+                btn.classList.toggle('active', isActive);
+            });
+            const activeButton = tutorialSteps[clampedIndex];
+            activeButton.focus();
+            tutorialStatus.textContent = `Step ${clampedIndex + 1} of ${tutorialSteps.length} selected. ${activeButton.textContent}.`;
+        };
+
+        tutorialSteps.forEach((btn, index) => {
+            btn.addEventListener('click', () => setActiveTutorialStep(index));
+            btn.addEventListener('keydown', (event) => {
+                if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
+                    event.preventDefault();
+                    setActiveTutorialStep(index + 1);
+                }
+                if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
+                    event.preventDefault();
+                    setActiveTutorialStep(index - 1);
+                }
+            });
+        });
+
+        if (skipTutorialBtn) {
+            skipTutorialBtn.addEventListener('click', () => {
+                tutorialSection?.setAttribute('aria-busy', 'false');
+                document.getElementById('game-container')?.focus();
+                showToast('Tutorial skipped. You can revisit steps anytime.');
+            });
+        }
+
+        if (completeTutorialBtn) {
+            completeTutorialBtn.addEventListener('click', () => {
+                tutorialSection?.setAttribute('data-closed', 'true');
+                tutorialStatus.textContent = 'Tutorial closed. The game remains available below.';
+                showToast('Tutorial closed.');
+                tutorialSection?.focus();
+            });
+        }
+
+        document.querySelectorAll('a[href="#resources-screen"]').forEach((link) => {
+            link.addEventListener('click', () => {
+                setTimeout(() => resourcesSection?.focus(), 50);
+            });
+        });
+
+        if (collectResourcesBtn) {
+            collectResourcesBtn.addEventListener('click', () => {
+                const timestamp = new Date().toLocaleTimeString();
+                resourceFeedback.textContent = `Resources collected successfully at ${timestamp}.`;
+                showToast('Resources collected and tallied.');
+            });
+        }
+
+        if (tutorialStatus) {
+            tutorialStatus.textContent = 'Step 1 of 4 selected. Intro to Quantum Idle.';
+        }
+
         // Touch-aware controls
         const touchGrid = document.getElementById('touch-grid');
         const body = document.body;
@@ -724,25 +908,27 @@
             pause: 'Input paused for 3s'
         };
 
-        touchGrid.addEventListener('pointerdown', (event) => {
-            const btn = event.target.closest('[data-action]');
-            if (!btn) return;
-            btn.dataset.active = 'true';
-            btn.style.boxShadow = '0 8px 22px rgba(94, 243, 255, 0.35)';
+        if (touchGrid) {
+            touchGrid.addEventListener('pointerdown', (event) => {
+                const btn = event.target.closest('[data-action]');
+                if (!btn) return;
+                btn.dataset.active = 'true';
+                btn.style.boxShadow = '0 8px 22px rgba(94, 243, 255, 0.35)';
 
-            if (btn.dataset.action === 'pause') {
-                body.classList.add('input-paused');
-                setTimeout(() => body.classList.remove('input-paused'), 3000);
-            }
-        });
+                if (btn.dataset.action === 'pause') {
+                    body.classList.add('input-paused');
+                    setTimeout(() => body.classList.remove('input-paused'), 3000);
+                }
+            });
 
-        touchGrid.addEventListener('pointerup', (event) => {
-            const btn = event.target.closest('[data-action]');
-            if (!btn) return;
-            btn.dataset.active = 'false';
-            btn.style.boxShadow = '';
-            btn.setAttribute('aria-label', touchStates[btn.dataset.action] || '');
-        });
+            touchGrid.addEventListener('pointerup', (event) => {
+                const btn = event.target.closest('[data-action]');
+                if (!btn) return;
+                btn.dataset.active = 'false';
+                btn.style.boxShadow = '';
+                btn.setAttribute('aria-label', touchStates[btn.dataset.action] || '');
+            });
+        }
 
         // Drag-to-scroll helpers
         const dragContainers = document.querySelectorAll('.drag-strip');
@@ -782,13 +968,37 @@
         // Tabbed panels
         const tabs = document.querySelectorAll('.tab');
         const panels = document.querySelectorAll('.tab-panel');
-        tabs.forEach((tab) => {
-            tab.addEventListener('click', () => {
-                tabs.forEach((t) => t.classList.remove('active'));
-                panels.forEach((p) => p.classList.remove('active'));
-                tab.classList.add('active');
-                const panel = document.querySelector(`[data-tab-panel="${tab.dataset.tab}"]`);
-                if (panel) panel.classList.add('active');
+
+        const activateTab = (tab) => {
+            tabs.forEach((t) => t.classList.remove('active'));
+            panels.forEach((p) => p.classList.remove('active'));
+            tab.classList.add('active');
+            tab.setAttribute('aria-selected', 'true');
+            const panel = document.querySelector(`[data-tab-panel="${tab.dataset.tab}"]`);
+            if (panel) panel.classList.add('active');
+        };
+
+        tabs.forEach((tab, index) => {
+            tab.setAttribute('role', 'tab');
+            tab.setAttribute('tabindex', index === 0 ? '0' : '-1');
+            tab.addEventListener('click', () => activateTab(tab));
+            tab.addEventListener('keydown', (event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    activateTab(tab);
+                }
+
+                if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
+                    event.preventDefault();
+                    const nextTab = tabs[(index + 1) % tabs.length];
+                    nextTab.focus();
+                }
+
+                if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
+                    event.preventDefault();
+                    const prevTab = tabs[(index - 1 + tabs.length) % tabs.length];
+                    prevTab.focus();
+                }
             });
         });
 
@@ -818,7 +1028,10 @@
         });
 
         if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-            document.querySelector('[data-setting="motion"]').classList.add('active');
+            const motionToggle = document.querySelector('[data-setting="motion"]');
+            if (motionToggle) {
+                motionToggle.classList.add('active');
+            }
             applySetting('motion', true);
         }
     </script>
