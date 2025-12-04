@@ -33,6 +33,15 @@ public:
     void SetElementVisible(const std::string& elementId, bool visible);
     void ActivateView(const std::string& viewId);
 
+    // Toast notification system
+    enum class ToastType {
+        Info,
+        Success,
+        Warning,
+        Achievement
+    };
+    void ShowToast(const std::string& title, const std::string& message, ToastType type = ToastType::Info, f32 duration = 4.0f);
+
 private:
     bool m_Initialized = false;
     SDL_Window* m_Window = nullptr;

@@ -114,6 +114,9 @@
       <div id="global-tooltip" class="tooltip">
         <div class="tooltip-content"></div>
       </div>
+
+      <!-- Toast Notification Container -->
+      <div id="toast-container"></div>
     </div>
   </body>
 </rml>

@@ -335,3 +335,109 @@ scrollbarvertical sliderbar:active {
   color: #10b981;
   font-weight: 600;
 }
+
+/* ========== Toast Notifications ========== */
+#toast-container {
+  position: fixed;
+  top: 80dp;
+  right: 20dp;
+  width: 320dp;
+  z-index: 2000;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  gap: 12dp;
+}
+
+.toast {
+  background: linear-gradient(135deg, rgba(10, 12, 18, 0.95) 0%, rgba(20, 25, 35, 0.95) 100%);
+  border: 2px solid rgba(59, 130, 246, 0.6);
+  border-radius: 12dp;
+  padding: 16dp;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6), 0 0 20px rgba(59, 130, 246, 0.3);
+  opacity: 0;
+  transform: translateX(100%);
+  animation: toastSlideIn 0.4s ease-out forwards;
+  pointer-events: auto;
+}
+
+.toast.removing {
+  animation: toastSlideOut 0.3s ease-in forwards;
+}
+
+@keyframes toastSlideIn {
+  from {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes toastSlideOut {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(120%);
+  }
+}
+
+.toast-header {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 10dp;
+  margin-bottom: 8dp;
+}
+
+.toast-icon {
+  font-size: 24dp;
+  line-height: 1;
+}
+
+.toast-title {
+  font-size: 16dp;
+  font-weight: 700;
+  color: #60a5fa;
+  flex: 1;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.toast-message {
+  font-size: 14dp;
+  color: rgba(255, 255, 255, 0.9);
+  line-height: 1.5;
+}
+
+.toast.success {
+  border-color: rgba(16, 185, 129, 0.6);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6), 0 0 20px rgba(16, 185, 129, 0.3);
+}
+
+.toast.success .toast-title {
+  color: #10b981;
+}
+
+.toast.warning {
+  border-color: rgba(245, 158, 11, 0.6);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6), 0 0 20px rgba(245, 158, 11, 0.3);
+}
+
+.toast.warning .toast-title {
+  color: #f59e0b;
+}
+
+.toast.achievement {
+  border-color: rgba(217, 70, 239, 0.6);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6), 0 0 20px rgba(217, 70, 239, 0.3);
+}
+
+.toast.achievement .toast-title {
+  color: #d946ef;
+}

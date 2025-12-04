@@ -360,6 +360,64 @@ void RmlUiSystem::ActivateView(const std::string& viewId) {
 #endif
 }
 
+// ========== Toast Notifications ==========
+
+void RmlUiSystem::ShowToast(const std::string& title, const std::string& message, ToastType type, f32 duration) {
+#ifdef RMLUI_ENABLED
+    if (!m_Initialized || !m_Backend || !m_Backend->context) return;
+
+    Rml::ElementDocument* document = m_Backend->context->GetDocument(0);
+    if (!document) return;
+
+    Rml::Element* container = document->GetElementById("toast-container");
+    if (!container) return;
+
+    // Determine toast class and icon based on type
+    std::string toastClass = "toast";
+    std::string icon = "ℹ️";
+
+    switch (type) {
+        case ToastType::Success:
+            toastClass += " success";
+            icon = "✅";
+            break;
+        case ToastType::Warning:
+            toastClass += " warning";
+            icon = "⚠️";
+            break;
+        case ToastType::Achievement:
+            toastClass += " achievement";
+            icon = "🏆";
+            break;
+        default:
+            break;
+    }
+
+    // Create toast HTML structure
+    std::string toastHTML =
+        "<div class=\"" + toastClass + "\">"
+        "  <div class=\"toast-header\">"
+        "    <span class=\"toast-icon\">" + icon + "</span>"
+        "    <span class=\"toast-title\">" + title + "</span>"
+        "  </div>"
+        "  <div class=\"toast-message\">" + message + "</div>"
+        "</div>";
+
+    // Append the toast to the container
+    container->SetInnerRML(container->GetInnerRML() + toastHTML);
+
+    // TODO: Add auto-removal after duration (would need timer system)
+    // For now, toasts will stay until manually cleared or document reloads
+
+    Log::Infof("Toast notification: ", title);
+#else
+    (void)title;
+    (void)message;
+    (void)type;
+    (void)duration;
+#endif
+}
+
 // ========== Event Listener Installation ==========
 
 #ifdef RMLUI_ENABLED
