@@ -7,6 +7,38 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 option(ENABLE_RMLUI "Enable experimental RmlUi HUD pipeline" OFF)
 
+# Fetch RmlUi if enabled
+if(ENABLE_RMLUI)
+    include(FetchContent)
+
+    message(STATUS "Fetching RmlUi library...")
+
+    FetchContent_Declare(
+        RmlUi
+        GIT_REPOSITORY https://github.com/mikke89/RmlUi.git
+        GIT_TAG        5.1
+        GIT_SHALLOW    TRUE
+    )
+
+    # Configure RmlUi options
+    set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+    set(RMLUI_SAMPLES_ENABLED OFF CACHE BOOL "" FORCE)
+    set(RMLUI_TESTS_ENABLED OFF CACHE BOOL "" FORCE)
+
+    # Enable backends based on platform
+    if(EMSCRIPTEN OR PLATFORM_WEB)
+        # For web builds, we'll use a custom OpenGL backend
+        set(RMLUI_BACKEND "SDL_GL3" CACHE STRING "" FORCE)
+    else()
+        # For desktop builds, use SDL + OpenGL3
+        set(RMLUI_BACKEND "SDL_GL3" CACHE STRING "" FORCE)
+    endif()
+
+    FetchContent_MakeAvailable(RmlUi)
+
+    message(STATUS "RmlUi fetched successfully")
+endif()
+
 # Platform detection
 if(EMSCRIPTEN OR PLATFORM_WEB)
     set(PLATFORM_WEB TRUE)
@@ -171,16 +203,23 @@ else()
     )
 endif()
 
-# Optional: RmlUi discovery. When present, define RMLUI_ENABLED so the runtime hooks activate.
+# Link RmlUi if enabled
 if(ENABLE_RMLUI)
-    find_package(RmlUi QUIET)
-    if(RmlUi_FOUND)
-        message(STATUS "RmlUi located; enabling HUD pipeline")
-        target_link_libraries(${PROJECT_NAME} PRIVATE RmlUi::RmlUi)
-        target_compile_definitions(${PROJECT_NAME} PRIVATE RMLUI_ENABLED)
-    else()
-        message(WARNING "ENABLE_RMLUI is ON but RmlUi was not found; building with stub runtime")
-    endif()
+    message(STATUS "RmlUi enabled; linking HUD pipeline")
+
+    # Add RmlUi backend sources
+    target_sources(${PROJECT_NAME} PRIVATE
+        ${CMAKE_BINARY_DIR}/_deps/rmlui-src/Backends/RmlUi_Platform_SDL.cpp
+        ${CMAKE_BINARY_DIR}/_deps/rmlui-src/Backends/RmlUi_Renderer_GL3.cpp
+    )
+
+    # Include RmlUi backends directory
+    target_include_directories(${PROJECT_NAME} PRIVATE
+        ${CMAKE_BINARY_DIR}/_deps/rmlui-src/Backends
+    )
+
+    target_link_libraries(${PROJECT_NAME} PRIVATE RmlCore RmlDebugger)
+    target_compile_definitions(${PROJECT_NAME} PRIVATE RMLUI_ENABLED RMLUI_STATIC_LIB)
 endif()
 
 target_include_directories(${PROJECT_NAME} PRIVATE
