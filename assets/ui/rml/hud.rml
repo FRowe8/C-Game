@@ -1,0 +1,13 @@
+<rml>
+  <head>
+    <title>Quantum Idle HUD</title>
+    <link type="text/rcss" href="hud.rcss" />
+  </head>
+  <body>
+    <div id="hud-root" class="column">
+      <div id="hud-resource-bar" class="panel">Resource bar placeholder</div>
+      <div id="hud-navigation" class="panel">Navigation placeholder</div>
+      <div id="hud-content" class="panel">Main content placeholder</div>
+    </div>
+  </body>
+</rml>

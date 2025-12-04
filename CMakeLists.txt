@@ -5,6 +5,8 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+option(ENABLE_RMLUI "Enable experimental RmlUi HUD pipeline" OFF)
+
 # Platform detection
 if(EMSCRIPTEN OR PLATFORM_WEB)
     set(PLATFORM_WEB TRUE)
@@ -136,7 +138,6 @@ if(SDL2_FOUND)
     endif()
 endif()
 
-
 # Sources
 file(GLOB_RECURSE ENGINE_SOURCES
         "src/engine/*.cpp"
@@ -168,6 +169,18 @@ else()
             ${ENGINE_SOURCES}
             ${GAME_SOURCES}
     )
+endif()
+
+# Optional: RmlUi discovery. When present, define RMLUI_ENABLED so the runtime hooks activate.
+if(ENABLE_RMLUI)
+    find_package(RmlUi QUIET)
+    if(RmlUi_FOUND)
+        message(STATUS "RmlUi located; enabling HUD pipeline")
+        target_link_libraries(${PROJECT_NAME} PRIVATE RmlUi::RmlUi)
+        target_compile_definitions(${PROJECT_NAME} PRIVATE RMLUI_ENABLED)
+    else()
+        message(WARNING "ENABLE_RMLUI is ON but RmlUi was not found; building with stub runtime")
+    endif()
 endif()
 
 target_include_directories(${PROJECT_NAME} PRIVATE
