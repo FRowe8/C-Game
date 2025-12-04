@@ -206,8 +206,20 @@ endif()
 # Link RmlUi if enabled
 if(ENABLE_RMLUI)
     message(STATUS "RmlUi enabled; linking HUD pipeline")
+
+    # Add RmlUi backend sources
+    target_sources(${PROJECT_NAME} PRIVATE
+        ${CMAKE_BINARY_DIR}/_deps/rmlui-src/Backends/RmlUi_Platform_SDL.cpp
+        ${CMAKE_BINARY_DIR}/_deps/rmlui-src/Backends/RmlUi_Renderer_GL3.cpp
+    )
+
+    # Include RmlUi backends directory
+    target_include_directories(${PROJECT_NAME} PRIVATE
+        ${CMAKE_BINARY_DIR}/_deps/rmlui-src/Backends
+    )
+
     target_link_libraries(${PROJECT_NAME} PRIVATE RmlCore RmlDebugger)
-    target_compile_definitions(${PROJECT_NAME} PRIVATE RMLUI_ENABLED)
+    target_compile_definitions(${PROJECT_NAME} PRIVATE RMLUI_ENABLED RMLUI_STATIC_LIB)
 endif()
 
 target_include_directories(${PROJECT_NAME} PRIVATE
