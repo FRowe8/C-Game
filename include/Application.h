@@ -9,6 +9,7 @@ typedef void* SDL_GLContext;
 class Renderer;
 class Input;
 class GameState;
+class RmlUiSystem;
 
 struct ApplicationConfig {
     std::string title = "Quantum Idle";
@@ -55,6 +56,7 @@ private:
     Scope<Renderer> m_Renderer;
     Scope<Input> m_Input;
     Scope<GameState> m_GameState;
+    Scope<RmlUiSystem> m_RmlUi;
 
     bool m_Running = false;
     bool m_Initialized = false;

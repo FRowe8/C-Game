@@ -3,6 +3,7 @@
 #include "Input.h"
 #include "GameState.h"
 #include "Logger.h"
+#include "RmlUiSystem.h"
 #include "imgui_impl_sdl2.h"  // For ImGui SDL2 event processing
 #include "Platform.h"
 #include "SteamIntegration.h"
@@ -136,6 +137,9 @@ bool Application::Initialize() {
     m_GameState = CreateScope<GameState>();
     m_GameState->Initialize();
 
+    m_RmlUi = CreateScope<RmlUiSystem>();
+    m_RmlUi->Initialize(m_Window, m_Renderer.get());
+
     m_Initialized = true;
     m_Running = true;
     m_LastFrameTime = Platform::GetTicks();
@@ -213,10 +217,20 @@ void Application::ProcessEvents() {
     SDL_Event event;
     while (SDL_PollEvent(&event)) {
         // Let ImGui process the event first
-        ImGui_ImplSDL2_ProcessEvent(&event);
+        bool rmlHandled = m_RmlUi ? m_RmlUi->ProcessEvent(event) : false;
+        if (!rmlHandled) {
+            ImGui_ImplSDL2_ProcessEvent(&event);
+        }
 
         if (event.type == SDL_QUIT) {
             m_Running = false;
+        }
+
+        if (event.type == SDL_WINDOWEVENT &&
+            (event.window.event == SDL_WINDOWEVENT_RESIZED || event.window.event == SDL_WINDOWEVENT_SIZE_CHANGED)) {
+            if (m_RmlUi) {
+                m_RmlUi->OnResize(event.window.data1, event.window.data2);
+            }
         }
 
         // Let input system process the event
@@ -237,10 +251,18 @@ void Application::Update(f64 deltaTime) {
 
 void Application::Render() {
     m_Renderer->BeginFrame();
+
+    if (m_RmlUi) {
+        m_RmlUi->BeginFrame();
+    }
     m_Renderer->Clear(Color::DarkBackground()); // Modern dark cyberpunk background
 
     // Render game
     m_GameState->Render(m_Renderer.get());
+
+    if (m_RmlUi) {
+        m_RmlUi->Render();
+    }
 
     m_Renderer->EndFrame();
 
@@ -279,6 +301,10 @@ void Application::Shutdown() {
 
     m_GameState.reset();
     m_Input.reset();
+    if (m_RmlUi) {
+        m_RmlUi->Shutdown();
+    }
+    m_RmlUi.reset();
     m_Renderer.reset();
 
     SteamIntegration::Shutdown();
