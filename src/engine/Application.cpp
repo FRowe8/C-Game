@@ -252,15 +252,23 @@ void Application::Update(f64 deltaTime) {
 void Application::Render() {
     m_Renderer->BeginFrame();
 
-    if (m_RmlUi) {
+    if (m_RmlUi && m_RmlUi->IsInitialized()) {
         m_RmlUi->BeginFrame();
+
+        // Update RmlUi with current game state
+        m_RmlUi->UpdateResource("qubits", m_GameState->GetResource(QuantumResource::Qubits));
+        m_RmlUi->UpdateResource("coherence", m_GameState->GetCoherence());
+        m_RmlUi->UpdateResource("entanglement", m_GameState->GetResource(QuantumResource::Entanglement));
+        m_RmlUi->UpdateResource("photons", static_cast<f64>(m_GameState->GetTimeline().photons));
+        m_RmlUi->UpdateResource("singularities", static_cast<f64>(m_GameState->GetTimeline().singularities));
     }
+
     m_Renderer->Clear(Color::DarkBackground()); // Modern dark cyberpunk background
 
     // Render game
     m_GameState->Render(m_Renderer.get());
 
-    if (m_RmlUi) {
+    if (m_RmlUi && m_RmlUi->IsInitialized()) {
         m_RmlUi->Render();
     }
 
