@@ -117,7 +117,8 @@ private:
      * @param cutoutMin Top-left corner of the highlighted area
      * @param cutoutMax Bottom-right corner of the highlighted area
      */
-    void DrawDimmingMask(const ImVec2& cutoutMin, const ImVec2& cutoutMax);
+    bool DrawDimmingMask(const ImVec2& cutoutMin, const ImVec2& cutoutMax, bool allowDismiss = false);
+    bool RenderBackdrop(const ImVec4& color, const char* id, bool allowDismiss);
 
     /**
      * Draw an animated arrow pointing to a UI element
