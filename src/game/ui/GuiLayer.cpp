@@ -2424,44 +2424,84 @@ void SpecializedSkillsView::Render(GameState* state, Renderer* renderer) {
 // ============================================================================
 
 void CollectionView::Render(GameState* state, Renderer* renderer) {
+    if (state->GetActiveModal() != ActiveModal::Collection) return;
     (void)renderer; // ImGui-only view
 
     ParticleCollection& collection = state->GetParticleCollection();
 
-    // Render collection stats at the top
-    RenderCollectionStats(state);
+    // Responsive sizing (fluid height with min/max width constraints)
+    ImVec2 displaySize = ImGui::GetIO().DisplaySize;
+    const f32 minWidth = 520.0f;
+    const f32 maxWidth = 960.0f;
+    const f32 minHeight = 440.0f;
+    const f32 margin = 24.0f;
 
-    ImGui::Separator();
-    ImGui::Spacing();
+    f32 panelWidth = std::clamp(displaySize.x * 0.9f, minWidth, displaySize.x - margin);
+    panelWidth = std::min(panelWidth, maxWidth);
+    f32 panelHeight = std::clamp(displaySize.y * 0.85f, minHeight, displaySize.y - margin * 2.0f);
 
-    // Render equipped particles section
-    RenderEquippedParticles(state);
+    ImVec2 center(displaySize.x * 0.5f, displaySize.y * 0.5f);
+    ImGui::SetNextWindowPos(center, ImGuiCond_Always, ImVec2(0.5f, 0.5f));
+    ImGui::SetNextWindowSize(ImVec2(panelWidth, panelHeight), ImGuiCond_Always);
 
-    ImGui::Separator();
-    ImGui::Spacing();
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 8.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(18.0f, 16.0f));
 
-    // Render particle grid (28 particles in a 7x4 grid)
-    ImGui::Text("Discovered Particles");
-    ImGui::Spacing();
+    bool windowOpen = true;
+    if (ImGui::Begin("Particle Collection", &windowOpen,
+                     ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
+                     ImGuiWindowFlags_NoCollapse)) {
 
-    const i32 cols = 7;
-    const i32 rows = 4;
+        ImGui::TextColored(ToImVec4(Color::CoherenceGreen()), "PARTICLE COLLECTION");
+        ImGui::Separator();
 
-    for (i32 row = 0; row < rows; row++) {
-        for (i32 col = 0; col < cols; col++) {
-            i32 index = row * cols + col;
-            if (index >= static_cast<i32>(ParticleType::COUNT)) break;
+        // Scrollable content prevents resize/drag conflicts (touch friendly)
+        ImVec2 contentSize = ImVec2(0, ImGui::GetContentRegionAvail().y);
+        if (ImGui::BeginChild("CollectionContent", contentSize, false, ImGuiWindowFlags_AlwaysVerticalScrollbar)) {
+            // Render collection stats at the top
+            RenderCollectionStats(state);
 
-            ParticleType type = static_cast<ParticleType>(index);
-            Particle* particle = collection.GetParticle(type);
-            bool discovered = collection.IsDiscovered(type);
+            ImGui::Separator();
+            ImGui::Spacing();
 
-            RenderParticleSlot(state, particle, discovered);
+            // Render equipped particles section
+            RenderEquippedParticles(state);
 
-            if (col < cols - 1) {
-                ImGui::SameLine();
+            ImGui::Separator();
+            ImGui::Spacing();
+
+            // Render particle grid (28 particles in a 7x4 grid)
+            ImGui::Text("Discovered Particles");
+            ImGui::Spacing();
+
+            const i32 cols = 7;
+            const i32 rows = 4;
+
+            for (i32 row = 0; row < rows; row++) {
+                for (i32 col = 0; col < cols; col++) {
+                    i32 index = row * cols + col;
+                    if (index >= static_cast<i32>(ParticleType::COUNT)) break;
+
+                    ParticleType type = static_cast<ParticleType>(index);
+                    Particle* particle = collection.GetParticle(type);
+                    bool discovered = collection.IsDiscovered(type);
+
+                    RenderParticleSlot(state, particle, discovered);
+
+                    if (col < cols - 1) {
+                        ImGui::SameLine();
+                    }
+                }
             }
         }
+        ImGui::EndChild();
+    }
+    ImGui::End();
+
+    ImGui::PopStyleVar(2);
+
+    if (!windowOpen) {
+        state->SetActiveModal(ActiveModal::None);
     }
 }
 
