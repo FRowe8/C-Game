@@ -247,6 +247,9 @@ public:
     f64 GetEssence() const { return m_QuantumEssence; }
     f64 GetProductionMultiplier(QuantumResource type) const;
 
+    // Coherence getter
+    f64 GetCoherence() const { return m_Coherence; }
+
     // Save/Load
     bool Save(const std::string& filepath);
     bool Load(const std::string& filepath);

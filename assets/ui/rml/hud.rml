@@ -4,10 +4,111 @@
     <link type="text/rcss" href="hud.rcss" />
   </head>
   <body>
-    <div id="hud-root" class="column">
-      <div id="hud-resource-bar" class="panel">Resource bar placeholder</div>
-      <div id="hud-navigation" class="panel">Navigation placeholder</div>
-      <div id="hud-content" class="panel">Main content placeholder</div>
+    <div id="hud-root">
+      <!-- Top Resource Bar -->
+      <div id="top-bar" class="bar-container">
+        <div class="resource-grid">
+          <div class="resource-item" data-resource="qubits">
+            <span class="resource-label">[Q]</span>
+            <span class="resource-value quantum-blue" data-bind="qubits">0</span>
+          </div>
+          <div class="resource-item" data-resource="coherence">
+            <span class="resource-label">[C]</span>
+            <span class="resource-value coherence-green" data-bind="coherence">100.0</span>
+          </div>
+          <div class="resource-item" data-resource="entanglement">
+            <span class="resource-label">[E]</span>
+            <span class="resource-value entanglement-orange" data-bind="entanglement">0</span>
+          </div>
+          <div class="resource-item" data-resource="photons">
+            <span class="resource-label">[P]</span>
+            <span class="resource-value photon-cyan" data-bind="photons">0</span>
+          </div>
+          <div class="resource-item" data-resource="singularities">
+            <span class="resource-label">[S]</span>
+            <span class="resource-value singularity-magenta" data-bind="singularities">0</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Main Content Area -->
+      <div id="main-content">
+        <div id="content-scroll" class="scroll-container">
+          <!-- Stations View (Default) -->
+          <div id="view-stations" class="view-panel active">
+            <h2 class="view-title">Quantum Stations</h2>
+            <div class="stations-grid">
+              <div class="station-card">
+                <h3 class="station-name">Observer Station</h3>
+                <p class="station-desc">Collapse quantum states to generate qubits</p>
+                <button class="btn-primary">Observe</button>
+              </div>
+              <div class="station-card">
+                <h3 class="station-name">Coherence Stabilizer</h3>
+                <p class="station-desc">Maintain quantum coherence</p>
+                <div class="progress-bar">
+                  <div class="progress-fill" style="width: 75%;"></div>
+                </div>
+              </div>
+              <div class="station-card">
+                <h3 class="station-name">Entanglement Network</h3>
+                <p class="station-desc">Generate quantum entanglement</p>
+                <p class="station-stat">Rate: <span data-bind="entanglement-rate">0.0</span>/s</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Research View -->
+          <div id="view-research" class="view-panel">
+            <h2 class="view-title">Research Tree</h2>
+            <p class="placeholder-text">Research tree will be implemented here</p>
+          </div>
+
+          <!-- Upgrades/Buyables View -->
+          <div id="view-upgrades" class="view-panel">
+            <h2 class="view-title">Upgrades</h2>
+            <p class="placeholder-text">Upgrades will be implemented here</p>
+          </div>
+
+          <!-- Combat View -->
+          <div id="view-combat" class="view-panel">
+            <h2 class="view-title">Combat</h2>
+            <p class="placeholder-text">Combat UI will be implemented here</p>
+          </div>
+
+          <!-- Menu View -->
+          <div id="view-menu" class="view-panel">
+            <h2 class="view-title">Menu</h2>
+            <p class="placeholder-text">Menu options will be implemented here</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Bottom Navigation Bar -->
+      <div id="bottom-nav" class="bar-container">
+        <div class="nav-buttons">
+          <button class="nav-btn active" data-view="stations">
+            <span class="nav-icon">🏠</span>
+            <span class="nav-label">STATIONS</span>
+          </button>
+          <button class="nav-btn" data-view="research">
+            <span class="nav-icon">🔬</span>
+            <span class="nav-label">RESEARCH</span>
+          </button>
+          <button class="nav-btn" data-view="upgrades">
+            <span class="nav-icon">⬆️</span>
+            <span class="nav-label">UPGRADES</span>
+          </button>
+          <button class="nav-btn" data-view="combat">
+            <span class="nav-icon">⚔️</span>
+            <span class="nav-label">COMBAT</span>
+          </button>
+          <button class="nav-btn" data-view="menu">
+            <span class="nav-icon">☰</span>
+            <span class="nav-label">MENU</span>
+          </button>
+        </div>
+      </div>
     </div>
   </body>
 </rml>
