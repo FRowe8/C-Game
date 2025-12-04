@@ -31,12 +31,56 @@ private:
     RmlUiSystem* m_System;
 };
 
+// Event listener for tooltip display
+class TooltipEventListener : public Rml::EventListener {
+public:
+    explicit TooltipEventListener(Rml::Context* context) : m_Context(context) {}
+
+    void ProcessEvent(Rml::Event& event) override {
+        Rml::Element* element = event.GetTargetElement();
+        if (!element) return;
+
+        Rml::ElementDocument* document = m_Context->GetDocument(0);
+        if (!document) return;
+
+        Rml::Element* tooltip = document->GetElementById("global-tooltip");
+        if (!tooltip) return;
+
+        if (event.GetType() == "mouseenter" || event.GetType() == "mouseover") {
+            // Get tooltip text from data attribute
+            std::string tooltipText = element->GetAttribute<Rml::String>("data-tooltip", "");
+            if (!tooltipText.empty()) {
+                // Set tooltip content
+                Rml::Element* content = tooltip->GetFirstChild();
+                if (content) {
+                    content->SetInnerRML(tooltipText);
+                }
+
+                // Position tooltip near mouse
+                auto mousePos = event.GetParameter<Rml::Vector2i>("mouse_x", Rml::Vector2i(0, 0));
+                tooltip->SetProperty("left", std::to_string(mousePos.x + 10) + "px");
+                tooltip->SetProperty("top", std::to_string(mousePos.y + 10) + "px");
+
+                // Show tooltip
+                tooltip->SetClass("visible", true);
+            }
+        } else if (event.GetType() == "mouseleave" || event.GetType() == "mouseout") {
+            // Hide tooltip
+            tooltip->SetClass("visible", false);
+        }
+    }
+
+private:
+    Rml::Context* m_Context;
+};
+
 struct RmlUiSystem::RmlUiBackend {
     Rml::Context* context = nullptr;
     bool debuggerInitialized = false;
     Scope<SystemInterface_SDL> systemInterface;
     Scope<RenderInterface_GL3> renderInterface;
     Scope<NavigationEventListener> navigationListener;
+    Scope<TooltipEventListener> tooltipListener;
 };
 #endif
 
@@ -336,7 +380,25 @@ void RmlUiSystem::InstallEventListeners() {
         button->AddEventListener(Rml::EventId::Click, m_Backend->navigationListener.get());
     }
 
-    Log::Infof("Installed event listeners on ", navButtons.size(), " navigation buttons");
+    Log::Infof("Installed click listeners on ", navButtons.size(), " navigation buttons");
+
+    // Create tooltip event listener
+    m_Backend->tooltipListener = CreateScope<TooltipEventListener>(m_Backend->context);
+
+    // Attach to all elements with data-tooltip attribute
+    Rml::ElementList allElements;
+    document->GetElementsByTagName(allElements, "*");
+
+    i32 tooltipCount = 0;
+    for (Rml::Element* element : allElements) {
+        if (element->HasAttribute("data-tooltip")) {
+            element->AddEventListener(Rml::EventId::Mouseover, m_Backend->tooltipListener.get());
+            element->AddEventListener(Rml::EventId::Mouseout, m_Backend->tooltipListener.get());
+            tooltipCount++;
+        }
+    }
+
+    Log::Infof("Installed tooltip listeners on ", tooltipCount, " elements");
 }
 #endif
 
