@@ -18,6 +18,99 @@
 
 namespace UI {
 
+namespace {
+
+struct ResourceDisplay {
+    std::string label;
+    Color color;
+    std::string value;
+    std::string tooltip;
+};
+
+constexpr f32 kTopMargin = 10.0f;
+constexpr f32 kNavBarHeight = 86.0f;
+constexpr f32 kNavButtonHeight = 60.0f;
+
+std::vector<ResourceDisplay> BuildResourceDisplays(GameState* state) {
+    auto fmt = state->m_NumberFormat;
+
+    std::vector<ResourceDisplay> resources;
+    resources.push_back({
+        "QUBITS",
+        Color::QuantumBlue(),
+        GameUtils::FormatNumber(state->GetResource(QuantumResource::Qubits), fmt),
+        "Primary currency - Used to upgrade stations and unlock new features"
+    });
+
+    resources.push_back({
+        "COHERENCE",
+        Color::CoherenceGreen(),
+        GameUtils::FormatNumber(state->GetResource(QuantumResource::Coherence), fmt),
+        "Quantum stability - Affects observation success rate\nLow coherence reduces rewards from observations"
+    });
+
+    resources.push_back({
+        "ENTANGLEMENT",
+        Color::EntanglementOrange(),
+        GameUtils::FormatNumber(state->GetResource(QuantumResource::Entanglement), fmt),
+        "Quantum connections - Used for research and advanced upgrades"
+    });
+
+    resources.push_back({
+        "PHOTONS",
+        Color::Magenta(),
+        GameUtils::FormatNumber(state->GetPhotons(), fmt),
+        "Prestige currency - Earned by performing prestige\nProvides permanent production bonuses (+10% per photon)"
+    });
+
+    if (state->GetExoticMaterials() > 0 || state->GetPhotons() > 5) {
+        resources.push_back({
+            "EXOTIC MATERIALS",
+            Color(1.0f, 0.5f, 1.0f, 1.0f),
+            GameUtils::FormatNumber(state->GetExoticMaterials(), fmt),
+            "Rare materials required for Tier 3+ research\nPrimarily recovered via Spaceship Expeditions"
+        });
+    }
+
+    if (state->GetResearchData() > 0) {
+        resources.push_back({
+            "RESEARCH DATA",
+            Color(0.3f, 0.9f, 1.0f, 1.0f),
+            GameUtils::FormatNumber(state->GetResearchData(), fmt),
+            "Intel gathered from combat victories. Useful for higher-tier research projects."
+        });
+    }
+
+    if (state->GetTimeline().singularities > 0) {
+        resources.push_back({
+            "SINGULARITIES",
+            Color(0.5f, 0.0f, 1.0f, 1.0f),
+            GameUtils::FormatNumber(state->GetTimeline().singularities, fmt),
+            "Ultimate currency - Earned from singularity collapse\nUnlocks powerful permanent upgrades"
+        });
+    }
+
+    return resources;
+}
+
+i32 CalculateResourceColumns(size_t count, f32 screenWidth) {
+    f32 minColumnWidth = 210.0f;
+    i32 columns = static_cast<i32>(screenWidth / minColumnWidth);
+    columns = std::clamp(columns, 2, static_cast<i32>(count));
+    return columns;
+}
+
+f32 ComputeResourceBarHeight(const std::vector<ResourceDisplay>& resources, f32 screenWidth) {
+    if (resources.empty()) return 0.0f;
+
+    i32 columns = CalculateResourceColumns(resources.size(), screenWidth);
+    i32 rows = static_cast<i32>((resources.size() + columns - 1) / columns);
+
+    return std::max(80.0f, rows * 34.0f + 18.0f);
+}
+
+} // namespace
+
 // =============================================================================
 // GuiLayer Implementation
 // =============================================================================
@@ -281,107 +374,46 @@ void GuiLayer::RenderActiveEvent(GameState* state, Renderer* renderer) {
 void ResourceView::Render(GameState* state, Renderer* renderer) {
     (void)renderer;
 
-    // NOTE: This is extracted from GameState::RenderResources
-    // The original implementation will be removed from GameState.cpp
-
-    f32 topBarY = 10.0f;
-    f32 topBarHeight = 80.0f;
     f32 screenWidth = ImGui::GetIO().DisplaySize.x;
+    auto resources = BuildResourceDisplays(state);
+    i32 columns = CalculateResourceColumns(resources.size(), screenWidth);
+    f32 topBarHeight = ComputeResourceBarHeight(resources, screenWidth);
 
-    ImGui::SetNextWindowPos(ImVec2(0, topBarY), ImGuiCond_Always);
+    ImGui::SetNextWindowPos(ImVec2(0, kTopMargin), ImGuiCond_Always);
     ImGui::SetNextWindowSize(ImVec2(screenWidth, topBarHeight), ImGuiCond_Always);
 
     Color darkPanel = Color::DarkPanel();
     ImGui::PushStyleColor(ImGuiCol_WindowBg, ToImVec4(darkPanel));
     ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
     ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(15.0f, 10.0f));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(14.0f, 10.0f));
 
     if (ImGui::Begin("##ResourceBar", nullptr,
                      ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
                      ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoScrollbar |
                      ImGuiWindowFlags_NoCollapse)) {
 
-        // Display resources in a horizontal layout
-        f64 qubits = state->GetResource(QuantumResource::Qubits);
-        f64 coherence = state->GetResource(QuantumResource::Coherence);
-        f64 entanglement = state->GetResource(QuantumResource::Entanglement);
-        f64 photons = state->GetPhotons();
-        f64 singularities = state->GetTimeline().singularities;
+        ImGuiTableFlags flags = ImGuiTableFlags_SizingStretchSame | ImGuiTableFlags_RowBg |
+                                ImGuiTableFlags_PadOuterX | ImGuiTableFlags_NoBordersInBody;
 
-        auto fmt = state->m_NumberFormat;
+        if (ImGui::BeginTable("ResourceBarTable", columns, flags)) {
+            ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(10.0f, 6.0f));
 
-        // Qubits (Phase 2.3: with tooltip)
-        ImGui::TextColored(ToImVec4(Color::QuantumBlue()), "QUBITS");
-        if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip("Primary currency - Used to upgrade stations and unlock new features");
-        }
-        ImGui::SameLine();
-        ImGui::Text("%s", GameUtils::FormatNumber(qubits, fmt).c_str());
+            for (size_t i = 0; i < resources.size(); ++i) {
+                ImGui::TableNextColumn();
 
-        ImGui::SameLine(0.0f, 30.0f);
+                ImGui::TextColored(ToImVec4(resources[i].color), "%s", resources[i].label.c_str());
+                if (ImGui::IsItemHovered()) {
+                    ImGui::SetTooltip("%s", resources[i].tooltip.c_str());
+                }
 
-        // Coherence (Phase 2.3: with tooltip)
-        ImGui::TextColored(ToImVec4(Color::CoherenceGreen()), "COHERENCE");
-        if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip("Quantum stability - Affects observation success rate\nLow coherence reduces rewards from observations");
-        }
-        ImGui::SameLine();
-        ImGui::Text("%s", GameUtils::FormatNumber(coherence, fmt).c_str());
-
-        ImGui::SameLine(0.0f, 30.0f);
-
-        // Entanglement (Phase 2.3: with tooltip)
-        ImGui::TextColored(ToImVec4(Color::EntanglementOrange()), "ENTANGLEMENT");
-        if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip("Quantum connections - Used for research and advanced upgrades");
-        }
-        ImGui::SameLine();
-        ImGui::Text("%s", GameUtils::FormatNumber(entanglement, fmt).c_str());
-
-        ImGui::SameLine(0.0f, 30.0f);
-
-        // Photons (prestige currency) (Phase 2.3: with tooltip)
-        ImGui::TextColored(ToImVec4(Color::Magenta()), "PHOTONS");
-        if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip("Prestige currency - Earned by performing prestige\nProvides permanent production bonuses (+10%% per photon)");
-        }
-        ImGui::SameLine();
-        ImGui::Text("%s", GameUtils::FormatNumber(photons, fmt).c_str());
-
-        // Phase 3.3: Exotic Materials (required for Tier 3+ research)
-        i32 exoticMaterials = state->GetExoticMaterials();
-        if (exoticMaterials > 0 || photons > 5) { // Show if player has any, or if they're mid-game (5+ photons)
-            ImGui::SameLine(0.0f, 30.0f);
-            ImGui::TextColored(ToImVec4(Color(1.0f, 0.5f, 1.0f, 1.0f)), "EXOTIC MATERIALS");
-            if (ImGui::IsItemHovered()) {
-                ImGui::SetTooltip("Rare materials required for Tier 3+ research\nPrimarily recovered via Spaceship Expeditions");
+                ImGui::PushStyleColor(ImGuiCol_Text, ToImVec4(Color::White()));
+                ImGui::Text("%s", resources[i].value.c_str());
+                ImGui::PopStyleColor();
             }
-            ImGui::SameLine();
-            ImGui::Text("%d", exoticMaterials);
-        }
 
-        // Research Data
-        i32 researchData = state->GetResearchData();
-        if (researchData > 0) {
-            ImGui::SameLine(0.0f, 30.0f);
-            ImGui::TextColored(ToImVec4(Color(0.3f, 0.9f, 1.0f, 1.0f)), "RESEARCH DATA");
-            if (ImGui::IsItemHovered()) {
-                ImGui::SetTooltip("Intel gathered from combat victories. Useful for higher-tier research projects.");
-            }
-            ImGui::SameLine();
-            ImGui::Text("%d", researchData);
-        }
-
-        // Singularities (if any) (Phase 2.3: with tooltip)
-        if (singularities > 0) {
-            ImGui::SameLine(0.0f, 30.0f);
-            ImGui::TextColored(ToImVec4(Color(0.5f, 0.0f, 1.0f, 1.0f)), "SINGULARITIES");
-            if (ImGui::IsItemHovered()) {
-                ImGui::SetTooltip("Ultimate currency - Earned from singularity collapse\nUnlocks powerful permanent upgrades");
-            }
-            ImGui::SameLine();
-            ImGui::Text("%s", GameUtils::FormatNumber(singularities, fmt).c_str());
+            ImGui::PopStyleVar();
+            ImGui::EndTable();
         }
     }
     ImGui::End();
@@ -397,12 +429,10 @@ void ResourceView::Render(GameState* state, Renderer* renderer) {
 void NavigationView::Render(GameState* state, Renderer* renderer) {
     (void)renderer;
 
-    // NOTE: This is extracted from GameState::RenderUI
-    // The original implementation will be removed from GameState.cpp
-
-    f32 navY = 100.0f;
-    f32 navHeight = 80.0f;
     f32 screenWidth = ImGui::GetIO().DisplaySize.x;
+    auto resources = BuildResourceDisplays(state);
+    f32 navY = ComputeResourceBarHeight(resources, screenWidth) + kTopMargin + 8.0f;
+    f32 navHeight = kNavBarHeight;
 
     ImGui::SetNextWindowPos(ImVec2(0, navY), ImGuiCond_Always);
     ImGui::SetNextWindowSize(ImVec2(screenWidth, navHeight), ImGuiCond_Always);
@@ -422,7 +452,6 @@ void NavigationView::Render(GameState* state, Renderer* renderer) {
                      ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoScrollbar |
                      ImGuiWindowFlags_NoCollapse)) {
 
-        // Draw the glowing cyan bottom border
         ImVec2 barStart = ImGui::GetWindowPos();
         ImVec2 barEnd(
             ImGui::GetWindowPos().x + ImGui::GetWindowSize().x,
@@ -436,14 +465,14 @@ void NavigationView::Render(GameState* state, Renderer* renderer) {
             ImGui::GetColorU32(ToImVec4(neonCyan * 0.6f))
         );
 
-        // Navigation Buttons
-        f32 btnWidth = 180.0f;
-        f32 btnHeight = 60.0f;
+        f32 btnHeight = kNavButtonHeight;
         f32 spacing = 10.0f;
-        f32 currentX = 15.0f;
-        f32 btnY = (navHeight - btnHeight) * 0.5f;
+        f32 boostBtnWidth = 200.0f;
+        f32 moreBtnWidth = 80.0f;
+        f32 reservedWidth = boostBtnWidth + moreBtnWidth + 60.0f;
+        f32 scrollWidth = std::max(screenWidth - reservedWidth, screenWidth * 0.45f);
+        f32 btnWidth = std::max(130.0f, scrollWidth / 4.0f);
 
-        // Phase 1.2: Button structure uses ActiveModal enum for state machine
         struct NavButton {
             const char* label;
             ActiveModal modal;
@@ -457,80 +486,77 @@ void NavigationView::Render(GameState* state, Renderer* renderer) {
             {"RESEARCH", ActiveModal::Research, Color::QuantumPurple()},
             {"STATS", ActiveModal::Statistics, Color::EntanglementOrange()},
             {"MILESTONES", ActiveModal::Milestones, Color::NeonPink()},
-            {"COLLECTION", ActiveModal::Collection, Color::CoherenceGreen()},  // Phase 4.1
+            {"COLLECTION", ActiveModal::Collection, Color::CoherenceGreen()},
         };
 
-        ImGui::SetCursorPos(ImVec2(currentX, btnY));
+        if (ImGui::BeginChild("NavButtonScroll", ImVec2(scrollWidth, navHeight - 6.0f), false,
+                              ImGuiWindowFlags_HorizontalScrollbar)) {
+            ImGui::SetCursorPos(ImVec2(12.0f, (navHeight - btnHeight) * 0.5f));
+            ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(spacing, 4.0f));
 
-        ActiveModal currentModal = state->GetActiveModal();
+            ActiveModal currentModal = state->GetActiveModal();
 
-        for (int i = 0; i < 7; i++) {  // Phase 4.1: Updated from 6 to 7 buttons
-            auto& btn = navButtons[i];
+            for (int i = 0; i < 7; i++) {
+                auto& btn = navButtons[i];
 
-            if (currentX + btnWidth + spacing + 200.0f + 80.0f + 35.0f > screenWidth) {
-                break;
-            }
+                bool active = (currentModal == btn.modal);
+                Color btnColor = active ? btn.color : btn.color * 0.5f;
 
-            bool active = (currentModal == btn.modal);
-            Color btnColor = active ? btn.color : btn.color * 0.5f;
+                ImGui::PushStyleColor(ImGuiCol_Button, ToImVec4(btnColor * 0.25f));
+                ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ToImVec4(btnColor * 0.5f));
+                ImGui::PushStyleColor(ImGuiCol_ButtonActive, ToImVec4(btnColor * 0.7f));
+                ImGui::PushStyleColor(ImGuiCol_Text, ToImVec4(Color::White()));
 
-            ImGui::PushStyleColor(ImGuiCol_Button, ToImVec4(btnColor * 0.25f));
-            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ToImVec4(btnColor * 0.5f));
-            ImGui::PushStyleColor(ImGuiCol_ButtonActive, ToImVec4(btnColor * 0.7f));
-            ImGui::PushStyleColor(ImGuiCol_Text, ToImVec4(Color::White()));
+                ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.0f);
 
-            ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.0f);
-
-            if (ImGui::Button(btn.label, ImVec2(btnWidth, btnHeight))) {
-                // Phase 1.2: Use state machine - toggle between modal and None
-                if (active) {
-                    state->SetActiveModal(ActiveModal::None);
-                } else {
-                    state->SetActiveModal(btn.modal);
+                if (i > 0) {
+                    ImGui::SameLine(0.0f, spacing);
                 }
 
-                // Visual/audio feedback hook
-                ImVec2 itemMin = ImGui::GetItemRectMin();
-                ImVec2 itemMax = ImGui::GetItemRectMax();
-                ImVec2 itemCenter((itemMin.x + itemMax.x) * 0.5f, (itemMin.y + itemMax.y) * 0.5f);
-                state->RegisterUIButtonFeedback(btn.label, itemCenter, ToImVec4(btn.color));
-            } else if (ImGui::IsItemHovered()) {
-                ImGui::SetTooltip("Open the %s panel", btn.label);
-            }
+                if (ImGui::Button(btn.label, ImVec2(btnWidth, btnHeight))) {
+                    if (active) {
+                        state->SetActiveModal(ActiveModal::None);
+                    } else {
+                        state->SetActiveModal(btn.modal);
+                    }
 
-            // Draw custom border/glow
-            if (active) {
-                ImVec2 rectMin(
-                    ImGui::GetItemRectMin().x - 2.0f,
-                    ImGui::GetItemRectMin().y - 2.0f
-                );
-                ImVec2 rectMax(
-                    ImGui::GetItemRectMax().x + 2.0f,
-                    ImGui::GetItemRectMax().y + 2.0f
-                );
-                draw_list->AddRect(rectMin, rectMax, ImGui::GetColorU32(ToImVec4(btn.color * 0.9f)), 0.0f, 0, 2.0f);
-            } else {
-                ImVec2 rectMin = ImGui::GetItemRectMin();
-                ImVec2 rectMax = ImGui::GetItemRectMax();
-                draw_list->AddRect(rectMin, rectMax, ImGui::GetColorU32(ToImVec4(Color::DarkBorder())), 0.0f, 0, 1.0f);
+                    ImVec2 itemMin = ImGui::GetItemRectMin();
+                    ImVec2 itemMax = ImGui::GetItemRectMax();
+                    ImVec2 itemCenter((itemMin.x + itemMax.x) * 0.5f, (itemMin.y + itemMax.y) * 0.5f);
+                    state->RegisterUIButtonFeedback(btn.label, itemCenter, ToImVec4(btn.color));
+                } else if (ImGui::IsItemHovered()) {
+                    ImGui::SetTooltip("Open the %s panel", btn.label);
+                }
+
+                if (active) {
+                    ImVec2 rectMin(
+                        ImGui::GetItemRectMin().x - 2.0f,
+                        ImGui::GetItemRectMin().y - 2.0f
+                    );
+                    ImVec2 rectMax(
+                        ImGui::GetItemRectMax().x + 2.0f,
+                        ImGui::GetItemRectMax().y + 2.0f
+                    );
+                    draw_list->AddRect(rectMin, rectMax, ImGui::GetColorU32(ToImVec4(btn.color * 0.9f)), 0.0f, 0, 2.0f);
+                } else {
+                    ImVec2 rectMin = ImGui::GetItemRectMin();
+                    ImVec2 rectMax = ImGui::GetItemRectMax();
+                    draw_list->AddRect(rectMin, rectMax, ImGui::GetColorU32(ToImVec4(Color::DarkBorder())), 0.0f, 0, 1.0f);
+                }
+
+                ImGui::PopStyleVar();
+                ImGui::PopStyleColor(4);
             }
 
             ImGui::PopStyleVar();
-            ImGui::PopStyleColor(4);
-
-            if (i < 5) {
-                ImGui::SameLine(0.0f, spacing);
-            }
+            ImGui::EndChild();
         }
 
-        // MORE Menu Button
         RenderMoreMenu(state);
         moreBtnPos = ImGui::GetItemRectMin();
 
-        // Boost Button
         RenderBoostButton(state);
 
-        // Force window boundary extension
         ImGui::SetCursorPosY(navHeight);
         ImGui::Dummy(ImVec2(1.0f, 1.0f));
     }
@@ -539,7 +565,6 @@ void NavigationView::Render(GameState* state, Renderer* renderer) {
     ImGui::PopStyleVar(3);
     ImGui::PopStyleColor();
 
-    // Render MORE Menu Popup
     if (state->m_ShowMoreMenu) {
         f32 menuWidth = 250.0f;
         f32 menuHeight = 490.0f;
@@ -561,12 +586,11 @@ void NavigationView::Render(GameState* state, Renderer* renderer) {
             f32 itemWidth = menuWidth - 20.0f;
             f32 itemHeight = 60.0f;
 
-            // Phase 1.2: Use ActiveModal enum for state machine with feature gating
             struct MoreButton {
                 const char* label;
                 ActiveModal modal;
                 Color color;
-                GameFeature feature;  // For unlock checking
+                GameFeature feature;
             };
 
             MoreButton moreButtons[] = {
@@ -585,10 +609,8 @@ void NavigationView::Render(GameState* state, Renderer* renderer) {
             for (size_t i = 0; i < 7; i++) {
                 auto& btn = moreButtons[i];
 
-                // Feature gating: check if feature is unlocked
                 bool isUnlocked = unlockManager.IsUnlocked(btn.feature);
                 if (!isUnlocked) {
-                    // Show locked button with tooltip
                     Color lockedColor = Color(0.2f, 0.2f, 0.2f, 0.5f);
                     ImGui::PushStyleColor(ImGuiCol_Button, ToImVec4(lockedColor));
                     ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ToImVec4(lockedColor));
@@ -603,7 +625,7 @@ void NavigationView::Render(GameState* state, Renderer* renderer) {
                     if (ImGui::IsItemHovered()) {
                         i32 unlockLevel = unlockManager.GetUnlockLevel(btn.feature);
                         ImGui::SetTooltip("Unlocks at Level %d\n%s", unlockLevel,
-                                         unlockManager.GetFeatureDescription(btn.feature));
+                                          unlockManager.GetFeatureDescription(btn.feature));
                     }
 
                     if (i < 6) ImGui::Spacing();
@@ -620,17 +642,14 @@ void NavigationView::Render(GameState* state, Renderer* renderer) {
 
                 ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 1.0f);
 
-                // Show "NEW!" badge for newly unlocked features
                 std::string buttonLabel = btn.label;
                 if (unlockManager.IsNewlyUnlocked(btn.feature)) {
                     buttonLabel = std::string(btn.label) + " ✨";
                 }
 
                 if (ImGui::Button(buttonLabel.c_str(), ImVec2(itemWidth, itemHeight))) {
-                    // Phase 4.2: Play click sound
                     state->GetSoundManager().PlaySound(SoundEffect::ButtonPress, 0.8f);
 
-                    // Phase 1.2: Use state machine - toggle between modal and None
                     if (active) {
                         state->SetActiveModal(ActiveModal::None);
                     } else {
@@ -654,8 +673,8 @@ void NavigationView::Render(GameState* state, Renderer* renderer) {
 
 void NavigationView::RenderMoreMenu(GameState* state) {
     f32 screenWidth = ImGui::GetIO().DisplaySize.x;
-    f32 navHeight = 80.0f;
-    f32 btnHeight = 60.0f;
+    f32 navHeight = kNavBarHeight;
+    f32 btnHeight = kNavButtonHeight;
     f32 btnY = (navHeight - btnHeight) * 0.5f;
 
     f32 boostBtnWidth = 200.0f;
@@ -721,8 +740,8 @@ void NavigationView::RenderMoreMenu(GameState* state) {
 
 void NavigationView::RenderBoostButton(GameState* state) {
     f32 screenWidth = ImGui::GetIO().DisplaySize.x;
-    f32 navHeight = 80.0f;
-    f32 btnHeight = 60.0f;
+    f32 navHeight = kNavBarHeight;
+    f32 btnHeight = kNavButtonHeight;
     f32 btnY = (navHeight - btnHeight) * 0.5f;
 
     f32 boostBtnWidth = 200.0f;
