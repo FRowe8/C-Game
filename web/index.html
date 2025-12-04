@@ -13,195 +13,38 @@
             box-sizing: border-box;
         }
 
-        :focus-visible {
-            outline: 3px solid #5ef3ff;
-            outline-offset: 3px;
-        }
-
-        .skip-link {
-            position: absolute;
-            left: -999px;
-            top: -999px;
-            background: #0f3460;
-            color: #fff;
-            padding: var(--space-2) var(--space-4);
-            border-radius: 10px;
-            border: 1px solid rgba(94, 243, 255, 0.6);
-            text-decoration: none;
-            z-index: 9999;
-        }
-
-        .skip-link:focus-visible {
-            left: var(--safe-left);
-            top: var(--safe-top);
-        }
-
-        :root {
-            --safe-top: max(env(safe-area-inset-top, 0px), 12px);
-            --safe-bottom: max(env(safe-area-inset-bottom, 0px), 12px);
-            --safe-left: max(env(safe-area-inset-left, 0px), 12px);
-            --safe-right: max(env(safe-area-inset-right, 0px), 12px);
-
-            /* Layout tokens */
-            --space-1: 4px;
-            --space-2: 8px;
-            --space-3: 12px;
-            --space-4: 16px;
-            --space-5: 24px;
-            --space-6: 32px;
-            --space-7: 40px;
-            --gutter: clamp(12px, 3vw, 28px);
-
-            /* Sizing */
-            --content-max: 1280px;
-            --panel-radius: 16px;
-
-            /* Typography scale */
-            --font-xs: 0.82rem;
-            --font-sm: 0.92rem;
-            --font-md: 1.05rem;
-            --font-lg: 1.22rem;
-            --font-xl: 1.85rem;
-
-            /* Line heights */
-            --line-tight: 1.3;
-            --line-snug: 1.45;
-            --line-cozy: 1.65;
-
-            /* Breakpoints */
-            --bp-sm: 480px;
-            --bp-md: 768px;
-            --bp-lg: 1024px;
-            --bp-xl: 1280px;
-
-            --panel-glow: 0 10px 40px rgba(0, 0, 0, 0.5);
-            --glass-bg: rgba(0, 0, 0, 0.35);
-        }
-
-        @supports (font-size: clamp(1rem, 2vw, 1.25rem)) {
-            :root {
-                --font-xs: clamp(0.78rem, 0.9vw, 0.9rem);
-                --font-sm: clamp(0.88rem, 1vw, 1rem);
-                --font-md: clamp(0.98rem, 1.5vw, 1.15rem);
-                --font-lg: clamp(1.08rem, 1.9vw, 1.32rem);
-                --font-xl: clamp(1.35rem, 3.6vw, 2.25rem);
-
-                --line-tight: clamp(1.25, calc(1.2 + 0.25vw), 1.35);
-                --line-snug: clamp(1.4, calc(1.35 + 0.35vw), 1.6);
-                --line-cozy: clamp(1.55, calc(1.5 + 0.45vw), 1.8);
-            }
-        }
-
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
             color: #fff;
-            overflow: hidden;
             width: 100vw;
             height: 100vh;
             display: flex;
             flex-direction: column;
-            padding: var(--safe-top) var(--safe-right) var(--safe-bottom) var(--safe-left);
-            line-height: var(--line-cozy);
-            text-wrap: pretty;
-            overflow-wrap: anywhere;
+            overflow: hidden;
         }
 
-        /* Base layout wrappers */
-        .ui-shell {
-            min-height: 100vh;
-        }
-
-        .content-shell {
-            width: 100%;
-            max-width: var(--content-max);
-            margin: 0 auto;
-            padding: 0 var(--gutter);
-            display: flex;
-            flex-direction: column;
-            gap: var(--space-4);
-        }
-
-        .stack {
-            display: flex;
-            flex-direction: column;
-            gap: var(--space-3);
-        }
-
-        .cluster {
-            display: flex;
-            align-items: center;
-            gap: var(--space-3);
-            flex-wrap: wrap;
-            min-width: 0;
-        }
-
-        .ui-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: var(--space-4);
-        }
-
-        .game-grid {
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-        }
-
-        .ui-surface {
-            background: var(--glass-bg);
-            border: 1px solid rgba(94, 243, 255, 0.2);
-            border-radius: var(--panel-radius);
-            padding: var(--space-5);
-            box-shadow: var(--panel-glow);
-            min-width: 0;
-        }
-
-        .eyebrow {
-            letter-spacing: 0.4px;
-            font-size: var(--font-xs);
-            color: #5ef3ff;
-            opacity: 0.9;
-            text-transform: uppercase;
-            line-height: var(--line-tight);
-        }
-
-        .text-scale {
-            font-size: var(--font-md);
-            line-height: var(--line-cozy);
-            overflow-wrap: anywhere;
-        }
-
-        .muted {
-            color: rgba(255, 255, 255, 0.82);
-        }
-
-        h1, h2, h3, h4, h5, h6, p {
-            overflow-wrap: anywhere;
-        }
-
-        @supports (text-wrap: balance) {
-            h1, h2, h3, h4, h5, h6, .btn {
-                text-wrap: balance;
-            }
-        }
-
-        /* Header */
-        #header {
-            background: rgba(0, 0, 0, 0.3);
+        header {
+            background: rgba(0, 0, 0, 0.35);
             text-align: center;
-            backdrop-filter: blur(10px);
-            border-bottom: 2px solid rgba(94, 243, 255, 0.3);
-            flex-shrink: 0;
+            padding: 12px;
+            border-bottom: 1px solid rgba(94, 243, 255, 0.35);
         }
 
-        #header h1 {
-            font-size: var(--font-xl);
+        header h1 {
+            font-size: clamp(1.2rem, 4vw, 2rem);
+            letter-spacing: 0.5px;
             background: linear-gradient(90deg, #5ef3ff, #a855f7, #5ef3ff);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
-            background-clip: text;
-            animation: shimmer 3s infinite linear;
             background-size: 200% 100%;
-            line-height: var(--line-snug);
+            animation: shimmer 4s infinite linear;
+        }
+
+        header p {
+            font-size: clamp(0.8rem, 2vw, 0.95rem);
+            color: #a8c7ff;
+            opacity: 0.85;
         }
 
         @keyframes shimmer {
@@ -209,26 +52,15 @@
             100% { background-position: -200% 0; }
         }
 
-        #header p {
-            font-size: var(--font-sm);
-            color: #5ef3ff;
-            opacity: 0.8;
-            line-height: var(--line-snug);
-            text-wrap: balance;
-        }
-
-        /* Main Game Container */
-        #game-container {
+        main {
             flex: 1;
             display: flex;
-            flex-direction: column;
             align-items: center;
             justify-content: center;
+            padding: 16px;
             min-height: 0;
-            gap: var(--space-3);
         }
 
-        /* Canvas Container */
         #canvas-container {
             position: relative;
             width: 100%;
@@ -238,14 +70,13 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            background: rgba(0, 0, 0, 0.2);
-            border-radius: var(--panel-radius);
-            border: 2px solid rgba(94, 243, 255, 0.2);
-            box-shadow: var(--panel-glow);
+            background: rgba(0, 0, 0, 0.25);
+            border-radius: 12px;
+            border: 2px solid rgba(94, 243, 255, 0.25);
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.55);
             overflow: hidden;
         }
 
-        /* Responsive canvas */
         canvas.emscripten {
             display: block;
             image-rendering: pixelated;
@@ -253,20 +84,17 @@
             margin: 0 auto;
         }
 
-        /* Loading Screen */
         #loading {
             position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(26, 26, 46, 0.95);
+            inset: 0;
+            background: rgba(16, 18, 34, 0.92);
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            z-index: 1000;
-            transition: opacity 0.5s;
+            gap: 14px;
+            transition: opacity 0.35s ease;
+            z-index: 10;
         }
 
         #loading.hidden {
@@ -277,7 +105,7 @@
         .loader {
             width: 60px;
             height: 60px;
-            border: 4px solid rgba(94, 243, 255, 0.1);
+            border: 4px solid rgba(94, 243, 255, 0.15);
             border-top-color: #5ef3ff;
             border-radius: 50%;
             animation: spin 1s linear infinite;
@@ -288,849 +116,119 @@
         }
 
         #loading-text {
-            margin-top: 20px;
-            font-size: var(--font-md);
+            font-size: 1rem;
             color: #5ef3ff;
-            animation: pulse 1.5s ease-in-out infinite;
-        }
-
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
+            text-align: center;
         }
 
         #progress-bar {
             width: 80%;
-            max-width: 400px;
+            max-width: 360px;
             height: 6px;
-            background: rgba(94, 243, 255, 0.1);
+            background: rgba(94, 243, 255, 0.15);
             border-radius: 3px;
-            margin-top: 15px;
             overflow: hidden;
         }
 
         #progress-fill {
             height: 100%;
-            background: linear-gradient(90deg, #5ef3ff, #a855f7);
             width: 0%;
-            transition: width 0.3s;
-            border-radius: 3px;
+            background: linear-gradient(90deg, #5ef3ff, #a855f7);
+            transition: width 0.25s ease;
         }
 
-        /* Footer Controls */
-        #controls {
-            background: rgba(0, 0, 0, 0.3);
-            text-align: center;
-            backdrop-filter: blur(10px);
-            border-top: 2px solid rgba(94, 243, 255, 0.3);
-            flex-shrink: 0;
-            justify-content: center;
-        }
-
-        #mobile-enhancements {
-            width: 100%;
-            max-width: 1280px;
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 12px;
-        }
-
-        .glass-card {
-            background: var(--glass-bg);
-            border: 1px solid rgba(94, 243, 255, 0.2);
-            border-radius: 12px;
-            padding: 12px;
-            box-shadow: var(--panel-glow);
-        }
-
-        .glass-card h3 {
-            font-size: 0.95rem;
-            letter-spacing: 0.5px;
-            color: #5ef3ff;
-            margin-bottom: 8px;
-        }
-
-        .touch-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-            gap: 8px;
-        }
-
-        .touch-btn {
-            background: linear-gradient(135deg, rgba(94, 243, 255, 0.2), rgba(168, 85, 247, 0.3));
-            border: 1px solid rgba(94, 243, 255, 0.4);
-            color: #fff;
-            border-radius: 12px;
-            padding: 14px 12px;
-            min-height: 44px;
-            min-width: 44px;
-            text-align: left;
-            display: flex;
-            gap: 10px;
-            align-items: center;
-            justify-content: flex-start;
-            cursor: pointer;
-            font-size: var(--font-sm);
-            line-height: 1.35;
-            transition: transform 0.15s ease, box-shadow 0.15s ease;
-            box-shadow: var(--touch-shadow, none);
-            line-height: var(--line-snug);
-            overflow-wrap: anywhere;
-        }
-
-        .touch-btn:active {
-            transform: scale(0.98);
-            box-shadow: 0 6px 20px rgba(94, 243, 255, 0.35);
-        }
-
-        .touch-btn:focus-visible {
-            outline: 2px solid rgba(94, 243, 255, 0.8);
-            outline-offset: 3px;
-        }
-
-        .touch-btn span {
-            display: block;
-            font-size: 0.85rem;
-            opacity: 0.85;
-            text-wrap: pretty;
-            min-width: 0;
-        }
-
-        .drag-strip {
-            display: flex;
-            gap: 8px;
-            overflow-x: auto;
-            -webkit-overflow-scrolling: touch;
-            padding-bottom: 6px;
-            cursor: grab;
-        }
-
-        .chip {
-            padding: 10px 14px;
-            border-radius: 999px;
-            background: rgba(255, 255, 255, 0.08);
-            border: 1px solid rgba(94, 243, 255, 0.25);
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            max-width: 100%;
-            font-size: 0.85rem;
-        }
-
-        .chip.active {
-            background: linear-gradient(135deg, rgba(94, 243, 255, 0.2), rgba(168, 85, 247, 0.4));
-            color: #0f1022;
-            border-color: rgba(94, 243, 255, 0.65);
-        }
-
-        .tab-bar {
-            display: flex;
-            gap: 8px;
-            flex-wrap: wrap;
-            margin-bottom: 10px;
-        }
-
-        .tab {
-            padding: 10px 14px;
-            border-radius: 10px;
-            border: 1px solid rgba(94, 243, 255, 0.35);
-            background: rgba(94, 243, 255, 0.08);
-            color: #fff;
-            cursor: pointer;
-            font-weight: 600;
-            transition: all 0.15s ease;
-        }
-
-        .tab.active {
-            background: linear-gradient(135deg, #5ef3ff, #a855f7);
-            color: #0f1022;
-            box-shadow: 0 8px 20px rgba(168, 85, 247, 0.35);
-        }
-
-        .tab-panel {
-            display: none;
-            gap: 8px;
-            flex-direction: column;
-        }
-
-        .tab-panel.active {
-            display: flex;
-        }
-
-        .settings-row {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 10px 0;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-        }
-
-        .settings-row:last-child {
-            border-bottom: none;
-        }
-
-        .toggle {
-            position: relative;
-            width: 46px;
-            height: 26px;
-            border-radius: 20px;
-            background: rgba(255, 255, 255, 0.15);
-            border: 1px solid rgba(94, 243, 255, 0.45);
-            cursor: pointer;
-        }
-
-        .toggle::after {
-            content: '';
-            position: absolute;
-            width: 18px;
-            height: 18px;
-            top: 3px;
-            left: 4px;
-            border-radius: 50%;
-            background: #fff;
-            transition: transform 0.15s ease;
-        }
-
-        .toggle.active::after {
-            transform: translateX(18px);
-            background: #0f1022;
-        }
-
-        .toggle.active {
-            background: linear-gradient(135deg, #5ef3ff, #a855f7);
-        }
-
-        body.input-paused #mobile-enhancements {
-            opacity: 0.5;
-            filter: grayscale(0.2);
-        }
-
-        body.reduced-motion *,
-        body.reduced-motion *::before,
-        body.reduced-motion *::after {
-            animation-duration: 0s !important;
-            transition-duration: 0s !important;
-        }
-
-        .btn {
-            background: linear-gradient(135deg, #5ef3ff, #a855f7);
-            border: none;
-            padding: var(--space-2) var(--space-4);
-            min-height: 44px;
-            min-width: 44px;
-            border-radius: 8px;
-            color: white;
-            font-weight: bold;
-            cursor: pointer;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            gap: var(--space-2);
-            line-height: 1.3;
-            transition: transform 0.2s, box-shadow 0.2s;
-            font-size: var(--font-sm);
-            line-height: var(--line-tight);
-            text-wrap: balance;
-            min-width: 0;
-            white-space: normal;
-        }
-
-        .btn.ghost {
-            background: rgba(94, 243, 255, 0.08);
-            border: 1px solid rgba(94, 243, 255, 0.35);
-        }
-
-        .btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(94, 243, 255, 0.4);
-        }
-
-        .btn:active {
-            transform: translateY(0);
-        }
-
-        .btn:focus-visible {
-            outline: 2px solid rgba(94, 243, 255, 0.9);
-            outline-offset: 3px;
-            box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.25);
-        }
-
-        /* Mobile Optimizations */
-        @media (max-width: 768px) {
-            .content-shell {
-                padding: 0 var(--space-3);
-                gap: var(--space-3);
-            }
-
-            .ui-surface {
-                padding: var(--space-4);
-            }
-
-            #game-container {
-                gap: var(--space-2);
-            }
-
-            #controls {
-                gap: var(--space-2);
-            }
-
-            .btn {
-                padding: var(--space-2) var(--space-3);
-                font-size: var(--font-xs);
-            }
-
-            .touch-btn {
-                padding: var(--space-3) var(--space-3);
-            }
-        }
-
-        @media (max-width: 480px) {
-            body {
-                overflow-y: auto;
-            }
-
-            #header h1 {
-                font-size: clamp(1.2rem, 7vw, 1.8rem);
-            }
-
-            .ui-surface {
-                padding: var(--space-4);
-            }
-
-            #controls {
-                flex-direction: column;
-                align-items: stretch;
-            }
-
-            .btn {
-                width: 100%;
-                text-align: center;
-            }
-        }
-
-        /* Portrait Mode Warning */
-        @media (orientation: portrait) and (max-width: 768px) {
-            #canvas-container::before {
-                content: "📱 Rotate for better experience";
-                position: absolute;
-                top: 10px;
-                left: 50%;
-                transform: translateX(-50%);
-                background: rgba(0, 0, 0, 0.8);
-                padding: var(--space-2) var(--space-4);
-                border-radius: 20px;
-                font-size: var(--font-xs);
-                z-index: 10;
-                animation: fadeIn 0.5s;
-            }
-        }
-
-        @keyframes fadeIn {
-            from { opacity: 0; }
-            to { opacity: 1; }
-        }
-
-        .toast-region {
-            position: fixed;
-            bottom: var(--space-4);
-            right: var(--space-4);
-            background: rgba(0, 0, 0, 0.85);
-            border: 1px solid rgba(94, 243, 255, 0.6);
-            padding: var(--space-3) var(--space-4);
-            border-radius: 12px;
-            box-shadow: 0 12px 35px rgba(0, 0, 0, 0.4);
-            opacity: 0;
-            transform: translateY(18px);
-            transition: opacity 0.25s ease, transform 0.25s ease;
-            pointer-events: none;
-            max-width: 320px;
-        }
-
-        .toast-region.visible {
-            opacity: 1;
-            transform: translateY(0);
-        }
-
-        @media (prefers-reduced-motion: reduce) {
-            .toast-region {
-                transition: none;
-            }
-        }
-
-        body.reduced-motion .toast-region {
-            transition: none;
-        }
-
-        /* Output/Console */
         #output {
-            display: none; /* Hide by default */
+            display: none;
         }
     </style>
 </head>
-<body class="ui-shell">
-    <a class="skip-link" href="#game-container" aria-label="Skip to main game canvas">Skip to main game</a>
-    <div class="content-shell">
-        <div id="header" class="ui-surface stack text-scale">
-            <div class="eyebrow">Quantum Idle</div>
-            <h1>⚛️ Quantum Idle</h1>
-            <p>Harness the power of quantum mechanics</p>
+<body>
+    <header>
+        <h1>Quantum Idle</h1>
+        <p>Quantum mechanics meets incremental gameplay.</p>
+    </header>
+
+    <main>
+        <div id="canvas-container">
+            <canvas id="canvas" class="emscripten" oncontextmenu="event.preventDefault()" tabindex="-1" aria-label="Quantum Idle game canvas"></canvas>
+            <div id="loading">
+                <div class="loader" aria-hidden="true"></div>
+                <div id="loading-text" role="status">Initializing...</div>
+                <div id="progress-bar" aria-hidden="true">
+                    <div id="progress-fill"></div>
+                </div>
+            </div>
         </div>
+    </main>
 
-        <div class="ui-grid game-grid" aria-label="Core game layout">
-            <section id="tutorial-screen" class="ui-surface stack text-scale" role="region" aria-labelledby="tutorial-heading" tabindex="-1">
-                <div class="cluster" style="justify-content: space-between; align-items: flex-start;">
-                    <div>
-                        <div class="eyebrow">Tutorial</div>
-                        <h2 id="tutorial-heading">Guided onboarding</h2>
-                    </div>
-                    <button class="btn ghost" id="skip-tutorial" aria-label="Skip tutorial and focus the game">Skip tutorial</button>
-                </div>
-                <p class="muted">Guided tips and onboarding steps will slot into this panel.</p>
-                <div class="stack" role="group" aria-label="Tutorial steps">
-                    <div class="drag-strip" id="tutorial-steps" role="listbox" aria-label="Tutorial step list">
-                        <button class="chip" role="option" aria-selected="true" data-step="0" tabindex="0">Intro to Quantum Idle</button>
-                        <button class="chip" role="option" aria-selected="false" data-step="1" tabindex="-1">Observe a state</button>
-                        <button class="chip" role="option" aria-selected="false" data-step="2" tabindex="-1">Collect resources</button>
-                        <button class="chip" role="option" aria-selected="false" data-step="3" tabindex="-1">Prepare to prestige</button>
-                    </div>
-                    <div class="stack" aria-live="polite" aria-atomic="true" id="tutorial-copy">
-                        <p class="muted">Use the arrow keys to move through these steps and the Enter key to activate them.</p>
-                        <p id="tutorial-status" class="muted">Step 1 of 4 selected.</p>
-                    </div>
-                </div>
-                <div class="cluster">
-                    <button class="btn" id="complete-tutorial" aria-label="Close tutorial and continue">Close tutorial</button>
-                    <a class="btn ghost" href="#resources-screen" aria-label="Jump to resources panel">Skip to resources</a>
-                </div>
-            </section>
+    <div id="output"></div>
 
-            <section id="resources-screen" class="ui-surface stack text-scale" role="region" aria-labelledby="resources-heading" tabindex="-1">
-                <div class="cluster" style="justify-content: space-between; align-items: flex-start;">
-                    <div>
-                        <div class="eyebrow">Resources</div>
-                        <h2 id="resources-heading">Resource summary</h2>
-                    </div>
-                    <button class="btn ghost" id="collect-resources" aria-label="Collect visible resources">Collect resources</button>
-                </div>
-                <p class="muted">Shared resource summaries live here to mirror in-game panels.</p>
-                <div class="stack" role="status" aria-live="polite" aria-atomic="true">
-                    <p class="muted" id="resource-feedback">No collection attempted yet.</p>
-                </div>
-            </section>
+    <script type="text/javascript">
+        (function() {
+            const loading = document.getElementById('loading');
+            const loadingText = document.getElementById('loading-text');
+            const progressFill = document.getElementById('progress-fill');
+            const canvasContainer = document.getElementById('canvas-container');
+            const canvas = document.getElementById('canvas');
 
-            <section id="game-container" class="ui-surface stack text-scale" aria-label="Main game HUD">
-                <div class="eyebrow">Main HUD</div>
-                <div id="canvas-container">
-                    <canvas id="canvas" class="emscripten" oncontextmenu="event.preventDefault()" tabindex="-1" aria-label="Quantum Idle game canvas" role="img"></canvas>
+            function resizeCanvas() {
+                const rect = canvasContainer.getBoundingClientRect();
+                canvas.width = rect.width;
+                canvas.height = rect.height;
+            }
 
-                    <div id="loading">
-                        <div class="loader"></div>
-                        <div id="loading-text">Initializing Quantum State...</div>
-                        <div id="progress-bar">
-                            <div id="progress-fill"></div>
-                        </div>
-                    </div>
-                </div>
-            </section>
-        </div>
+            window.addEventListener('resize', resizeCanvas);
 
-        <div id="controls" class="ui-surface cluster text-scale" aria-label="Core controls">
-            <button class="btn" onclick="toggleFullscreen()">🖥️ Fullscreen</button>
-            <button class="btn" onclick="resetGame()">🔄 New Game</button>
-            <button class="btn" onclick="showHelp()">❓ Help</button>
-        </div>
-
-        <div id="output"></div>
-        <div id="toast-region" class="toast-region" role="status" aria-live="polite" aria-atomic="true"></div>
-    </div>
-
-    <script type='text/javascript'>
-        console.log("=== HTML SCRIPT LOADED ===");
-
-        // Progress tracking
-        var Module = {
-            preRun: [function() {
-                console.log("=== MODULE PRE-RUN CALLBACK ===");
-            }],
-            postRun: [function() {
-                console.log("=== MODULE POST-RUN CALLBACK ===");
-            }],
-            print: (function() {
-                console.log("=== MODULE PRINT SETUP ===");
-                var element = document.getElementById('output');
-                if (element) element.value = '';
-                return function(text) {
+            window.Module = {
+                preRun: [],
+                postRun: [],
+                print: function(text) {
                     if (arguments.length > 1) text = Array.prototype.slice.call(arguments).join(' ');
-                    console.log("[WASM] " + text);
-                };
-            })(),
-            printErr: function(text) {
-                if (arguments.length > 1) text = Array.prototype.slice.call(arguments).join(' ');
-                console.error("[WASM ERROR] " + text);
-            },
-            canvas: (function() {
-                var canvas = document.getElementById('canvas');
-                canvas.addEventListener("webglcontextlost", function(e) {
-                    alert('WebGL context lost. You will need to reload the page.');
-                    e.preventDefault();
-                }, false);
-                return canvas;
-            })(),
-            // WebGL context attributes for better performance
-            webglContextAttributes: {
-                alpha: false,              // Disable alpha channel (no transparency) for better performance
-                antialias: false,          // Disable antialiasing for pixel-perfect rendering
-                depth: true,               // Enable depth buffer
-                stencil: false,            // Disable stencil buffer (not needed)
-                preserveDrawingBuffer: false,  // Don't preserve buffer between frames
-                powerPreference: "high-performance",  // Request high-performance GPU
-                premultipliedAlpha: true,  // Standard WebGL setting
-                failIfMajorPerformanceCaveat: false  // Allow software rendering if needed
-            },
-            setStatus: function(text) {
-                console.log("=== MODULE STATUS: " + (text || "(empty - loaded)") + " ===");
-                var loading = document.getElementById('loading');
-                var loadingText = document.getElementById('loading-text');
-                var progressFill = document.getElementById('progress-fill');
-
-                if (text) {
-                    loadingText.innerHTML = text;
-
-                    // Parse progress from text
-                    var match = text.match(/(\d+)%/);
-                    if (match) {
-                        progressFill.style.width = match[1] + '%';
+                    console.log('[WASM]', text);
+                },
+                printErr: function(text) {
+                    if (arguments.length > 1) text = Array.prototype.slice.call(arguments).join(' ');
+                    console.error('[WASM]', text);
+                },
+                canvas: (function() {
+                    canvas.addEventListener('webglcontextlost', function(e) {
+                        alert('WebGL context lost. Please reload the page.');
+                        e.preventDefault();
+                    }, false);
+                    return canvas;
+                })(),
+                webglContextAttributes: {
+                    alpha: false,
+                    antialias: false,
+                    depth: true,
+                    stencil: false,
+                    preserveDrawingBuffer: false,
+                    powerPreference: 'high-performance'
+                },
+                setStatus: function(text) {
+                    if (!text) {
+                        loading.classList.add('hidden');
+                        return;
                     }
-                } else {
-                    // Game loaded - hide loading screen
-                    console.log("=== HIDING LOADING SCREEN ===");
-                    loading.classList.add('hidden');
-                    setTimeout(() => loading.remove(), 500);
+
+                    loading.classList.remove('hidden');
+                    loadingText.textContent = text;
+
+                    const match = text.match(/(\d+)%/);
+                    if (match) {
+                        const pct = parseInt(match[1]);
+                        progressFill.style.width = pct + '%';
+                    }
+                },
+                monitorRunDependencies: function(left) {
+                    if (left === 0) {
+                        loading.classList.add('hidden');
+                    }
                 }
-            },
-            totalDependencies: 0,
-            monitorRunDependencies: function(left) {
-                this.totalDependencies = Math.max(this.totalDependencies, left);
-                Module.setStatus(left ? 'Preparing... (' + (this.totalDependencies-left) + '/' + this.totalDependencies + ')' : '');
-            }
-        };
-
-        console.log("=== MODULE OBJECT CONFIGURED ===");
-        console.log("=== Setting initial status: Downloading... ===");
-        Module.setStatus('Downloading...');
-
-        window.onerror = function(event) {
-            console.error("=== WINDOW ERROR: " + event + " ===");
-            Module.setStatus('Error: See console for details');
-        };
-
-        console.log("=== WAITING FOR WASM TO LOAD ===");
-
-        // Fullscreen toggle
-        function toggleFullscreen() {
-            var elem = document.getElementById('canvas-container');
-            if (!document.fullscreenElement) {
-                elem.requestFullscreen().catch(err => {
-                    alert(`Error attempting to enable fullscreen: ${err.message}`);
-                });
-            } else {
-                document.exitFullscreen();
-            }
-        }
-
-        // Reset game
-        function resetGame() {
-            if (confirm('Reset all progress? This cannot be undone!')) {
-                localStorage.clear();
-                location.reload();
-            }
-        }
-
-        // Help dialog
-        function showHelp() {
-            alert(`Quantum Idle - How to Play
-
-🎯 Goal: Generate qubits by observing superposition states
-
-🖱️ Controls:
-• Click on stations to observe and collapse quantum states
-• Upgrade stations to increase production
-• Unlock new research stations as you progress
-
-⚛️ Quantum Mechanics:
-• Superposition: Resources accumulate in uncertain states
-• Observation: Collapse the wave function to earn resources
-• Entanglement: Link stations for bonus effects
-
-🌟 Prestige: Reset for permanent bonuses when you've earned enough!`);
-        }
-
-        // Handle window resize
-        function resizeCanvas() {
-            var canvas = document.getElementById('canvas');
-            var container = document.getElementById('canvas-container');
-
-            // Get container size
-            var containerWidth = container.clientWidth;
-            var containerHeight = container.clientHeight;
-
-            // Calculate aspect ratio (16:9 for 1280x720)
-            var targetAspect = 1280 / 720;
-            var containerAspect = containerWidth / containerHeight;
-
-            var newWidth, newHeight;
-
-            if (containerAspect > targetAspect) {
-                // Container is wider - fit to height
-                newHeight = containerHeight;
-                newWidth = containerHeight * targetAspect;
-            } else {
-                // Container is taller - fit to width
-                newWidth = containerWidth;
-                newHeight = containerWidth / targetAspect;
-            }
-
-            // Set canvas display size
-            canvas.style.width = newWidth + 'px';
-            canvas.style.height = newHeight + 'px';
-
-            console.log("Canvas resized to: " + newWidth + "x" + newHeight);
-        }
-
-        window.addEventListener('resize', resizeCanvas);
-
-        // Initial resize when page loads
-        window.addEventListener('load', function() {
-            setTimeout(resizeCanvas, 100);
-        });
-
-        // Prevent zoom on mobile
-        document.addEventListener('gesturestart', function (e) {
-            e.preventDefault();
-        });
-
-        const tutorialSection = document.getElementById('tutorial-screen');
-        const tutorialStatus = document.getElementById('tutorial-status');
-        const tutorialSteps = Array.from(document.querySelectorAll('#tutorial-steps [data-step]'));
-        const tutorialCopy = document.getElementById('tutorial-copy');
-        const skipTutorialBtn = document.getElementById('skip-tutorial');
-        const completeTutorialBtn = document.getElementById('complete-tutorial');
-        const resourcesSection = document.getElementById('resources-screen');
-        const collectResourcesBtn = document.getElementById('collect-resources');
-        const resourceFeedback = document.getElementById('resource-feedback');
-        const toastRegion = document.getElementById('toast-region');
-        let toastTimeout;
-
-        const prefersReducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches || document.body.classList.contains('reduced-motion');
-
-        const showToast = (message) => {
-            if (!toastRegion) return;
-            toastRegion.textContent = message;
-            toastRegion.classList.add('visible');
-            clearTimeout(toastTimeout);
-            const duration = prefersReducedMotion() ? 2000 : 3500;
-            toastTimeout = setTimeout(() => toastRegion.classList.remove('visible'), duration);
-        };
-
-        const setActiveTutorialStep = (index) => {
-            if (!tutorialSteps.length) return;
-            const clampedIndex = (index + tutorialSteps.length) % tutorialSteps.length;
-            tutorialSteps.forEach((btn, i) => {
-                const isActive = i === clampedIndex;
-                btn.setAttribute('aria-selected', isActive.toString());
-                btn.tabIndex = isActive ? 0 : -1;
-                btn.classList.toggle('active', isActive);
-            });
-            const activeButton = tutorialSteps[clampedIndex];
-            activeButton.focus();
-            tutorialStatus.textContent = `Step ${clampedIndex + 1} of ${tutorialSteps.length} selected. ${activeButton.textContent}.`;
-        };
-
-        tutorialSteps.forEach((btn, index) => {
-            btn.addEventListener('click', () => setActiveTutorialStep(index));
-            btn.addEventListener('keydown', (event) => {
-                if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
-                    event.preventDefault();
-                    setActiveTutorialStep(index + 1);
-                }
-                if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
-                    event.preventDefault();
-                    setActiveTutorialStep(index - 1);
-                }
-            });
-        });
-
-        if (skipTutorialBtn) {
-            skipTutorialBtn.addEventListener('click', () => {
-                tutorialSection?.setAttribute('aria-busy', 'false');
-                document.getElementById('game-container')?.focus();
-                showToast('Tutorial skipped. You can revisit steps anytime.');
-            });
-        }
-
-        if (completeTutorialBtn) {
-            completeTutorialBtn.addEventListener('click', () => {
-                tutorialSection?.setAttribute('data-closed', 'true');
-                tutorialStatus.textContent = 'Tutorial closed. The game remains available below.';
-                showToast('Tutorial closed.');
-                tutorialSection?.focus();
-            });
-        }
-
-        document.querySelectorAll('a[href="#resources-screen"]').forEach((link) => {
-            link.addEventListener('click', () => {
-                setTimeout(() => resourcesSection?.focus(), 50);
-            });
-        });
-
-        if (collectResourcesBtn) {
-            collectResourcesBtn.addEventListener('click', () => {
-                const timestamp = new Date().toLocaleTimeString();
-                resourceFeedback.textContent = `Resources collected successfully at ${timestamp}.`;
-                showToast('Resources collected and tallied.');
-            });
-        }
-
-        if (tutorialStatus) {
-            tutorialStatus.textContent = 'Step 1 of 4 selected. Intro to Quantum Idle.';
-        }
-
-        // Touch-aware controls
-        const touchGrid = document.getElementById('touch-grid');
-        const body = document.body;
-        const touchStates = {
-            tap: 'Tap detected',
-            press: 'Long press held',
-            swipe: 'Swipe enabled',
-            pause: 'Input paused for 3s'
-        };
-
-        if (touchGrid) {
-            touchGrid.addEventListener('pointerdown', (event) => {
-                const btn = event.target.closest('[data-action]');
-                if (!btn) return;
-                btn.dataset.active = 'true';
-                btn.style.boxShadow = '0 8px 22px rgba(94, 243, 255, 0.35)';
-
-                if (btn.dataset.action === 'pause') {
-                    body.classList.add('input-paused');
-                    setTimeout(() => body.classList.remove('input-paused'), 3000);
-                }
-            });
-
-            touchGrid.addEventListener('pointerup', (event) => {
-                const btn = event.target.closest('[data-action]');
-                if (!btn) return;
-                btn.dataset.active = 'false';
-                btn.style.boxShadow = '';
-                btn.setAttribute('aria-label', touchStates[btn.dataset.action] || '');
-            });
-        }
-
-        // Drag-to-scroll helpers
-        const dragContainers = document.querySelectorAll('.drag-strip');
-        dragContainers.forEach((strip) => {
-            let isDown = false;
-            let startX = 0;
-            let scrollLeft = 0;
-
-            const startDrag = (e) => {
-                isDown = true;
-                strip.classList.add('dragging');
-                startX = e.pageX || e.touches?.[0]?.pageX || 0;
-                scrollLeft = strip.scrollLeft;
             };
 
-            const endDrag = () => {
-                isDown = false;
-                strip.classList.remove('dragging');
-            };
-
-            const onMove = (e) => {
-                if (!isDown) return;
-                const x = e.pageX || e.touches?.[0]?.pageX || 0;
-                const walk = (x - startX) * 1.1;
-                strip.scrollLeft = scrollLeft - walk;
-            };
-
-            strip.addEventListener('mousedown', startDrag);
-            strip.addEventListener('touchstart', startDrag, { passive: true });
-            window.addEventListener('mouseup', endDrag);
-            window.addEventListener('touchend', endDrag);
-            window.addEventListener('touchcancel', endDrag);
-            window.addEventListener('mousemove', onMove);
-            window.addEventListener('touchmove', onMove, { passive: true });
-        });
-
-        // Tabbed panels
-        const tabs = document.querySelectorAll('.tab');
-        const panels = document.querySelectorAll('.tab-panel');
-
-        const activateTab = (tab) => {
-            tabs.forEach((t) => t.classList.remove('active'));
-            panels.forEach((p) => p.classList.remove('active'));
-            tab.classList.add('active');
-            tab.setAttribute('aria-selected', 'true');
-            const panel = document.querySelector(`[data-tab-panel="${tab.dataset.tab}"]`);
-            if (panel) panel.classList.add('active');
-        };
-
-        tabs.forEach((tab, index) => {
-            tab.setAttribute('role', 'tab');
-            tab.setAttribute('tabindex', index === 0 ? '0' : '-1');
-            tab.addEventListener('click', () => activateTab(tab));
-            tab.addEventListener('keydown', (event) => {
-                if (event.key === 'Enter' || event.key === ' ') {
-                    event.preventDefault();
-                    activateTab(tab);
-                }
-
-                if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
-                    event.preventDefault();
-                    const nextTab = tabs[(index + 1) % tabs.length];
-                    nextTab.focus();
-                }
-
-                if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
-                    event.preventDefault();
-                    const prevTab = tabs[(index - 1 + tabs.length) % tabs.length];
-                    prevTab.focus();
-                }
-            });
-        });
-
-        // Settings toggles
-        const toggles = document.querySelectorAll('.toggle');
-        const applySetting = (name, enabled) => {
-            switch (name) {
-                case 'haptics':
-                    document.documentElement.style.setProperty('--touch-shadow', enabled ? '0 8px 22px rgba(94, 243, 255, 0.45)' : '');
-                    break;
-                case 'contrast':
-                    document.documentElement.style.setProperty('--glass-bg', enabled ? 'rgba(0, 0, 0, 0.6)' : 'rgba(0, 0, 0, 0.35)');
-                    break;
-                case 'motion':
-                    document.body.classList.toggle('reduced-motion', enabled);
-                    break;
-            }
-        };
-
-        toggles.forEach((toggle) => {
-            toggle.addEventListener('click', () => {
-                toggle.classList.toggle('active');
-                const enabled = toggle.classList.contains('active');
-                const name = toggle.dataset.setting;
-                applySetting(name, enabled);
-            });
-        });
-
-        if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-            const motionToggle = document.querySelector('[data-setting="motion"]');
-            if (motionToggle) {
-                motionToggle.classList.add('active');
-            }
-            applySetting('motion', true);
-        }
+            resizeCanvas();
+        })();
     </script>
 
     <!-- Emscripten script placeholder (required by Emscripten) -->
