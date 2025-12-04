@@ -1353,8 +1353,215 @@ void StatisticsView::Render(GameState* state, Renderer* renderer) {
 }
 
 void ResearchView::Render(GameState* state, Renderer* renderer) {
-    // TODO: Extract from GameState::RenderResearchTree
-    state->RenderResearchTree(renderer);
+    if (state->GetActiveModal() != ActiveModal::Research) return;
+    (void)renderer;
+
+    // 1. Responsive position and size
+    ImVec2 displaySize = ImGui::GetIO().DisplaySize;
+    f32 panelWidth = std::min(displaySize.x * 0.95f, 900.0f);
+    f32 panelHeight = std::min(displaySize.y * 0.9f, 600.0f);
+
+    // Center the window
+    ImVec2 centerPos(displaySize.x * 0.5f, displaySize.y * 0.5f);
+    ImGui::SetNextWindowPos(centerPos, ImGuiCond_Always, ImVec2(0.5f, 0.5f));
+    ImGui::SetNextWindowSize(ImVec2(panelWidth, panelHeight), ImGuiCond_Always);
+
+    // 2. Setup styles (Quantum Purple theme)
+    Color mainBorderColor = Color::QuantumPurple() * 0.8f;
+    Color mainBgColor = Color(0.05f, 0.05f, 0.1f, 0.95f) * 0.8f;
+
+    ImGui::PushStyleColor(ImGuiCol_WindowBg, ToImVec4(mainBgColor));
+    ImGui::PushStyleColor(ImGuiCol_Border, ToImVec4(mainBorderColor));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 2.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(15.0f, 15.0f));
+
+    // 3. Begin the main research window
+    bool windowOpen = true;
+    if (ImGui::Begin("Research Tree", &windowOpen,
+                     ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
+                     ImGuiWindowFlags_NoCollapse)) {
+
+        // --- Header ---
+        ImGui::TextColored(ToImVec4(Color(0.6f, 0.6f, 0.6f, 1.0f)), "(Press R or ESC to close)");
+
+        // Research count
+        i32 researched = state->m_ResearchTree->GetResearchedCount();
+        i32 total = static_cast<i32>(ResearchID::COUNT);
+        std::string countText = "Researched: " + std::to_string(researched) + "/" + std::to_string(total);
+
+        ImGui::SetCursorPosY(45.0f);
+        ImGui::TextColored(ToImVec4(Color(0.9f, 0.9f, 1.0f, 1.0f)), "%s", countText.c_str());
+
+        ImGui::Separator();
+        ImGui::Spacing();
+
+        // --- Research Nodes List (Scrollable Child Window) ---
+        f32 contentStartY = ImGui::GetCursorPosY();
+        f32 nodesContentHeight = panelHeight - contentStartY - 60.0f - 30.0f;
+
+        if (ImGui::BeginChild("##ResearchNodesList", ImVec2(0, nodesContentHeight), false, ImGuiWindowFlags_AlwaysVerticalScrollbar)) {
+
+            f32 nodeWidth = ImGui::GetContentRegionAvail().x;
+            f32 nodeHeight = 100.0f;
+            auto availableNodes = state->m_ResearchTree->GetAvailableResearch(state->m_Timeline.completedResets);
+            auto researchedNodes = state->m_ResearchTree->GetResearchedNodes();
+
+            // --- Render Available Nodes ---
+            if (!availableNodes.empty()) {
+                ImGui::TextColored(ToImVec4(Color::White()), "Available Research:");
+                ImGui::Spacing();
+
+                for (const ResearchNode* node : availableNodes) {
+                    bool canAfford = state->CanAffordResearch(node->id);
+
+                    // Node background
+                    Color nodeBg = canAfford ? Color(0.2f, 0.3f, 0.2f, 1.0f) : Color(0.2f, 0.2f, 0.25f, 1.0f);
+                    Color nodeBorder = canAfford ? Color::CoherenceGreen() : Color::QuantumBlue();
+
+                    ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 0.0f);
+                    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(10.0f, 10.0f));
+                    ImGui::PushStyleColor(ImGuiCol_ChildBg, ToImVec4(nodeBg));
+                    ImGui::PushStyleColor(ImGuiCol_Border, ToImVec4(nodeBorder));
+
+                    std::string nodeChildName = "##ResearchNode_" + std::to_string(static_cast<i32>(node->id));
+
+                    if (ImGui::BeginChild(nodeChildName.c_str(), ImVec2(nodeWidth, nodeHeight), true, ImGuiWindowFlags_NoScrollbar)) {
+
+                        // Node name
+                        ImGui::TextColored(ToImVec4(Color::White()), "%s", node->name.c_str());
+
+                        // Auto-research toggle button
+                        f32 autoToggleW = 60.0f;
+                        f32 autoToggleH = 25.0f;
+                        ImGui::SameLine(nodeWidth - autoToggleW - 10.0f);
+                        ImGui::SetCursorPosY(10.0f);
+
+                        ResearchNode* mutableNode = state->m_ResearchTree->GetNode(node->id);
+                        bool autoEnabled = (mutableNode && mutableNode->autoResearch);
+
+                        Color autoToggleColor = autoEnabled ? Color::CoherenceGreen() : Color(0.3f, 0.3f, 0.3f, 1.0f);
+
+                        ImGui::PushStyleColor(ImGuiCol_Button, ToImVec4(autoToggleColor * 0.4f));
+                        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ToImVec4(autoToggleColor * 0.6f));
+                        ImGui::PushStyleColor(ImGuiCol_Border, ToImVec4(autoToggleColor));
+
+                        if (ImGui::Button("AUTO", ImVec2(autoToggleW, autoToggleH))) {
+                            if (mutableNode) mutableNode->autoResearch = !mutableNode->autoResearch;
+                        }
+                        ImGui::PopStyleColor(3);
+
+                        // Node description
+                        ImGui::TextColored(ToImVec4(Color(0.8f, 0.8f, 0.9f, 1.0f)), "%s", node->description.c_str());
+
+                        // Costs
+                        std::string costText = "Cost: ";
+                        if (node->qubitCost > 0) costText += GameUtils::FormatNumber(node->qubitCost, state->m_NumberFormat) + " Qubits | ";
+                        if (node->coherenceCost > 0) costText += GameUtils::FormatNumber(node->coherenceCost, state->m_NumberFormat) + " Coherence | ";
+                        if (node->entanglementCost > 0) costText += GameUtils::FormatNumber(node->entanglementCost, state->m_NumberFormat) + " Entanglement | ";
+                        if (node->photonCost > 0) costText += std::to_string(node->photonCost) + " Photons";
+                        if (node->exoticMaterialsCost > 0) costText += " | " + std::to_string(node->exoticMaterialsCost) + " Exotic Materials";
+
+                        Color costColor = canAfford ? Color::CoherenceGreen() : Color::QuantumPurple();
+                        ImGui::TextColored(ToImVec4(costColor), "%s", costText.c_str());
+
+                        // Prerequisites
+                        if (!node->prerequisites.empty()) {
+                            std::string prereqText = "Requires: ";
+                            for (size_t i = 0; i < node->prerequisites.size(); i++) {
+                                const ResearchNode* prereq = state->m_ResearchTree->GetNode(node->prerequisites[i]);
+                                if (prereq) {
+                                    prereqText += prereq->name;
+                                    if (i < node->prerequisites.size() - 1) prereqText += ", ";
+                                }
+                            }
+                            ImGui::TextColored(ToImVec4(Color(0.7f, 0.7f, 0.7f, 1.0f)), "%s", prereqText.c_str());
+                        }
+
+                        // Research button
+                        ImGui::SetCursorPosY(nodeHeight - 35.0f);
+                        ImGui::SameLine(nodeWidth - 120.0f);
+
+                        Color btnColor = canAfford ? Color::QuantumPurple() : Color(0.3f, 0.3f, 0.3f, 1.0f);
+                        Color btnHoveredColor = canAfford ? Color::QuantumPurple() * 1.5f : Color(0.4f, 0.4f, 0.4f, 1.0f);
+
+                        ImGui::PushStyleColor(ImGuiCol_Button, ToImVec4(btnColor * 0.3f));
+                        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ToImVec4(btnHoveredColor * 0.5f));
+                        ImGui::PushStyleColor(ImGuiCol_Border, ToImVec4(btnHoveredColor));
+
+                        if (ImGui::Button("RESEARCH", ImVec2(110.0f, 30.0f)) && canAfford) {
+                            state->PurchaseResearch(node->id);
+                        }
+                        ImGui::PopStyleColor(3);
+                    }
+                    ImGui::EndChild();
+
+                    ImGui::PopStyleColor(2);
+                    ImGui::PopStyleVar(2);
+                    ImGui::Spacing();
+                }
+            }
+
+            // --- Render Completed Research if no Available Nodes ---
+            if (availableNodes.empty()) {
+                ImGui::SetCursorPosX(nodeWidth / 2.0f - 180.0f);
+                ImGui::TextColored(ToImVec4(Color(0.7f, 0.7f, 0.7f, 1.0f)), "No research available at current prestige level!");
+                ImGui::Spacing();
+
+                ImGui::TextColored(ToImVec4(Color::CoherenceGreen()), "Completed Research:");
+
+                i32 completedCount = 0;
+                for (const ResearchNode* node : researchedNodes) {
+                    if (completedCount == 0) ImGui::Separator();
+
+                    std::string completedText = "* " + node->name;
+                    ImGui::TextColored(ToImVec4(Color(0.8f, 0.9f, 0.8f, 1.0f)), "%s", completedText.c_str());
+
+                    completedCount++;
+
+                    if (completedCount % 2 == 1 && static_cast<size_t>(completedCount) < researchedNodes.size()) {
+                        ImGui::SameLine(nodeWidth / 2.0f);
+                    }
+
+                    if (completedCount >= 8) {
+                        ImGui::TextColored(ToImVec4(Color(0.7f, 0.7f, 0.7f, 1.0f)), "(...and %d more)", (int)researchedNodes.size() - completedCount);
+                        break;
+                    }
+                }
+            }
+        }
+        ImGui::EndChild();
+
+        // --- Bonuses Summary ---
+        ImGui::SetCursorPosY(panelHeight - 60.0f);
+        ImGui::Separator();
+        ImGui::Spacing();
+
+        ImGui::TextColored(ToImVec4(Color::QuantumBlue()), "Active Bonuses:");
+
+        f64 prodMult = state->m_ResearchTree->GetTotalProductionMultiplier();
+        f64 obsMult = state->m_ResearchTree->GetTotalObservationBonus();
+        f64 cohMult = state->m_ResearchTree->GetTotalCoherenceBonus();
+
+        std::string bonusText = "Production: +" + std::to_string(static_cast<i32>((prodMult - 1.0) * 100.0)) + "%%  |  ";
+        std::string obsBonusStr = (obsMult >= 1.0) ? "+" + std::to_string(static_cast<i32>((obsMult - 1.0) * 100.0)) : std::to_string(static_cast<i32>((obsMult - 1.0) * 100.0));
+        std::string cohBonusStr = (cohMult >= 1.0) ? "+" + std::to_string(static_cast<i32>((cohMult - 1.0) * 100.0)) : std::to_string(static_cast<i32>((cohMult - 1.0) * 100.0));
+
+        bonusText += "Observation: " + obsBonusStr + "%%  |  ";
+        bonusText += "Coherence: " + cohBonusStr + "%%";
+
+        ImGui::TextColored(ToImVec4(Color::CoherenceGreen()), "%s", bonusText.c_str());
+    }
+    ImGui::End();
+
+    // 4. Pop styles
+    ImGui::PopStyleVar(3);
+    ImGui::PopStyleColor(2);
+
+    // Handle close
+    if (!windowOpen) {
+        state->SetActiveModal(ActiveModal::None);
+    }
 }
 
 void MilestoneView::Render(GameState* state, Renderer* renderer) {
@@ -1436,9 +1643,9 @@ void BuyablesView::Render(GameState* state, Renderer* renderer) {
 
     if (state->GetActiveModal() != ActiveModal::Buyables) return;
 
-    f32 panelWidth = 900.0f;
-    f32 panelHeight = 600.0f;
     ImVec2 displaySize = ImGui::GetIO().DisplaySize;
+    f32 panelWidth = std::min(displaySize.x * 0.95f, 900.0f);
+    f32 panelHeight = std::min(displaySize.y * 0.9f, 600.0f);
 
     ImVec2 centerPos(displaySize.x * 0.5f, displaySize.y * 0.5f);
     ImGui::SetNextWindowPos(centerPos, ImGuiCond_Always, ImVec2(0.5f, 0.5f));
@@ -1546,9 +1753,9 @@ void ChallengeView::Render(GameState* state, Renderer* renderer) {
 
     if (state->GetActiveModal() != ActiveModal::Challenges) return;
 
-    f32 panelWidth = 900.0f;
-    f32 panelHeight = 650.0f;
     ImVec2 displaySize = ImGui::GetIO().DisplaySize;
+    f32 panelWidth = std::min(displaySize.x * 0.95f, 900.0f);
+    f32 panelHeight = std::min(displaySize.y * 0.9f, 650.0f);
 
     ImVec2 centerPos(displaySize.x * 0.5f, displaySize.y * 0.5f);
     ImGui::SetNextWindowPos(centerPos, ImGuiCond_Always, ImVec2(0.5f, 0.5f));
@@ -1693,9 +1900,9 @@ void EssenceShopView::Render(GameState* state, Renderer* renderer) {
 
     if (state->GetActiveModal() != ActiveModal::EssenceShop) return;
 
-    f32 panelWidth = 900.0f;
-    f32 panelHeight = 650.0f;
     ImVec2 displaySize = ImGui::GetIO().DisplaySize;
+    f32 panelWidth = std::min(displaySize.x * 0.95f, 900.0f);
+    f32 panelHeight = std::min(displaySize.y * 0.9f, 650.0f);
 
     ImVec2 centerPos(displaySize.x * 0.5f, displaySize.y * 0.5f);
     ImGui::SetNextWindowPos(centerPos, ImGuiCond_Always, ImVec2(0.5f, 0.5f));
@@ -1802,9 +2009,9 @@ void SingularityShopView::Render(GameState* state, Renderer* renderer) {
 
     if (state->GetActiveModal() != ActiveModal::SingularityShop) return;
 
-    f32 panelWidth = 900.0f;
-    f32 panelHeight = 650.0f;
     ImVec2 displaySize = ImGui::GetIO().DisplaySize;
+    f32 panelWidth = std::min(displaySize.x * 0.95f, 900.0f);
+    f32 panelHeight = std::min(displaySize.y * 0.9f, 650.0f);
 
     ImVec2 centerPos(displaySize.x * 0.5f, displaySize.y * 0.5f);
     ImGui::SetNextWindowPos(centerPos, ImGuiCond_Always, ImVec2(0.5f, 0.5f));
@@ -1912,10 +2119,10 @@ void SpaceshipView::Render(GameState* state, Renderer* renderer) {
     // We still pass the renderer to the m_Spaceship functions, but the main UI relies on ImGui
     (void)renderer;
 
-    // 1. Setup position and size
-    f32 panelWidth = 1100.0f;
-    f32 panelHeight = 700.0f;
+    // 1. Responsive position and size
     ImVec2 displaySize = ImGui::GetIO().DisplaySize;
+    f32 panelWidth = std::min(displaySize.x * 0.95f, 1100.0f);
+    f32 panelHeight = std::min(displaySize.y * 0.9f, 700.0f);
 
     // Center the window
     ImVec2 centerPos(displaySize.x * 0.5f, displaySize.y * 0.5f);
@@ -2027,21 +2234,20 @@ void SkillTreeView::Render(GameState* state, Renderer* renderer) {
 }
 
 void EnhancementView::Render(GameState* state, Renderer* renderer) {
-    // TODO: Extract from GameState::RenderEnhancement
-    // Note: This method doesn't exist yet in GameState
-    (void)state;
-    (void)renderer;
-    ImGui::Text("Enhancement view - Coming soon!");
+    if (state->GetActiveModal() != ActiveModal::Enhancement) return;
+
+    // EnhancementSystem handles its own ImGui window creation
+    state->m_EnhancementSystem.RenderEnhancementUI(renderer, state);
 }
 
 void SpecializedSkillsView::Render(GameState* state, Renderer* renderer) {
     if (state->GetActiveModal() != ActiveModal::SpecializedSkills) return;
     (void)renderer; // Unused in ImGui rendering
 
-    // Window setup
-    f32 panelWidth = 800.0f;
-    f32 panelHeight = 600.0f;
+    // Responsive window setup
     ImVec2 displaySize = ImGui::GetIO().DisplaySize;
+    f32 panelWidth = std::min(displaySize.x * 0.95f, 800.0f);
+    f32 panelHeight = std::min(displaySize.y * 0.9f, 600.0f);
     ImVec2 centerPos(displaySize.x * 0.5f, displaySize.y * 0.5f);
     ImGui::SetNextWindowPos(centerPos, ImGuiCond_Always, ImVec2(0.5f, 0.5f));
     ImGui::SetNextWindowSize(ImVec2(panelWidth, panelHeight), ImGuiCond_Always);

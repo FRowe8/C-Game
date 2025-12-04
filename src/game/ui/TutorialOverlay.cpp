@@ -149,9 +149,14 @@ bool TutorialOverlay::ShouldAllowInteraction(const char* elementId) const {
 // ============================================================================
 
 void TutorialOverlay::RenderWelcomeStep(GameState* state) {
+    (void)state;
     ImGuiIO& io = ImGui::GetIO();
     ImVec2 screenSize = io.DisplaySize;
-    ImVec2 windowSize(500, 300);
+
+    // Responsive window sizing - 90% of screen width, max 500px
+    float windowWidth = std::min(screenSize.x * 0.9f, 500.0f);
+    float windowHeight = std::min(screenSize.y * 0.7f, 380.0f);
+    ImVec2 windowSize(windowWidth, windowHeight);
     ImVec2 windowPos((screenSize.x - windowSize.x) * 0.5f, (screenSize.y - windowSize.y) * 0.5f);
 
     // Full screen dimming
@@ -172,12 +177,11 @@ void TutorialOverlay::RenderWelcomeStep(GameState* state) {
     ImGui::PushStyleColor(ImGuiCol_WindowBg, UITheme::ColorPanelBg);
     ImGui::PushStyleColor(ImGuiCol_Border, UITheme::ColorAccent);
     ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 2.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(20.0f, 20.0f));
 
     ImGui::Begin("Welcome to Quantum Idle", nullptr,
                  ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
                  ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoScrollbar);
-
-    ImGui::PushFont(ImGui::GetIO().Fonts->Fonts[0]); // Use default font
 
     ImGui::TextWrapped("Welcome to the Quantum Realm!");
     ImGui::Spacing();
@@ -185,57 +189,63 @@ void TutorialOverlay::RenderWelcomeStep(GameState* state) {
     ImGui::Spacing();
 
     ImGui::TextWrapped(
-        "In this incremental game, you'll harness the power of quantum mechanics "
-        "to generate resources and expand your research empire."
+        "In this incremental game, you'll harness quantum mechanics "
+        "to generate resources and expand your empire."
     );
     ImGui::Spacing();
-    ImGui::TextWrapped(
-        "The core mechanic revolves around SUPERPOSITION and OBSERVATION:"
-    );
+    ImGui::TextWrapped("Core mechanics:");
     ImGui::Spacing();
-    ImGui::BulletText("Research stations build up potential resources in superposition");
-    ImGui::BulletText("Observing collapses the wave function to collect resources");
-    ImGui::BulletText("Manage coherence to maintain quantum stability");
+    ImGui::BulletText("Stations build resources in superposition");
+    ImGui::BulletText("Tap OBSERVE to collect resources");
+    ImGui::BulletText("Manage coherence for stability");
 
     ImGui::Spacing();
     ImGui::Spacing();
 
-    // Center the buttons
-    float buttonWidth = 120.0f;
-    float spacing = 10.0f;
-    float totalWidth = buttonWidth * 2 + spacing;
-    float startX = (windowSize.x - totalWidth) * 0.5f;
+    // Mobile-friendly buttons - minimum 48px height for touch targets
+    float buttonHeight = 48.0f;
+    float buttonWidth = (windowSize.x - 60.0f) * 0.48f; // 48% of available width each
+    float spacing = (windowSize.x - 60.0f) * 0.04f;
+    float startX = 10.0f;
 
     ImGui::SetCursorPosX(startX);
-    if (ImGui::Button("Start Tutorial", ImVec2(buttonWidth, 30))) {
+
+    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.2f, 0.6f, 0.3f, 1.0f));
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.3f, 0.7f, 0.4f, 1.0f));
+    ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.4f, 0.8f, 0.5f, 1.0f));
+    if (ImGui::Button("START TUTORIAL", ImVec2(buttonWidth, buttonHeight))) {
         AdvanceStep();
     }
+    ImGui::PopStyleColor(3);
 
     ImGui::SameLine(0, spacing);
-    if (ImGui::Button("Skip", ImVec2(buttonWidth, 30))) {
+
+    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.4f, 0.4f, 0.4f, 1.0f));
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.5f, 0.5f, 0.5f, 1.0f));
+    ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.6f, 0.6f, 0.6f, 1.0f));
+    if (ImGui::Button("SKIP", ImVec2(buttonWidth, buttonHeight))) {
         Skip();
     }
+    ImGui::PopStyleColor(3);
 
-    ImGui::PopFont();
     ImGui::End();
 
-    ImGui::PopStyleVar(2);
+    ImGui::PopStyleVar(3);
     ImGui::PopStyleColor(2);
 }
 
 void TutorialOverlay::RenderObserveStep(GameState* state) {
-    // Find the position of the first "Observe" button in the station view
-    // For now, we'll show a centered tooltip with instructions
-
     ImGuiIO& io = ImGui::GetIO();
     ImVec2 screenSize = io.DisplaySize;
 
     // Semi-transparent dimming except for station area
     DrawDimmingMask(ImVec2(0, 100), ImVec2(screenSize.x, screenSize.y - 100));
 
-    // Tooltip window pointing to station area
-    ImVec2 tooltipSize(400, 200);
-    ImVec2 tooltipPos(screenSize.x * 0.5f - tooltipSize.x * 0.5f, screenSize.y * 0.3f);
+    // Responsive tooltip window
+    float tooltipWidth = std::min(screenSize.x * 0.9f, 420.0f);
+    float tooltipHeight = std::min(screenSize.y * 0.4f, 280.0f);
+    ImVec2 tooltipSize(tooltipWidth, tooltipHeight);
+    ImVec2 tooltipPos(screenSize.x * 0.5f - tooltipSize.x * 0.5f, 20.0f);
 
     ImGui::SetNextWindowPos(tooltipPos);
     ImGui::SetNextWindowSize(tooltipSize);
@@ -243,6 +253,7 @@ void TutorialOverlay::RenderObserveStep(GameState* state) {
     ImGui::PushStyleColor(ImGuiCol_Border, UITheme::ColorAccent);
     ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 3.0f);
     ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 10.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(15.0f, 15.0f));
 
     ImGui::Begin("##ObserveTutorial", nullptr,
                  ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
@@ -255,40 +266,46 @@ void TutorialOverlay::RenderObserveStep(GameState* state) {
     ImGui::Spacing();
 
     ImGui::TextWrapped(
-        "Look at your research station below. It's building up resources in SUPERPOSITION "
-        "(the yellow/gold bar)."
+        "Your research station is building resources in SUPERPOSITION (the gold bar)."
     );
     ImGui::Spacing();
-    ImGui::TextWrapped("Click the OBSERVE button to collapse the wave function and collect qubits!");
+    ImGui::TextWrapped("Tap the OBSERVE button below to collect qubits!");
     ImGui::Spacing();
-    ImGui::TextColored(UITheme::ColorWarning, "Try observing now!");
 
-    // Animated arrow pointing down
-    float time = ImGui::GetTime();
-    float bounce = sinf(time * 3.0f) * 10.0f;
-    ImVec2 arrowStart(tooltipSize.x * 0.5f, tooltipSize.y - 20 + bounce);
-    ImVec2 arrowEnd(tooltipSize.x * 0.5f, tooltipSize.y - 10 + bounce);
+    // Show current progress
+    ImGui::TextColored(UITheme::ColorWarning, "Qubits: %.0f / 10 (auto-advances at 10)",
+                      state->GetResource(QuantumResource::Qubits));
 
-    ImDrawList* drawList = ImGui::GetWindowDrawList();
-    ImVec2 windowPos = ImGui::GetWindowPos();
-    drawList->AddLine(
-        ImVec2(windowPos.x + arrowStart.x, windowPos.y + arrowStart.y),
-        ImVec2(windowPos.x + arrowEnd.x, windowPos.y + arrowEnd.y),
-        ImGui::ColorConvertFloat4ToU32(UITheme::ColorAccent), 3.0f
-    );
+    ImGui::Spacing();
+    ImGui::Spacing();
 
-    // Arrow head
-    drawList->AddTriangleFilled(
-        ImVec2(windowPos.x + arrowEnd.x, windowPos.y + arrowEnd.y),
-        ImVec2(windowPos.x + arrowEnd.x - 5, windowPos.y + arrowEnd.y - 10),
-        ImVec2(windowPos.x + arrowEnd.x + 5, windowPos.y + arrowEnd.y - 10),
-        ImGui::ColorConvertFloat4ToU32(UITheme::ColorAccent)
-    );
+    // Mobile-friendly buttons
+    float buttonHeight = 48.0f;
+    float buttonWidth = (tooltipSize.x - 50.0f) * 0.48f;
+    float spacing = (tooltipSize.x - 50.0f) * 0.04f;
+
+    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.2f, 0.5f, 0.7f, 1.0f));
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.3f, 0.6f, 0.8f, 1.0f));
+    ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.4f, 0.7f, 0.9f, 1.0f));
+    if (ImGui::Button("NEXT", ImVec2(buttonWidth, buttonHeight))) {
+        AdvanceStep();
+    }
+    ImGui::PopStyleColor(3);
+
+    ImGui::SameLine(0, spacing);
+
+    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.4f, 0.4f, 0.4f, 1.0f));
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.5f, 0.5f, 0.5f, 1.0f));
+    ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.6f, 0.6f, 0.6f, 1.0f));
+    if (ImGui::Button("SKIP ALL", ImVec2(buttonWidth, buttonHeight))) {
+        Skip();
+    }
+    ImGui::PopStyleColor(3);
 
     ImGui::PopTextWrapPos();
     ImGui::End();
 
-    ImGui::PopStyleVar(2);
+    ImGui::PopStyleVar(3);
     ImGui::PopStyleColor(2);
 }
 
@@ -299,9 +316,11 @@ void TutorialOverlay::RenderUpgradeStep(GameState* state) {
     // Semi-transparent dimming
     DrawDimmingMask(ImVec2(0, 100), ImVec2(screenSize.x, screenSize.y - 100));
 
-    // Tooltip window
-    ImVec2 tooltipSize(400, 220);
-    ImVec2 tooltipPos(screenSize.x * 0.5f - tooltipSize.x * 0.5f, screenSize.y * 0.3f);
+    // Responsive tooltip window
+    float tooltipWidth = std::min(screenSize.x * 0.9f, 420.0f);
+    float tooltipHeight = std::min(screenSize.y * 0.45f, 300.0f);
+    ImVec2 tooltipSize(tooltipWidth, tooltipHeight);
+    ImVec2 tooltipPos(screenSize.x * 0.5f - tooltipSize.x * 0.5f, 20.0f);
 
     ImGui::SetNextWindowPos(tooltipPos);
     ImGui::SetNextWindowSize(tooltipSize);
@@ -309,6 +328,7 @@ void TutorialOverlay::RenderUpgradeStep(GameState* state) {
     ImGui::PushStyleColor(ImGuiCol_Border, UITheme::ColorSuccess);
     ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 3.0f);
     ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 10.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(15.0f, 15.0f));
 
     ImGui::Begin("##UpgradeTutorial", nullptr,
                  ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
@@ -323,19 +343,43 @@ void TutorialOverlay::RenderUpgradeStep(GameState* state) {
     ImGui::TextWrapped("Great! You've collected qubits.");
     ImGui::Spacing();
     ImGui::TextWrapped(
-        "Now you can UPGRADE your station to increase production. "
-        "Each upgrade makes your station generate resources faster!"
+        "Now tap UPGRADE to increase production speed!"
     );
-    ImGui::Spacing();
-    ImGui::TextColored(UITheme::ColorSuccess, "Click the UPGRADE button to improve your station.");
     ImGui::Spacing();
 
     ImGui::Text("Current Qubits: %.0f", state->GetResource(QuantumResource::Qubits));
+    ImGui::TextColored(ImVec4(0.7f, 0.7f, 0.7f, 1.0f), "(Auto-advances when coherence < 50%%)");
+
+    ImGui::Spacing();
+    ImGui::Spacing();
+
+    // Mobile-friendly buttons
+    float buttonHeight = 48.0f;
+    float buttonWidth = (tooltipSize.x - 50.0f) * 0.48f;
+    float spacing = (tooltipSize.x - 50.0f) * 0.04f;
+
+    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.2f, 0.5f, 0.7f, 1.0f));
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.3f, 0.6f, 0.8f, 1.0f));
+    ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.4f, 0.7f, 0.9f, 1.0f));
+    if (ImGui::Button("NEXT", ImVec2(buttonWidth, buttonHeight))) {
+        AdvanceStep();
+    }
+    ImGui::PopStyleColor(3);
+
+    ImGui::SameLine(0, spacing);
+
+    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.4f, 0.4f, 0.4f, 1.0f));
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.5f, 0.5f, 0.5f, 1.0f));
+    ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.6f, 0.6f, 0.6f, 1.0f));
+    if (ImGui::Button("SKIP ALL", ImVec2(buttonWidth, buttonHeight))) {
+        Skip();
+    }
+    ImGui::PopStyleColor(3);
 
     ImGui::PopTextWrapPos();
     ImGui::End();
 
-    ImGui::PopStyleVar(2);
+    ImGui::PopStyleVar(3);
     ImGui::PopStyleColor(2);
 }
 
@@ -346,9 +390,11 @@ void TutorialOverlay::RenderCoherenceStep(GameState* state) {
     // Dim entire screen except top bar (where resources are)
     DrawDimmingMask(ImVec2(0, 0), ImVec2(screenSize.x, 80));
 
-    // Tooltip window
-    ImVec2 tooltipSize(450, 250);
-    ImVec2 tooltipPos(screenSize.x * 0.5f - tooltipSize.x * 0.5f, 100);
+    // Responsive tooltip window
+    float tooltipWidth = std::min(screenSize.x * 0.9f, 450.0f);
+    float tooltipHeight = std::min(screenSize.y * 0.55f, 340.0f);
+    ImVec2 tooltipSize(tooltipWidth, tooltipHeight);
+    ImVec2 tooltipPos(screenSize.x * 0.5f - tooltipSize.x * 0.5f, 90);
 
     ImGui::SetNextWindowPos(tooltipPos);
     ImGui::SetNextWindowSize(tooltipSize);
@@ -356,6 +402,7 @@ void TutorialOverlay::RenderCoherenceStep(GameState* state) {
     ImGui::PushStyleColor(ImGuiCol_Border, UITheme::ColorDanger);
     ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 3.0f);
     ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 10.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(15.0f, 15.0f));
 
     ImGui::Begin("##CoherenceTutorial", nullptr,
                  ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
@@ -367,42 +414,57 @@ void TutorialOverlay::RenderCoherenceStep(GameState* state) {
     ImGui::Separator();
     ImGui::Spacing();
 
-    ImGui::TextWrapped("Warning! Your COHERENCE is dropping!");
+    ImGui::TextWrapped("Coherence = quantum stability.");
     ImGui::Spacing();
     ImGui::TextWrapped(
-        "Coherence represents quantum stability. When it drops too low, your observation "
-        "success rate decreases."
-    );
-    ImGui::Spacing();
-    ImGui::TextWrapped(
-        "Look at the top bar - Coherence is the second resource (shown in cyan/blue). "
-        "You can stabilize it by purchasing Coherence upgrades from the Research menu."
-    );
-    ImGui::Spacing();
-    ImGui::TextColored(UITheme::ColorWarning,
-        "For now, just observe how coherence affects your gameplay. "
-        "It will regenerate slowly over time."
+        "Low coherence reduces observation success. Watch the cyan bar at the top!"
     );
     ImGui::Spacing();
 
     ImGui::Text("Current Coherence: %.1f / 100.0", state->GetResource(QuantumResource::Coherence));
 
     ImGui::Spacing();
-    if (ImGui::Button("I Understand", ImVec2(150, 30))) {
+    ImGui::Spacing();
+
+    // Mobile-friendly buttons
+    float buttonHeight = 48.0f;
+    float buttonWidth = (tooltipSize.x - 50.0f) * 0.48f;
+    float spacing = (tooltipSize.x - 50.0f) * 0.04f;
+
+    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.2f, 0.6f, 0.3f, 1.0f));
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.3f, 0.7f, 0.4f, 1.0f));
+    ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.4f, 0.8f, 0.5f, 1.0f));
+    if (ImGui::Button("GOT IT!", ImVec2(buttonWidth, buttonHeight))) {
         AdvanceStep();
     }
+    ImGui::PopStyleColor(3);
+
+    ImGui::SameLine(0, spacing);
+
+    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.4f, 0.4f, 0.4f, 1.0f));
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.5f, 0.5f, 0.5f, 1.0f));
+    ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.6f, 0.6f, 0.6f, 1.0f));
+    if (ImGui::Button("SKIP ALL", ImVec2(buttonWidth, buttonHeight))) {
+        Skip();
+    }
+    ImGui::PopStyleColor(3);
 
     ImGui::PopTextWrapPos();
     ImGui::End();
 
-    ImGui::PopStyleVar(2);
+    ImGui::PopStyleVar(3);
     ImGui::PopStyleColor(2);
 }
 
 void TutorialOverlay::RenderCompletedStep(GameState* state) {
+    (void)state;
     ImGuiIO& io = ImGui::GetIO();
     ImVec2 screenSize = io.DisplaySize;
-    ImVec2 windowSize(450, 250);
+
+    // Responsive window sizing
+    float windowWidth = std::min(screenSize.x * 0.9f, 450.0f);
+    float windowHeight = std::min(screenSize.y * 0.6f, 320.0f);
+    ImVec2 windowSize(windowWidth, windowHeight);
     ImVec2 windowPos((screenSize.x - windowSize.x) * 0.5f, (screenSize.y - windowSize.y) * 0.5f);
 
     // Full screen dimming
@@ -423,46 +485,49 @@ void TutorialOverlay::RenderCompletedStep(GameState* state) {
     ImGui::PushStyleColor(ImGuiCol_WindowBg, UITheme::ColorPanelBg);
     ImGui::PushStyleColor(ImGuiCol_Border, UITheme::ColorSuccess);
     ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 2.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(20.0f, 20.0f));
 
     ImGui::Begin("Tutorial Complete!", nullptr,
                  ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
                  ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoScrollbar);
 
-    ImGui::PushTextWrapPos(windowSize.x - 30);
+    ImGui::PushTextWrapPos(windowSize.x - 40);
 
     ImGui::TextColored(UITheme::ColorSuccess, "Congratulations!");
     ImGui::Separator();
     ImGui::Spacing();
 
-    ImGui::TextWrapped("You've learned the basics of Quantum Idle:");
+    ImGui::TextWrapped("You've learned the basics:");
     ImGui::Spacing();
-    ImGui::BulletText("Observing stations to collect resources");
-    ImGui::BulletText("Upgrading to increase production");
-    ImGui::BulletText("Managing coherence for quantum stability");
+    ImGui::BulletText("Observe to collect resources");
+    ImGui::BulletText("Upgrade for faster production");
+    ImGui::BulletText("Manage coherence stability");
 
     ImGui::Spacing();
-    ImGui::Spacing();
-    ImGui::TextWrapped(
-        "There's much more to discover: Research Trees, Prestige, Combat, "
-        "Spaceships, and more! Experiment and have fun!"
-    );
+    ImGui::TextWrapped("Explore Research, Prestige, Combat & more!");
 
     ImGui::Spacing();
     ImGui::Spacing();
 
-    // Center the button
-    float buttonWidth = 150.0f;
-    float startX = (windowSize.x - buttonWidth) * 0.5f;
+    // Mobile-friendly centered button
+    float buttonHeight = 52.0f;
+    float buttonWidth = windowSize.x - 60.0f;
+    float startX = 10.0f;
 
     ImGui::SetCursorPosX(startX);
-    if (ImGui::Button("Start Playing!", ImVec2(buttonWidth, 35))) {
+
+    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.2f, 0.6f, 0.3f, 1.0f));
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.3f, 0.7f, 0.4f, 1.0f));
+    ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.4f, 0.8f, 0.5f, 1.0f));
+    if (ImGui::Button("START PLAYING!", ImVec2(buttonWidth, buttonHeight))) {
         AdvanceStep(); // Will set to None
     }
+    ImGui::PopStyleColor(3);
 
     ImGui::PopTextWrapPos();
     ImGui::End();
 
-    ImGui::PopStyleVar(2);
+    ImGui::PopStyleVar(3);
     ImGui::PopStyleColor(2);
 }
 
