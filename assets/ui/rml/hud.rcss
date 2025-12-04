@@ -1,22 +1,276 @@
+/* ========== Global Styles ========== */
 body {
   font-family: "Inter", "Roboto", sans-serif;
   background: transparent;
+  margin: 0;
+  padding: 0;
+  color: #e5e7eb;
+  font-size: 14px;
 }
 
+/* ========== Root Container ========== */
 #hud-root {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  padding: 12px;
+  width: 100%;
+  height: 100%;
   min-height: 100vh;
   box-sizing: border-box;
 }
 
-.panel {
+/* ========== Bar Containers (Top & Bottom) ========== */
+.bar-container {
+  background-color: rgba(10, 12, 18, 0.95);
   border: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 12dp 16dp;
+  flex-shrink: 0;
+}
+
+#top-bar {
+  border-bottom: 2px solid #3b82f6;
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+}
+
+#bottom-nav {
+  border-top: 2px solid #3b82f6;
+  box-shadow: 0 -2px 8px rgba(59, 130, 246, 0.3);
+}
+
+/* ========== Resource Grid ========== */
+.resource-grid {
+  display: flex;
+  flex-direction: row;
+  gap: 20dp;
+  justify-content: flex-start;
+  align-items: center;
+}
+
+.resource-item {
+  display: flex;
+  flex-direction: row;
+  gap: 8dp;
+  align-items: center;
+  padding: 4dp 8dp;
+  background-color: rgba(255, 255, 255, 0.02);
+  border-radius: 6dp;
+  min-width: 100dp;
+}
+
+.resource-label {
+  font-size: 13dp;
+  font-weight: bold;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.resource-value {
+  font-size: 16dp;
+  font-weight: 600;
+  font-family: "Courier New", monospace;
+}
+
+/* Resource Colors */
+.quantum-blue { color: #3b82f6; }
+.coherence-green { color: #10b981; }
+.entanglement-orange { color: #f97316; }
+.photon-cyan { color: #06b6d4; }
+.singularity-magenta { color: #d946ef; }
+
+/* ========== Main Content Area ========== */
+#main-content {
+  flex: 1;
+  overflow: hidden;
+  background: transparent;
+  padding: 0;
+}
+
+.scroll-container {
+  width: 100%;
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 16dp;
+  box-sizing: border-box;
+}
+
+/* ========== View Panels ========== */
+.view-panel {
+  display: none;
+}
+
+.view-panel.active {
+  display: block;
+}
+
+.view-title {
+  font-size: 24dp;
+  font-weight: 700;
+  color: #3b82f6;
+  margin: 0 0 20dp 0;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  text-shadow: 0 0 10px rgba(59, 130, 246, 0.5);
+}
+
+.placeholder-text {
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 16dp;
+  text-align: center;
+  padding: 40dp;
+}
+
+/* ========== Station Cards ========== */
+.stations-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 16dp;
+}
+
+.station-card {
   background-color: rgba(10, 12, 18, 0.85);
-  border-radius: 8px;
-  padding: 12px;
-  color: #e5e7eb;
-  font-size: 14px;
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  border-radius: 12dp;
+  padding: 16dp;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.station-card:hover {
+  border-color: rgba(59, 130, 246, 0.6);
+  box-shadow: 0 6px 16px rgba(59, 130, 246, 0.2);
+}
+
+.station-name {
+  font-size: 18dp;
+  font-weight: 600;
+  color: #60a5fa;
+  margin: 0 0 8dp 0;
+}
+
+.station-desc {
+  font-size: 14dp;
+  color: rgba(255, 255, 255, 0.7);
+  margin: 0 0 12dp 0;
+  line-height: 1.5;
+}
+
+.station-stat {
+  font-size: 14dp;
+  color: rgba(255, 255, 255, 0.8);
+  margin: 0;
+}
+
+/* ========== Buttons ========== */
+button {
+  font-family: inherit;
+  font-size: 14dp;
+  font-weight: 600;
+  border: none;
+  border-radius: 8dp;
+  padding: 10dp 20dp;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.btn-primary {
+  background-color: #3b82f6;
+  color: white;
+  border: 1px solid #2563eb;
+}
+
+.btn-primary:hover {
+  background-color: #2563eb;
+  box-shadow: 0 0 16px rgba(59, 130, 246, 0.5);
+}
+
+.btn-primary:active {
+  background-color: #1d4ed8;
+  transform: scale(0.98);
+}
+
+/* ========== Navigation Buttons ========== */
+.nav-buttons {
+  display: flex;
+  flex-direction: row;
+  gap: 8dp;
+  justify-content: space-between;
+}
+
+.nav-btn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4dp;
+  padding: 12dp 8dp;
+  background-color: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10dp;
+  min-height: 60dp;
+}
+
+.nav-btn:hover {
+  background-color: rgba(59, 130, 246, 0.1);
+  border-color: rgba(59, 130, 246, 0.3);
+}
+
+.nav-btn.active {
+  background-color: rgba(59, 130, 246, 0.2);
+  border-color: #3b82f6;
+  box-shadow: 0 0 12px rgba(59, 130, 246, 0.4);
+}
+
+.nav-icon {
+  font-size: 24dp;
+  line-height: 1;
+}
+
+.nav-label {
+  font-size: 11dp;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+/* ========== Progress Bar ========== */
+.progress-bar {
+  width: 100%;
+  height: 12dp;
+  background-color: rgba(255, 255, 255, 0.1);
+  border-radius: 6dp;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #10b981 0%, #059669 100%);
+  transition: width 0.3s;
+  box-shadow: 0 0 8px rgba(16, 185, 129, 0.6);
+}
+
+/* ========== Scrollbar Styling ========== */
+scrollbarvertical {
+  width: 12dp;
+  background-color: rgba(0, 0, 0, 0.3);
+}
+
+scrollbarvertical slidertrack {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+scrollbarvertical sliderbar {
+  background-color: rgba(59, 130, 246, 0.5);
+  border-radius: 6dp;
+}
+
+scrollbarvertical sliderbar:hover {
+  background-color: rgba(59, 130, 246, 0.7);
+}
+
+scrollbarvertical sliderbar:active {
+  background-color: rgba(59, 130, 246, 0.9);
 }
