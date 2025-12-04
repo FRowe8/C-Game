@@ -172,3 +172,121 @@ void RmlUiSystem::OnResize(int width, int height) {
 #endif
 }
 
+// ========== Data Binding Helpers ==========
+
+void RmlUiSystem::UpdateResource(const std::string& resourceName, f64 value) {
+#ifdef RMLUI_ENABLED
+    if (!m_Initialized || !m_Backend || !m_Backend->context) return;
+
+    // Format the value (simple formatting for now)
+    char buffer[64];
+    if (value >= 1e12) {
+        snprintf(buffer, sizeof(buffer), "%.2fT", value / 1e12);
+    } else if (value >= 1e9) {
+        snprintf(buffer, sizeof(buffer), "%.2fB", value / 1e9);
+    } else if (value >= 1e6) {
+        snprintf(buffer, sizeof(buffer), "%.2fM", value / 1e6);
+    } else if (value >= 1e3) {
+        snprintf(buffer, sizeof(buffer), "%.2fK", value / 1e3);
+    } else if (value >= 10) {
+        snprintf(buffer, sizeof(buffer), "%.1f", value);
+    } else {
+        snprintf(buffer, sizeof(buffer), "%.2f", value);
+    }
+
+    UpdateResourceFormatted(resourceName, buffer);
+#else
+    (void)resourceName;
+    (void)value;
+#endif
+}
+
+void RmlUiSystem::UpdateResourceFormatted(const std::string& resourceName, const std::string& formattedValue) {
+#ifdef RMLUI_ENABLED
+    if (!m_Initialized || !m_Backend || !m_Backend->context) return;
+
+    Rml::ElementDocument* document = m_Backend->context->GetDocument(0);
+    if (!document) return;
+
+    // Find element with data-bind attribute
+    Rml::ElementList elements;
+    document->GetElementsByTagName(elements, "*");
+
+    for (Rml::Element* element : elements) {
+        if (element->GetAttribute<Rml::String>("data-bind", "") == resourceName) {
+            element->SetInnerRML(formattedValue);
+        }
+    }
+#else
+    (void)resourceName;
+    (void)formattedValue;
+#endif
+}
+
+void RmlUiSystem::SetElementText(const std::string& elementId, const std::string& text) {
+#ifdef RMLUI_ENABLED
+    if (!m_Initialized || !m_Backend || !m_Backend->context) return;
+
+    Rml::ElementDocument* document = m_Backend->context->GetDocument(0);
+    if (!document) return;
+
+    Rml::Element* element = document->GetElementById(elementId);
+    if (element) {
+        element->SetInnerRML(text);
+    }
+#else
+    (void)elementId;
+    (void)text;
+#endif
+}
+
+void RmlUiSystem::SetElementVisible(const std::string& elementId, bool visible) {
+#ifdef RMLUI_ENABLED
+    if (!m_Initialized || !m_Backend || !m_Backend->context) return;
+
+    Rml::ElementDocument* document = m_Backend->context->GetDocument(0);
+    if (!document) return;
+
+    Rml::Element* element = document->GetElementById(elementId);
+    if (element) {
+        element->SetProperty("display", visible ? "block" : "none");
+    }
+#else
+    (void)elementId;
+    (void)visible;
+#endif
+}
+
+void RmlUiSystem::ActivateView(const std::string& viewId) {
+#ifdef RMLUI_ENABLED
+    if (!m_Initialized || !m_Backend || !m_Backend->context) return;
+
+    Rml::ElementDocument* document = m_Backend->context->GetDocument(0);
+    if (!document) return;
+
+    // Deactivate all view panels
+    Rml::ElementList panels;
+    document->GetElementsByClassName(panels, "view-panel");
+    for (Rml::Element* panel : panels) {
+        panel->SetClass("active", false);
+    }
+
+    // Activate the requested view
+    Rml::Element* targetView = document->GetElementById(viewId);
+    if (targetView) {
+        targetView->SetClass("active", true);
+    }
+
+    // Update navigation button states
+    Rml::ElementList navButtons;
+    document->GetElementsByClassName(navButtons, "nav-btn");
+    for (Rml::Element* button : navButtons) {
+        std::string dataView = button->GetAttribute<Rml::String>("data-view", "");
+        bool isActive = ("view-" + dataView == viewId);
+        button->SetClass("active", isActive);
+    }
+#else
+    (void)viewId;
+#endif
+}
+
