@@ -66,6 +66,12 @@ void TutorialOverlay::Render(GameState* state, Renderer* renderer) {
         return;
     }
 
+    // Allow keyboard-only users to close the tutorial quickly
+    if (ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+        Skip();
+        return;
+    }
+
     // Render step-specific content
     switch (m_CurrentStep) {
         case TutorialStep::Welcome:
@@ -153,22 +159,18 @@ void TutorialOverlay::RenderWelcomeStep(GameState* state) {
     ImGuiIO& io = ImGui::GetIO();
     ImVec2 screenSize = io.DisplaySize;
 
-    // Responsive window sizing - 90% of screen width, max 500px
-    float windowWidth = std::min(screenSize.x * 0.9f, 500.0f);
-    float windowHeight = std::min(screenSize.y * 0.7f, 380.0f);
+    // Responsive window sizing - scales with viewport while respecting a max size
+    float windowWidth = std::min(screenSize.x * 0.92f, 520.0f);
+    float windowHeight = std::min(screenSize.y * 0.78f, 420.0f);
     ImVec2 windowSize(windowWidth, windowHeight);
     ImVec2 windowPos((screenSize.x - windowSize.x) * 0.5f, (screenSize.y - windowSize.y) * 0.5f);
 
-    // Full screen dimming
-    ImGui::SetNextWindowPos(ImVec2(0, 0));
-    ImGui::SetNextWindowSize(screenSize);
-    ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0, 0, 0, 0.7f));
-    ImGui::Begin("##TutorialDim", nullptr,
-                 ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
-                 ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoScrollbar |
-                 ImGuiWindowFlags_NoInputs);
-    ImGui::End();
-    ImGui::PopStyleColor();
+    // Full screen dimming (clicking the backdrop closes the tutorial)
+    bool backdropClicked = RenderBackdrop(ImVec4(0, 0, 0, 0.7f), "##TutorialDim", true);
+    if (backdropClicked) {
+        Skip();
+        return;
+    }
 
     // Welcome dialog
     ImGui::SetNextWindowPos(windowPos);
@@ -179,9 +181,27 @@ void TutorialOverlay::RenderWelcomeStep(GameState* state) {
     ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 2.0f);
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(20.0f, 20.0f));
 
+    ImGui::SetNextWindowFocus();
     ImGui::Begin("Welcome to Quantum Idle", nullptr,
                  ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
                  ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoScrollbar);
+
+    // Skip/close control placed at the top for visibility and keyboard focus
+    ImVec2 closeButtonSize(std::min(windowSize.x * 0.4f, 130.0f), 34.0f);
+    ImGui::SetCursorPos(ImVec2(windowSize.x - closeButtonSize.x - 10.0f, 4.0f));
+    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.35f, 0.35f, 0.35f, 1.0f));
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.45f, 0.45f, 0.45f, 1.0f));
+    ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.5f, 0.5f, 0.5f, 1.0f));
+    if (ImGui::Button("Skip tutorial", closeButtonSize)) {
+        Skip();
+        ImGui::PopStyleColor(3);
+        ImGui::End();
+        ImGui::PopStyleVar(3);
+        ImGui::PopStyleColor(2);
+        return;
+    }
+    ImGui::PopStyleColor(3);
+    ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 6.0f);
 
     ImGui::TextWrapped("Welcome to the Quantum Realm!");
     ImGui::Spacing();
@@ -239,7 +259,11 @@ void TutorialOverlay::RenderObserveStep(GameState* state) {
     ImVec2 screenSize = io.DisplaySize;
 
     // Semi-transparent dimming except for station area
-    DrawDimmingMask(ImVec2(0, 100), ImVec2(screenSize.x, screenSize.y - 100));
+    bool backdropClicked = DrawDimmingMask(ImVec2(0, 100), ImVec2(screenSize.x, screenSize.y - 100), true);
+    if (backdropClicked) {
+        Skip();
+        return;
+    }
 
     // Responsive tooltip window
     float tooltipWidth = std::min(screenSize.x * 0.9f, 420.0f);
@@ -255,9 +279,27 @@ void TutorialOverlay::RenderObserveStep(GameState* state) {
     ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 10.0f);
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(15.0f, 15.0f));
 
+    ImGui::SetNextWindowFocus();
     ImGui::Begin("##ObserveTutorial", nullptr,
                  ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
                  ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse);
+
+    ImVec2 closeButtonSize(std::min(tooltipSize.x * 0.45f, 140.0f), 32.0f);
+    ImGui::SetCursorPos(ImVec2(tooltipSize.x - closeButtonSize.x - 6.0f, 2.0f));
+    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.3f, 0.3f, 0.3f, 1.0f));
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.4f, 0.4f, 0.4f, 1.0f));
+    ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.45f, 0.45f, 0.45f, 1.0f));
+    if (ImGui::Button("Skip tutorial", closeButtonSize)) {
+        Skip();
+        ImGui::PopStyleColor(3);
+        ImGui::PopTextWrapPos();
+        ImGui::End();
+        ImGui::PopStyleVar(3);
+        ImGui::PopStyleColor(2);
+        return;
+    }
+    ImGui::PopStyleColor(3);
+    ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 4.0f);
 
     ImGui::PushTextWrapPos(tooltipSize.x - 30);
 
@@ -287,6 +329,7 @@ void TutorialOverlay::RenderObserveStep(GameState* state) {
     ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.2f, 0.5f, 0.7f, 1.0f));
     ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.3f, 0.6f, 0.8f, 1.0f));
     ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.4f, 0.7f, 0.9f, 1.0f));
+    ImGui::SetItemDefaultFocus();
     if (ImGui::Button("NEXT", ImVec2(buttonWidth, buttonHeight))) {
         AdvanceStep();
     }
@@ -314,7 +357,11 @@ void TutorialOverlay::RenderUpgradeStep(GameState* state) {
     ImVec2 screenSize = io.DisplaySize;
 
     // Semi-transparent dimming
-    DrawDimmingMask(ImVec2(0, 100), ImVec2(screenSize.x, screenSize.y - 100));
+    bool backdropClicked = DrawDimmingMask(ImVec2(0, 100), ImVec2(screenSize.x, screenSize.y - 100), true);
+    if (backdropClicked) {
+        Skip();
+        return;
+    }
 
     // Responsive tooltip window
     float tooltipWidth = std::min(screenSize.x * 0.9f, 420.0f);
@@ -330,9 +377,27 @@ void TutorialOverlay::RenderUpgradeStep(GameState* state) {
     ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 10.0f);
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(15.0f, 15.0f));
 
+    ImGui::SetNextWindowFocus();
     ImGui::Begin("##UpgradeTutorial", nullptr,
                  ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
                  ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse);
+
+    ImVec2 closeButtonSize(std::min(tooltipSize.x * 0.45f, 140.0f), 32.0f);
+    ImGui::SetCursorPos(ImVec2(tooltipSize.x - closeButtonSize.x - 6.0f, 2.0f));
+    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.3f, 0.3f, 0.3f, 1.0f));
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.4f, 0.4f, 0.4f, 1.0f));
+    ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.45f, 0.45f, 0.45f, 1.0f));
+    if (ImGui::Button("Skip tutorial", closeButtonSize)) {
+        Skip();
+        ImGui::PopStyleColor(3);
+        ImGui::PopTextWrapPos();
+        ImGui::End();
+        ImGui::PopStyleVar(3);
+        ImGui::PopStyleColor(2);
+        return;
+    }
+    ImGui::PopStyleColor(3);
+    ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 4.0f);
 
     ImGui::PushTextWrapPos(tooltipSize.x - 30);
 
@@ -361,6 +426,7 @@ void TutorialOverlay::RenderUpgradeStep(GameState* state) {
     ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.2f, 0.5f, 0.7f, 1.0f));
     ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.3f, 0.6f, 0.8f, 1.0f));
     ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.4f, 0.7f, 0.9f, 1.0f));
+    ImGui::SetItemDefaultFocus();
     if (ImGui::Button("NEXT", ImVec2(buttonWidth, buttonHeight))) {
         AdvanceStep();
     }
@@ -388,7 +454,11 @@ void TutorialOverlay::RenderCoherenceStep(GameState* state) {
     ImVec2 screenSize = io.DisplaySize;
 
     // Dim entire screen except top bar (where resources are)
-    DrawDimmingMask(ImVec2(0, 0), ImVec2(screenSize.x, 80));
+    bool backdropClicked = DrawDimmingMask(ImVec2(0, 0), ImVec2(screenSize.x, 80), true);
+    if (backdropClicked) {
+        Skip();
+        return;
+    }
 
     // Responsive tooltip window
     float tooltipWidth = std::min(screenSize.x * 0.9f, 450.0f);
@@ -404,9 +474,27 @@ void TutorialOverlay::RenderCoherenceStep(GameState* state) {
     ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 10.0f);
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(15.0f, 15.0f));
 
+    ImGui::SetNextWindowFocus();
     ImGui::Begin("##CoherenceTutorial", nullptr,
                  ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
                  ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse);
+
+    ImVec2 closeButtonSize(std::min(tooltipSize.x * 0.45f, 140.0f), 32.0f);
+    ImGui::SetCursorPos(ImVec2(tooltipSize.x - closeButtonSize.x - 6.0f, 2.0f));
+    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.3f, 0.3f, 0.3f, 1.0f));
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.4f, 0.4f, 0.4f, 1.0f));
+    ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.45f, 0.45f, 0.45f, 1.0f));
+    if (ImGui::Button("Skip tutorial", closeButtonSize)) {
+        Skip();
+        ImGui::PopStyleColor(3);
+        ImGui::PopTextWrapPos();
+        ImGui::End();
+        ImGui::PopStyleVar(3);
+        ImGui::PopStyleColor(2);
+        return;
+    }
+    ImGui::PopStyleColor(3);
+    ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 4.0f);
 
     ImGui::PushTextWrapPos(tooltipSize.x - 30);
 
@@ -434,6 +522,7 @@ void TutorialOverlay::RenderCoherenceStep(GameState* state) {
     ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.2f, 0.6f, 0.3f, 1.0f));
     ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.3f, 0.7f, 0.4f, 1.0f));
     ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.4f, 0.8f, 0.5f, 1.0f));
+    ImGui::SetItemDefaultFocus();
     if (ImGui::Button("GOT IT!", ImVec2(buttonWidth, buttonHeight))) {
         AdvanceStep();
     }
@@ -462,21 +551,17 @@ void TutorialOverlay::RenderCompletedStep(GameState* state) {
     ImVec2 screenSize = io.DisplaySize;
 
     // Responsive window sizing
-    float windowWidth = std::min(screenSize.x * 0.9f, 450.0f);
-    float windowHeight = std::min(screenSize.y * 0.6f, 320.0f);
+    float windowWidth = std::min(screenSize.x * 0.92f, 470.0f);
+    float windowHeight = std::min(screenSize.y * 0.65f, 340.0f);
     ImVec2 windowSize(windowWidth, windowHeight);
     ImVec2 windowPos((screenSize.x - windowSize.x) * 0.5f, (screenSize.y - windowSize.y) * 0.5f);
 
     // Full screen dimming
-    ImGui::SetNextWindowPos(ImVec2(0, 0));
-    ImGui::SetNextWindowSize(screenSize);
-    ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0, 0, 0, 0.7f));
-    ImGui::Begin("##TutorialCompleteDim", nullptr,
-                 ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
-                 ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoScrollbar |
-                 ImGuiWindowFlags_NoInputs);
-    ImGui::End();
-    ImGui::PopStyleColor();
+    bool backdropClicked = RenderBackdrop(ImVec4(0, 0, 0, 0.7f), "##TutorialCompleteDim", true);
+    if (backdropClicked) {
+        AdvanceStep();
+        return;
+    }
 
     // Completion dialog
     ImGui::SetNextWindowPos(windowPos);
@@ -487,9 +572,27 @@ void TutorialOverlay::RenderCompletedStep(GameState* state) {
     ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 2.0f);
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(20.0f, 20.0f));
 
+    ImGui::SetNextWindowFocus();
     ImGui::Begin("Tutorial Complete!", nullptr,
                  ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
                  ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoScrollbar);
+
+    ImVec2 closeButtonSize(std::min(windowSize.x * 0.4f, 140.0f), 32.0f);
+    ImGui::SetCursorPos(ImVec2(windowSize.x - closeButtonSize.x - 10.0f, 4.0f));
+    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.35f, 0.35f, 0.35f, 1.0f));
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.45f, 0.45f, 0.45f, 1.0f));
+    ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.5f, 0.5f, 0.5f, 1.0f));
+    if (ImGui::Button("Close tutorial", closeButtonSize)) {
+        AdvanceStep();
+        ImGui::PopStyleColor(3);
+        ImGui::PopTextWrapPos();
+        ImGui::End();
+        ImGui::PopStyleVar(3);
+        ImGui::PopStyleColor(2);
+        return;
+    }
+    ImGui::PopStyleColor(3);
+    ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 6.0f);
 
     ImGui::PushTextWrapPos(windowSize.x - 40);
 
@@ -519,6 +622,7 @@ void TutorialOverlay::RenderCompletedStep(GameState* state) {
     ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.2f, 0.6f, 0.3f, 1.0f));
     ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.3f, 0.7f, 0.4f, 1.0f));
     ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.4f, 0.8f, 0.5f, 1.0f));
+    ImGui::SetItemDefaultFocus();
     if (ImGui::Button("START PLAYING!", ImVec2(buttonWidth, buttonHeight))) {
         AdvanceStep(); // Will set to None
     }
@@ -535,7 +639,7 @@ void TutorialOverlay::RenderCompletedStep(GameState* state) {
 // Helper Functions
 // ============================================================================
 
-void TutorialOverlay::DrawDimmingMask(const ImVec2& cutoutMin, const ImVec2& cutoutMax) {
+bool TutorialOverlay::DrawDimmingMask(const ImVec2& cutoutMin, const ImVec2& cutoutMax, bool allowDismiss) {
     ImGuiIO& io = ImGui::GetIO();
     ImVec2 screenSize = io.DisplaySize;
 
@@ -545,9 +649,15 @@ void TutorialOverlay::DrawDimmingMask(const ImVec2& cutoutMin, const ImVec2& cut
     ImGui::Begin("##TutorialMask", nullptr,
                  ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
                  ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoScrollbar |
-                 ImGuiWindowFlags_NoInputs);
+                 ImGuiWindowFlags_NoSavedSettings);
 
     ImDrawList* drawList = ImGui::GetWindowDrawList();
+
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0.0f, 0.0f));
+    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, 0.0f));
+    ImGui::InvisibleButton("##TutorialMaskClickArea", screenSize);
+    bool clicked = allowDismiss && ImGui::IsItemClicked();
+    ImGui::PopStyleVar(2);
 
     // Draw four rectangles around the cutout area to create dimming effect
     ImU32 dimColor = ImGui::ColorConvertFloat4ToU32(ImVec4(0, 0, 0, 0.6f));
@@ -571,6 +681,32 @@ void TutorialOverlay::DrawDimmingMask(const ImVec2& cutoutMin, const ImVec2& cut
 
     ImGui::End();
     ImGui::PopStyleColor();
+
+    return clicked;
+}
+
+bool TutorialOverlay::RenderBackdrop(const ImVec4& color, const char* id, bool allowDismiss) {
+    ImGuiIO& io = ImGui::GetIO();
+    ImVec2 screenSize = io.DisplaySize;
+
+    ImGui::SetNextWindowPos(ImVec2(0, 0));
+    ImGui::SetNextWindowSize(screenSize);
+    ImGui::PushStyleColor(ImGuiCol_WindowBg, color);
+    ImGui::Begin(id, nullptr,
+                 ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
+                 ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoScrollbar |
+                 ImGuiWindowFlags_NoSavedSettings);
+
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0.0f, 0.0f));
+    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, 0.0f));
+    ImGui::InvisibleButton("##TutorialBackdropArea", screenSize);
+    bool clicked = allowDismiss && ImGui::IsItemClicked();
+    ImGui::PopStyleVar(2);
+
+    ImGui::End();
+    ImGui::PopStyleColor();
+
+    return clicked;
 }
 
 void TutorialOverlay::DrawTooltipArrow(const ImVec2& targetPos, const char* text) {
