@@ -112,6 +112,11 @@ private:
     void RenderCoherenceStep(GameState* state);
     void RenderCompletedStep(GameState* state);
 
+    ImVec2 CalculateModalSize(const ImVec2& screenSize, float maxWidth, float maxHeight) const;
+    ImVec2 CenterModal(const ImVec2& windowSize, const ImVec2& screenSize) const;
+    void RenderSectionHeader(const char* title, const char* subtitle = nullptr) const;
+    void AddVerticalSpace(float amount) const;
+
     /**
      * Draw dimming mask over entire screen except for cutout area
      * @param cutoutMin Top-left corner of the highlighted area

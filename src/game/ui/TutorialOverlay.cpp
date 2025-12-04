@@ -14,6 +14,39 @@ TutorialOverlay::TutorialOverlay()
 {
 }
 
+ImVec2 TutorialOverlay::CalculateModalSize(const ImVec2& screenSize, float maxWidth, float maxHeight) const {
+    const float horizontalMargin = UITheme::SpacingLG() * 2.5f;
+    const float verticalMargin = UITheme::SpacingLG() * 2.5f;
+
+    const float width = std::min(screenSize.x - horizontalMargin * 2.0f, maxWidth);
+    const float height = std::min(screenSize.y - verticalMargin * 2.0f, maxHeight);
+
+    return ImVec2(std::max(width, UITheme::SpacingLG() * 20.0f),
+                  std::max(height, UITheme::SpacingLG() * 15.0f));
+}
+
+ImVec2 TutorialOverlay::CenterModal(const ImVec2& windowSize, const ImVec2& screenSize) const {
+    return ImVec2((screenSize.x - windowSize.x) * 0.5f, (screenSize.y - windowSize.y) * 0.5f);
+}
+
+void TutorialOverlay::RenderSectionHeader(const char* title, const char* subtitle) const {
+    ImGui::TextColored(UITheme::ColorAccent, "%s", title);
+    ImGui::PushStyleColor(ImGuiCol_Separator, UITheme::ColorCardBorder);
+    ImGui::Separator();
+    ImGui::PopStyleColor();
+
+    if (subtitle && subtitle[0] != '\0') {
+        AddVerticalSpace(UITheme::SpacingSM());
+        ImGui::TextColored(UITheme::ColorTextDim, "%s", subtitle);
+    }
+
+    AddVerticalSpace(UITheme::SpacingMD());
+}
+
+void TutorialOverlay::AddVerticalSpace(float amount) const {
+    ImGui::Dummy(ImVec2(0.0f, amount));
+}
+
 void TutorialOverlay::Update(GameState* state) {
     if (m_TutorialCompleted) {
         return;
@@ -160,10 +193,8 @@ void TutorialOverlay::RenderWelcomeStep(GameState* state) {
     ImVec2 screenSize = io.DisplaySize;
 
     // Responsive window sizing - scales with viewport while respecting a max size
-    float windowWidth = std::min(screenSize.x * 0.92f, 520.0f);
-    float windowHeight = std::min(screenSize.y * 0.78f, 420.0f);
-    ImVec2 windowSize(windowWidth, windowHeight);
-    ImVec2 windowPos((screenSize.x - windowSize.x) * 0.5f, (screenSize.y - windowSize.y) * 0.5f);
+    ImVec2 windowSize = CalculateModalSize(screenSize, 540.0f, 440.0f);
+    ImVec2 windowPos = CenterModal(windowSize, screenSize);
 
     // Full screen dimming (clicking the backdrop closes the tutorial)
     bool backdropClicked = RenderBackdrop(ImVec4(0, 0, 0, 0.7f), "##TutorialDim", true);
@@ -175,11 +206,11 @@ void TutorialOverlay::RenderWelcomeStep(GameState* state) {
     // Welcome dialog
     ImGui::SetNextWindowPos(windowPos);
     ImGui::SetNextWindowSize(windowSize);
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 12.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, UITheme::CardRounding());
     ImGui::PushStyleColor(ImGuiCol_WindowBg, UITheme::ColorPanelBg);
     ImGui::PushStyleColor(ImGuiCol_Border, UITheme::ColorAccent);
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 2.0f);
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(20.0f, 20.0f));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, UITheme::BorderThickness() * 1.6f);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, UITheme::DialogPadding());
 
     ImGui::SetNextWindowFocus();
     ImGui::Begin("Welcome to Quantum Idle", nullptr,
@@ -188,7 +219,7 @@ void TutorialOverlay::RenderWelcomeStep(GameState* state) {
 
     // Skip/close control placed at the top for visibility and keyboard focus
     ImVec2 closeButtonSize(std::min(windowSize.x * 0.4f, 130.0f), 34.0f);
-    ImGui::SetCursorPos(ImVec2(windowSize.x - closeButtonSize.x - 10.0f, 4.0f));
+    ImGui::SetCursorPos(ImVec2(windowSize.x - closeButtonSize.x - UITheme::SpacingMD(), UITheme::SpacingSM()));
     ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.35f, 0.35f, 0.35f, 1.0f));
     ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.45f, 0.45f, 0.45f, 1.0f));
     ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.5f, 0.5f, 0.5f, 1.0f));
@@ -201,34 +232,30 @@ void TutorialOverlay::RenderWelcomeStep(GameState* state) {
         return;
     }
     ImGui::PopStyleColor(3);
-    ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 6.0f);
-
-    ImGui::TextWrapped("Welcome to the Quantum Realm!");
-    ImGui::Spacing();
-    ImGui::Separator();
-    ImGui::Spacing();
+    AddVerticalSpace(UITheme::SpacingMD());
+    RenderSectionHeader("Welcome to the Quantum Realm!", "Learn the basics before you dive in.");
 
     ImGui::TextWrapped(
         "In this incremental game, you'll harness quantum mechanics "
         "to generate resources and expand your empire."
     );
-    ImGui::Spacing();
+    AddVerticalSpace(UITheme::SpacingSM());
     ImGui::TextWrapped("Core mechanics:");
-    ImGui::Spacing();
+    AddVerticalSpace(UITheme::SpacingSM());
     ImGui::BulletText("Stations build resources in superposition");
     ImGui::BulletText("Tap OBSERVE to collect resources");
     ImGui::BulletText("Manage coherence for stability");
 
-    ImGui::Spacing();
-    ImGui::Spacing();
+    AddVerticalSpace(UITheme::SpacingLG());
 
     // Mobile-friendly buttons - minimum 48px height for touch targets
     float buttonHeight = 48.0f;
-    float buttonWidth = (windowSize.x - 60.0f) * 0.48f; // 48% of available width each
-    float spacing = (windowSize.x - 60.0f) * 0.04f;
-    float startX = 10.0f;
+    float horizontalPadding = UITheme::SpacingLG() * 1.5f;
+    float availableWidth = windowSize.x - horizontalPadding * 2.0f;
+    float spacing = UITheme::SpacingMD();
+    float buttonWidth = (availableWidth - spacing) * 0.5f;
 
-    ImGui::SetCursorPosX(startX);
+    ImGui::SetCursorPosX(horizontalPadding);
 
     ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.2f, 0.6f, 0.3f, 1.0f));
     ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.3f, 0.7f, 0.4f, 1.0f));
@@ -266,18 +293,17 @@ void TutorialOverlay::RenderObserveStep(GameState* state) {
     }
 
     // Responsive tooltip window
-    float tooltipWidth = std::min(screenSize.x * 0.9f, 420.0f);
-    float tooltipHeight = std::min(screenSize.y * 0.4f, 280.0f);
-    ImVec2 tooltipSize(tooltipWidth, tooltipHeight);
-    ImVec2 tooltipPos(screenSize.x * 0.5f - tooltipSize.x * 0.5f, 20.0f);
+    ImVec2 tooltipSize = CalculateModalSize(screenSize, 460.0f, 320.0f);
+    ImVec2 tooltipPos = CenterModal(tooltipSize, screenSize);
+    tooltipPos.y = UITheme::SpacingLG() * 2.0f;
 
     ImGui::SetNextWindowPos(tooltipPos);
     ImGui::SetNextWindowSize(tooltipSize);
     ImGui::PushStyleColor(ImGuiCol_WindowBg, UITheme::ColorPanelBg);
     ImGui::PushStyleColor(ImGuiCol_Border, UITheme::ColorAccent);
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 3.0f);
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 10.0f);
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(15.0f, 15.0f));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, UITheme::BorderThickness() * 1.8f);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, UITheme::CardRounding());
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, UITheme::DialogPadding());
 
     ImGui::SetNextWindowFocus();
     ImGui::Begin("##ObserveTutorial", nullptr,
@@ -285,7 +311,7 @@ void TutorialOverlay::RenderObserveStep(GameState* state) {
                  ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse);
 
     ImVec2 closeButtonSize(std::min(tooltipSize.x * 0.45f, 140.0f), 32.0f);
-    ImGui::SetCursorPos(ImVec2(tooltipSize.x - closeButtonSize.x - 6.0f, 2.0f));
+    ImGui::SetCursorPos(ImVec2(tooltipSize.x - closeButtonSize.x - UITheme::SpacingSM(), UITheme::SpacingXS()));
     ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.3f, 0.3f, 0.3f, 1.0f));
     ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.4f, 0.4f, 0.4f, 1.0f));
     ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.45f, 0.45f, 0.45f, 1.0f));
@@ -299,32 +325,31 @@ void TutorialOverlay::RenderObserveStep(GameState* state) {
         return;
     }
     ImGui::PopStyleColor(3);
-    ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 4.0f);
+    ImGui::SetCursorPosY(ImGui::GetCursorPosY() + UITheme::SpacingSM());
 
-    ImGui::PushTextWrapPos(tooltipSize.x - 30);
+    ImGui::PushTextWrapPos(tooltipSize.x - UITheme::SpacingLG());
 
-    ImGui::TextColored(UITheme::ColorAccent, "Step 1: Observe");
-    ImGui::Separator();
-    ImGui::Spacing();
+    RenderSectionHeader("Step 1: Observe", "Collect qubits to advance.");
 
     ImGui::TextWrapped(
         "Your research station is building resources in SUPERPOSITION (the gold bar)."
     );
-    ImGui::Spacing();
+    AddVerticalSpace(UITheme::SpacingSM());
     ImGui::TextWrapped("Tap the OBSERVE button below to collect qubits!");
-    ImGui::Spacing();
+    AddVerticalSpace(UITheme::SpacingSM());
 
     // Show current progress
     ImGui::TextColored(UITheme::ColorWarning, "Qubits: %.0f / 10 (auto-advances at 10)",
                       state->GetResource(QuantumResource::Qubits));
 
-    ImGui::Spacing();
-    ImGui::Spacing();
+    AddVerticalSpace(UITheme::SpacingLG());
 
     // Mobile-friendly buttons
     float buttonHeight = 48.0f;
-    float buttonWidth = (tooltipSize.x - 50.0f) * 0.48f;
-    float spacing = (tooltipSize.x - 50.0f) * 0.04f;
+    float horizontalPadding = UITheme::SpacingLG() * 1.25f;
+    float availableWidth = tooltipSize.x - horizontalPadding * 2.0f;
+    float spacing = UITheme::SpacingMD();
+    float buttonWidth = (availableWidth - spacing) * 0.5f;
 
     ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.2f, 0.5f, 0.7f, 1.0f));
     ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.3f, 0.6f, 0.8f, 1.0f));
@@ -364,18 +389,17 @@ void TutorialOverlay::RenderUpgradeStep(GameState* state) {
     }
 
     // Responsive tooltip window
-    float tooltipWidth = std::min(screenSize.x * 0.9f, 420.0f);
-    float tooltipHeight = std::min(screenSize.y * 0.45f, 300.0f);
-    ImVec2 tooltipSize(tooltipWidth, tooltipHeight);
-    ImVec2 tooltipPos(screenSize.x * 0.5f - tooltipSize.x * 0.5f, 20.0f);
+    ImVec2 tooltipSize = CalculateModalSize(screenSize, 460.0f, 340.0f);
+    ImVec2 tooltipPos = CenterModal(tooltipSize, screenSize);
+    tooltipPos.y = UITheme::SpacingLG() * 2.0f;
 
     ImGui::SetNextWindowPos(tooltipPos);
     ImGui::SetNextWindowSize(tooltipSize);
     ImGui::PushStyleColor(ImGuiCol_WindowBg, UITheme::ColorPanelBg);
     ImGui::PushStyleColor(ImGuiCol_Border, UITheme::ColorSuccess);
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 3.0f);
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 10.0f);
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(15.0f, 15.0f));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, UITheme::BorderThickness() * 1.8f);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, UITheme::CardRounding());
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, UITheme::DialogPadding());
 
     ImGui::SetNextWindowFocus();
     ImGui::Begin("##UpgradeTutorial", nullptr,
@@ -383,7 +407,7 @@ void TutorialOverlay::RenderUpgradeStep(GameState* state) {
                  ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse);
 
     ImVec2 closeButtonSize(std::min(tooltipSize.x * 0.45f, 140.0f), 32.0f);
-    ImGui::SetCursorPos(ImVec2(tooltipSize.x - closeButtonSize.x - 6.0f, 2.0f));
+    ImGui::SetCursorPos(ImVec2(tooltipSize.x - closeButtonSize.x - UITheme::SpacingSM(), UITheme::SpacingXS()));
     ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.3f, 0.3f, 0.3f, 1.0f));
     ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.4f, 0.4f, 0.4f, 1.0f));
     ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.45f, 0.45f, 0.45f, 1.0f));
@@ -397,31 +421,30 @@ void TutorialOverlay::RenderUpgradeStep(GameState* state) {
         return;
     }
     ImGui::PopStyleColor(3);
-    ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 4.0f);
+    ImGui::SetCursorPosY(ImGui::GetCursorPosY() + UITheme::SpacingSM());
 
-    ImGui::PushTextWrapPos(tooltipSize.x - 30);
+    ImGui::PushTextWrapPos(tooltipSize.x - UITheme::SpacingLG());
 
-    ImGui::TextColored(UITheme::ColorSuccess, "Step 2: Upgrade");
-    ImGui::Separator();
-    ImGui::Spacing();
+    RenderSectionHeader("Step 2: Upgrade", "Spend qubits to boost production.");
 
     ImGui::TextWrapped("Great! You've collected qubits.");
-    ImGui::Spacing();
+    AddVerticalSpace(UITheme::SpacingSM());
     ImGui::TextWrapped(
         "Now tap UPGRADE to increase production speed!"
     );
-    ImGui::Spacing();
+    AddVerticalSpace(UITheme::SpacingSM());
 
     ImGui::Text("Current Qubits: %.0f", state->GetResource(QuantumResource::Qubits));
     ImGui::TextColored(ImVec4(0.7f, 0.7f, 0.7f, 1.0f), "(Auto-advances when coherence < 50%%)");
 
-    ImGui::Spacing();
-    ImGui::Spacing();
+    AddVerticalSpace(UITheme::SpacingLG());
 
     // Mobile-friendly buttons
     float buttonHeight = 48.0f;
-    float buttonWidth = (tooltipSize.x - 50.0f) * 0.48f;
-    float spacing = (tooltipSize.x - 50.0f) * 0.04f;
+    float horizontalPadding = UITheme::SpacingLG() * 1.25f;
+    float availableWidth = tooltipSize.x - horizontalPadding * 2.0f;
+    float spacing = UITheme::SpacingMD();
+    float buttonWidth = (availableWidth - spacing) * 0.5f;
 
     ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.2f, 0.5f, 0.7f, 1.0f));
     ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.3f, 0.6f, 0.8f, 1.0f));
@@ -461,18 +484,17 @@ void TutorialOverlay::RenderCoherenceStep(GameState* state) {
     }
 
     // Responsive tooltip window
-    float tooltipWidth = std::min(screenSize.x * 0.9f, 450.0f);
-    float tooltipHeight = std::min(screenSize.y * 0.55f, 340.0f);
-    ImVec2 tooltipSize(tooltipWidth, tooltipHeight);
-    ImVec2 tooltipPos(screenSize.x * 0.5f - tooltipSize.x * 0.5f, 90);
+    ImVec2 tooltipSize = CalculateModalSize(screenSize, 480.0f, 360.0f);
+    ImVec2 tooltipPos = CenterModal(tooltipSize, screenSize);
+    tooltipPos.y = UITheme::SpacingLG() * 2.5f;
 
     ImGui::SetNextWindowPos(tooltipPos);
     ImGui::SetNextWindowSize(tooltipSize);
     ImGui::PushStyleColor(ImGuiCol_WindowBg, UITheme::ColorPanelBg);
     ImGui::PushStyleColor(ImGuiCol_Border, UITheme::ColorDanger);
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 3.0f);
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 10.0f);
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(15.0f, 15.0f));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, UITheme::BorderThickness() * 1.8f);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, UITheme::CardRounding());
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, UITheme::DialogPadding());
 
     ImGui::SetNextWindowFocus();
     ImGui::Begin("##CoherenceTutorial", nullptr,
@@ -480,7 +502,7 @@ void TutorialOverlay::RenderCoherenceStep(GameState* state) {
                  ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse);
 
     ImVec2 closeButtonSize(std::min(tooltipSize.x * 0.45f, 140.0f), 32.0f);
-    ImGui::SetCursorPos(ImVec2(tooltipSize.x - closeButtonSize.x - 6.0f, 2.0f));
+    ImGui::SetCursorPos(ImVec2(tooltipSize.x - closeButtonSize.x - UITheme::SpacingSM(), UITheme::SpacingXS()));
     ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.3f, 0.3f, 0.3f, 1.0f));
     ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.4f, 0.4f, 0.4f, 1.0f));
     ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.45f, 0.45f, 0.45f, 1.0f));
@@ -494,30 +516,29 @@ void TutorialOverlay::RenderCoherenceStep(GameState* state) {
         return;
     }
     ImGui::PopStyleColor(3);
-    ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 4.0f);
+    ImGui::SetCursorPosY(ImGui::GetCursorPosY() + UITheme::SpacingSM());
 
-    ImGui::PushTextWrapPos(tooltipSize.x - 30);
+    ImGui::PushTextWrapPos(tooltipSize.x - UITheme::SpacingLG());
 
-    ImGui::TextColored(UITheme::ColorDanger, "Step 3: Manage Coherence");
-    ImGui::Separator();
-    ImGui::Spacing();
+    RenderSectionHeader("Step 3: Manage Coherence", "Protect observation success.");
 
     ImGui::TextWrapped("Coherence = quantum stability.");
-    ImGui::Spacing();
+    AddVerticalSpace(UITheme::SpacingSM());
     ImGui::TextWrapped(
         "Low coherence reduces observation success. Watch the cyan bar at the top!"
     );
-    ImGui::Spacing();
+    AddVerticalSpace(UITheme::SpacingSM());
 
     ImGui::Text("Current Coherence: %.1f / 100.0", state->GetResource(QuantumResource::Coherence));
 
-    ImGui::Spacing();
-    ImGui::Spacing();
+    AddVerticalSpace(UITheme::SpacingLG());
 
     // Mobile-friendly buttons
     float buttonHeight = 48.0f;
-    float buttonWidth = (tooltipSize.x - 50.0f) * 0.48f;
-    float spacing = (tooltipSize.x - 50.0f) * 0.04f;
+    float horizontalPadding = UITheme::SpacingLG() * 1.25f;
+    float availableWidth = tooltipSize.x - horizontalPadding * 2.0f;
+    float spacing = UITheme::SpacingMD();
+    float buttonWidth = (availableWidth - spacing) * 0.5f;
 
     ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.2f, 0.6f, 0.3f, 1.0f));
     ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.3f, 0.7f, 0.4f, 1.0f));
@@ -551,10 +572,8 @@ void TutorialOverlay::RenderCompletedStep(GameState* state) {
     ImVec2 screenSize = io.DisplaySize;
 
     // Responsive window sizing
-    float windowWidth = std::min(screenSize.x * 0.92f, 470.0f);
-    float windowHeight = std::min(screenSize.y * 0.65f, 340.0f);
-    ImVec2 windowSize(windowWidth, windowHeight);
-    ImVec2 windowPos((screenSize.x - windowSize.x) * 0.5f, (screenSize.y - windowSize.y) * 0.5f);
+    ImVec2 windowSize = CalculateModalSize(screenSize, 500.0f, 360.0f);
+    ImVec2 windowPos = CenterModal(windowSize, screenSize);
 
     // Full screen dimming
     bool backdropClicked = RenderBackdrop(ImVec4(0, 0, 0, 0.7f), "##TutorialCompleteDim", true);
@@ -566,11 +585,11 @@ void TutorialOverlay::RenderCompletedStep(GameState* state) {
     // Completion dialog
     ImGui::SetNextWindowPos(windowPos);
     ImGui::SetNextWindowSize(windowSize);
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 12.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, UITheme::CardRounding());
     ImGui::PushStyleColor(ImGuiCol_WindowBg, UITheme::ColorPanelBg);
     ImGui::PushStyleColor(ImGuiCol_Border, UITheme::ColorSuccess);
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 2.0f);
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(20.0f, 20.0f));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, UITheme::BorderThickness() * 1.6f);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, UITheme::DialogPadding());
 
     ImGui::SetNextWindowFocus();
     ImGui::Begin("Tutorial Complete!", nullptr,
@@ -578,7 +597,7 @@ void TutorialOverlay::RenderCompletedStep(GameState* state) {
                  ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoScrollbar);
 
     ImVec2 closeButtonSize(std::min(windowSize.x * 0.4f, 140.0f), 32.0f);
-    ImGui::SetCursorPos(ImVec2(windowSize.x - closeButtonSize.x - 10.0f, 4.0f));
+    ImGui::SetCursorPos(ImVec2(windowSize.x - closeButtonSize.x - UITheme::SpacingMD(), UITheme::SpacingSM()));
     ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.35f, 0.35f, 0.35f, 1.0f));
     ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.45f, 0.45f, 0.45f, 1.0f));
     ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.5f, 0.5f, 0.5f, 1.0f));
@@ -592,32 +611,29 @@ void TutorialOverlay::RenderCompletedStep(GameState* state) {
         return;
     }
     ImGui::PopStyleColor(3);
-    ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 6.0f);
+    ImGui::SetCursorPosY(ImGui::GetCursorPosY() + UITheme::SpacingSM());
 
-    ImGui::PushTextWrapPos(windowSize.x - 40);
+    ImGui::PushTextWrapPos(windowSize.x - UITheme::SpacingLG() * 2.0f);
 
-    ImGui::TextColored(UITheme::ColorSuccess, "Congratulations!");
-    ImGui::Separator();
-    ImGui::Spacing();
+    RenderSectionHeader("Congratulations!", "You're ready to explore.");
 
     ImGui::TextWrapped("You've learned the basics:");
-    ImGui::Spacing();
+    AddVerticalSpace(UITheme::SpacingSM());
     ImGui::BulletText("Observe to collect resources");
     ImGui::BulletText("Upgrade for faster production");
     ImGui::BulletText("Manage coherence stability");
 
-    ImGui::Spacing();
+    AddVerticalSpace(UITheme::SpacingSM());
     ImGui::TextWrapped("Explore Research, Prestige, Combat & more!");
 
-    ImGui::Spacing();
-    ImGui::Spacing();
+    AddVerticalSpace(UITheme::SpacingLG());
 
     // Mobile-friendly centered button
     float buttonHeight = 52.0f;
-    float buttonWidth = windowSize.x - 60.0f;
-    float startX = 10.0f;
+    float horizontalPadding = UITheme::SpacingLG() * 1.5f;
+    float buttonWidth = windowSize.x - horizontalPadding * 2.0f;
 
-    ImGui::SetCursorPosX(startX);
+    ImGui::SetCursorPosX(horizontalPadding);
 
     ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.2f, 0.6f, 0.3f, 1.0f));
     ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.3f, 0.7f, 0.4f, 1.0f));
