@@ -1356,10 +1356,10 @@ void ResearchView::Render(GameState* state, Renderer* renderer) {
     if (state->GetActiveModal() != ActiveModal::Research) return;
     (void)renderer;
 
-    // 1. Setup position and size
-    f32 panelWidth = 900.0f;
-    f32 panelHeight = 600.0f;
+    // 1. Responsive position and size
     ImVec2 displaySize = ImGui::GetIO().DisplaySize;
+    f32 panelWidth = std::min(displaySize.x * 0.95f, 900.0f);
+    f32 panelHeight = std::min(displaySize.y * 0.9f, 600.0f);
 
     // Center the window
     ImVec2 centerPos(displaySize.x * 0.5f, displaySize.y * 0.5f);
@@ -1643,9 +1643,9 @@ void BuyablesView::Render(GameState* state, Renderer* renderer) {
 
     if (state->GetActiveModal() != ActiveModal::Buyables) return;
 
-    f32 panelWidth = 900.0f;
-    f32 panelHeight = 600.0f;
     ImVec2 displaySize = ImGui::GetIO().DisplaySize;
+    f32 panelWidth = std::min(displaySize.x * 0.95f, 900.0f);
+    f32 panelHeight = std::min(displaySize.y * 0.9f, 600.0f);
 
     ImVec2 centerPos(displaySize.x * 0.5f, displaySize.y * 0.5f);
     ImGui::SetNextWindowPos(centerPos, ImGuiCond_Always, ImVec2(0.5f, 0.5f));
@@ -1753,9 +1753,9 @@ void ChallengeView::Render(GameState* state, Renderer* renderer) {
 
     if (state->GetActiveModal() != ActiveModal::Challenges) return;
 
-    f32 panelWidth = 900.0f;
-    f32 panelHeight = 650.0f;
     ImVec2 displaySize = ImGui::GetIO().DisplaySize;
+    f32 panelWidth = std::min(displaySize.x * 0.95f, 900.0f);
+    f32 panelHeight = std::min(displaySize.y * 0.9f, 650.0f);
 
     ImVec2 centerPos(displaySize.x * 0.5f, displaySize.y * 0.5f);
     ImGui::SetNextWindowPos(centerPos, ImGuiCond_Always, ImVec2(0.5f, 0.5f));
@@ -1900,9 +1900,9 @@ void EssenceShopView::Render(GameState* state, Renderer* renderer) {
 
     if (state->GetActiveModal() != ActiveModal::EssenceShop) return;
 
-    f32 panelWidth = 900.0f;
-    f32 panelHeight = 650.0f;
     ImVec2 displaySize = ImGui::GetIO().DisplaySize;
+    f32 panelWidth = std::min(displaySize.x * 0.95f, 900.0f);
+    f32 panelHeight = std::min(displaySize.y * 0.9f, 650.0f);
 
     ImVec2 centerPos(displaySize.x * 0.5f, displaySize.y * 0.5f);
     ImGui::SetNextWindowPos(centerPos, ImGuiCond_Always, ImVec2(0.5f, 0.5f));
@@ -2009,9 +2009,9 @@ void SingularityShopView::Render(GameState* state, Renderer* renderer) {
 
     if (state->GetActiveModal() != ActiveModal::SingularityShop) return;
 
-    f32 panelWidth = 900.0f;
-    f32 panelHeight = 650.0f;
     ImVec2 displaySize = ImGui::GetIO().DisplaySize;
+    f32 panelWidth = std::min(displaySize.x * 0.95f, 900.0f);
+    f32 panelHeight = std::min(displaySize.y * 0.9f, 650.0f);
 
     ImVec2 centerPos(displaySize.x * 0.5f, displaySize.y * 0.5f);
     ImGui::SetNextWindowPos(centerPos, ImGuiCond_Always, ImVec2(0.5f, 0.5f));
@@ -2119,10 +2119,10 @@ void SpaceshipView::Render(GameState* state, Renderer* renderer) {
     // We still pass the renderer to the m_Spaceship functions, but the main UI relies on ImGui
     (void)renderer;
 
-    // 1. Setup position and size
-    f32 panelWidth = 1100.0f;
-    f32 panelHeight = 700.0f;
+    // 1. Responsive position and size
     ImVec2 displaySize = ImGui::GetIO().DisplaySize;
+    f32 panelWidth = std::min(displaySize.x * 0.95f, 1100.0f);
+    f32 panelHeight = std::min(displaySize.y * 0.9f, 700.0f);
 
     // Center the window
     ImVec2 centerPos(displaySize.x * 0.5f, displaySize.y * 0.5f);
@@ -2244,10 +2244,10 @@ void SpecializedSkillsView::Render(GameState* state, Renderer* renderer) {
     if (state->GetActiveModal() != ActiveModal::SpecializedSkills) return;
     (void)renderer; // Unused in ImGui rendering
 
-    // Window setup
-    f32 panelWidth = 800.0f;
-    f32 panelHeight = 600.0f;
+    // Responsive window setup
     ImVec2 displaySize = ImGui::GetIO().DisplaySize;
+    f32 panelWidth = std::min(displaySize.x * 0.95f, 800.0f);
+    f32 panelHeight = std::min(displaySize.y * 0.9f, 600.0f);
     ImVec2 centerPos(displaySize.x * 0.5f, displaySize.y * 0.5f);
     ImGui::SetNextWindowPos(centerPos, ImGuiCond_Always, ImVec2(0.5f, 0.5f));
     ImGui::SetNextWindowSize(ImVec2(panelWidth, panelHeight), ImGuiCond_Always);
