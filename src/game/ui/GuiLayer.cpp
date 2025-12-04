@@ -32,7 +32,7 @@ constexpr f32 kNavBarHeight = 86.0f;
 constexpr f32 kNavButtonHeight = 60.0f;
 
 std::vector<ResourceDisplay> BuildResourceDisplays(GameState* state) {
-    auto fmt = state->m_NumberFormat;
+    auto fmt = state->GetNumberFormat();
 
     std::vector<ResourceDisplay> resources;
     resources.push_back({
@@ -966,13 +966,13 @@ void StationView::RenderUnlockedStation(GameState* state, ResearchStation& stati
             progress = static_cast<f32>(station.superpositionValue / (station.upgradeCost * 0.1));
         }
 
-        std::string headline = "Superposition: " + GameUtils::FormatNumber(station.superpositionValue, state->m_NumberFormat);
+        std::string headline = "Superposition: " + GameUtils::FormatNumber(station.superpositionValue, state->GetNumberFormat());
         std::string passiveInfo;
         if (station.passiveCollapseRate > 0.0) {
             f64 passiveRate = station.superpositionValue * station.passiveCollapseRate;
-            passiveInfo = " | +" + GameUtils::FormatNumber(passiveRate, state->m_NumberFormat) + "/s passive";
+            passiveInfo = " | +" + GameUtils::FormatNumber(passiveRate, state->GetNumberFormat()) + "/s passive";
         }
-        std::string detail = "Production: " + GameUtils::FormatNumber(productionRate, state->m_NumberFormat) + "/s" + passiveInfo;
+        std::string detail = "Production: " + GameUtils::FormatNumber(productionRate, state->GetNumberFormat()) + "/s" + passiveInfo;
         RenderProgressBarDetailed("SuperpositionBar##" + std::to_string(index), progress, headline, detail);
 
         ImGui::Dummy(ImVec2(0.0f, UITheme::ItemSpacing() * 0.2f));
@@ -1029,7 +1029,7 @@ void StationView::RenderUnlockedStation(GameState* state, ResearchStation& stati
             ImGui::TableSetupColumn("BuyMax", ImGuiTableColumnFlags_WidthStretch);
 
             ImGui::TableNextColumn();
-            std::string upgradeLabel = "Upgrade • " + GameUtils::FormatNumber(effectiveUpgradeCost, state->m_NumberFormat);
+            std::string upgradeLabel = "Upgrade • " + GameUtils::FormatNumber(effectiveUpgradeCost, state->GetNumberFormat());
             ImVec2 upgradeSize(ImGui::GetContentRegionAvail().x, std::max(UITheme::NavigationButtonHeight() * 0.9f, UITheme::TouchMinSize()));
             if (RenderTouchButton(upgradeLabel + "##UpgradeBtn" + std::to_string(index), upgradeSize,
                                   ImVec4(upgradeColor.r, upgradeColor.g, upgradeColor.b, 0.8f),
@@ -1124,7 +1124,7 @@ void StationView::RenderLockedStation(GameState* state, ResearchStation& station
     ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(unlockColor.r * 0.7f, unlockColor.g * 0.7f, unlockColor.b * 0.7f, 0.7f));
     ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(unlockColor.r, unlockColor.g, unlockColor.b, 1.0f));
 
-    std::string unlockText = "Unlock for " + GameUtils::FormatNumber(station.unlockCost, state->m_NumberFormat) + " Qubits";
+    std::string unlockText = "Unlock for " + GameUtils::FormatNumber(station.unlockCost, state->GetNumberFormat()) + " Qubits";
     if (ImGui::Button((unlockText + "##UnlockBtn" + std::to_string(index)).c_str(), ImVec2(-1, 50.0f)) && canAffordUnlock) {
         if (state->SpendResource(QuantumResource::Qubits, station.unlockCost)) {
             station.unlocked = true;
@@ -1227,7 +1227,7 @@ void AchievementView::Render(GameState* state, Renderer* renderer) {
                 ImGui::Spacing();
                 std::string rewardText = "Claim: ";
                 if (achievement.rewardQubits > 0) {
-                    rewardText += GameUtils::FormatNumber(achievement.rewardQubits, state->m_NumberFormat) + " Qubits ";
+                    rewardText += GameUtils::FormatNumber(achievement.rewardQubits, state->GetNumberFormat()) + " Qubits ";
                 }
                 if (achievement.rewardPhotons > 0) {
                     rewardText += std::to_string(achievement.rewardPhotons) + " Photons";
@@ -1274,7 +1274,7 @@ void StatisticsView::Render(GameState* state, Renderer* renderer) {
         ImGui::Columns(2, "StatColumns", true);
         ImGui::SetColumnWidth(0, 300.0f);
 
-        auto format = [state](f64 value) { return GameUtils::FormatNumber(value, state->m_NumberFormat); };
+        auto format = [state](f64 value) { return GameUtils::FormatNumber(value, state->GetNumberFormat()); };
 
         // --- Total Stats ---
         ImGui::Text("Total Qubits Earned:"); ImGui::NextColumn();
@@ -1475,9 +1475,9 @@ void ResearchView::Render(GameState* state, Renderer* renderer) {
 
                         // Costs
                         std::string costText = "Cost: ";
-                        if (node->qubitCost > 0) costText += GameUtils::FormatNumber(node->qubitCost, state->m_NumberFormat) + " Qubits | ";
-                        if (node->coherenceCost > 0) costText += GameUtils::FormatNumber(node->coherenceCost, state->m_NumberFormat) + " Coherence | ";
-                        if (node->entanglementCost > 0) costText += GameUtils::FormatNumber(node->entanglementCost, state->m_NumberFormat) + " Entanglement | ";
+                        if (node->qubitCost > 0) costText += GameUtils::FormatNumber(node->qubitCost, state->GetNumberFormat()) + " Qubits | ";
+                        if (node->coherenceCost > 0) costText += GameUtils::FormatNumber(node->coherenceCost, state->GetNumberFormat()) + " Coherence | ";
+                        if (node->entanglementCost > 0) costText += GameUtils::FormatNumber(node->entanglementCost, state->GetNumberFormat()) + " Entanglement | ";
                         if (node->photonCost > 0) costText += std::to_string(node->photonCost) + " Photons";
                         if (node->exoticMaterialsCost > 0) costText += " | " + std::to_string(node->exoticMaterialsCost) + " Exotic Materials";
 
@@ -1620,7 +1620,7 @@ void MilestoneView::Render(GameState* state, Renderer* renderer) {
 
             ImGui::Indent();
             ImGui::TextWrapped("Target: %s %s",
-                GameUtils::FormatNumber(milestone.target, state->m_NumberFormat).c_str(),
+                GameUtils::FormatNumber(milestone.target, state->GetNumberFormat()).c_str(),
                 milestone.featureName.c_str());
 
             f32 progress = static_cast<f32>(milestone.progress / milestone.target);
@@ -1724,7 +1724,7 @@ void BuyablesView::Render(GameState* state, Renderer* renderer) {
                     ImGui::SetCursorPosY(buyableHeight - 35.0f);
 
                     if (!maxed) {
-                        std::string costStr = GameUtils::FormatNumber(buyable.GetCurrentCost(), state->m_NumberFormat) + " Qubits";
+                        std::string costStr = GameUtils::FormatNumber(buyable.GetCurrentCost(), state->GetNumberFormat()) + " Qubits";
                         Color costColor = interactive ? Color::CoherenceGreen() : Color(0.7f, 0.5f, 0.5f, 1.0f);
                         ImGui::TextColored(ToImVec4(costColor), "Cost: %s", costStr.c_str());
 
@@ -1804,8 +1804,8 @@ void ChallengeView::Render(GameState* state, Renderer* renderer) {
             ImGui::TextColored(ToImVec4(Color::Red()), "⚠ ACTIVE CHALLENGE: %s", currentChallenge->name.c_str());
 
             f64 currentQubits = state->GetResource(QuantumResource::Qubits);
-            std::string goalText = "Goal: " + GameUtils::FormatNumber(currentQubits, state->m_NumberFormat) +
-                                   " / " + GameUtils::FormatNumber(currentChallenge->goalQubits, state->m_NumberFormat) + " Qubits";
+            std::string goalText = "Goal: " + GameUtils::FormatNumber(currentQubits, state->GetNumberFormat()) +
+                                   " / " + GameUtils::FormatNumber(currentChallenge->goalQubits, state->GetNumberFormat()) + " Qubits";
             ImGui::TextColored(ToImVec4(Color::Yellow()), "%s", goalText.c_str());
 
             ImGui::Spacing();
@@ -1862,7 +1862,7 @@ void ChallengeView::Render(GameState* state, Renderer* renderer) {
                     Color reqColor = currentPrestige >= challenge.minPrestigeLevel ? Color::CoherenceGreen() : Color(0.7f, 0.5f, 0.5f, 1.0f);
                     ImGui::TextColored(ToImVec4(reqColor), "%s", reqText.c_str());
 
-                    std::string goalText = "Goal: " + GameUtils::FormatNumber(challenge.goalQubits, state->m_NumberFormat) + " Qubits";
+                    std::string goalText = "Goal: " + GameUtils::FormatNumber(challenge.goalQubits, state->GetNumberFormat()) + " Qubits";
                     ImGui::TextColored(ToImVec4(Color::Yellow()), "%s", goalText.c_str());
 
                     ImGui::TextColored(ToImVec4(Color::QuantumPurple()), "Reward: %s", challenge.rewardDescription.c_str());
@@ -1944,7 +1944,7 @@ void EssenceShopView::Render(GameState* state, Renderer* renderer) {
         ImGui::TextColored(ToImVec4(Color(0.6f, 0.6f, 0.6f, 1.0f)), "(Press E or ESC to close)");
         ImGui::Separator();
 
-        std::string essenceText = "Your Quantum Essence: " + GameUtils::FormatNumber(state->m_QuantumEssence, state->m_NumberFormat);
+        std::string essenceText = "Your Quantum Essence: " + GameUtils::FormatNumber(state->m_QuantumEssence, state->GetNumberFormat());
         ImGui::TextColored(ToImVec4(Color::Magenta() * 1.3f), "%s", essenceText.c_str());
 
         ImGui::Spacing();
@@ -1982,7 +1982,7 @@ void EssenceShopView::Render(GameState* state, Renderer* renderer) {
 
                     if (!maxed) {
                         f64 cost = upgrade.GetCurrentCost();
-                        std::string costStr = "Cost: " + GameUtils::FormatNumber(cost, state->m_NumberFormat) + " Essence";
+                        std::string costStr = "Cost: " + GameUtils::FormatNumber(cost, state->GetNumberFormat()) + " Essence";
                         Color costColor = canAfford ? Color::Magenta() * 1.3f : Color(0.7f, 0.5f, 0.5f, 1.0f);
                         ImGui::TextColored(ToImVec4(costColor), "%s", costStr.c_str());
 
@@ -2053,7 +2053,7 @@ void SingularityShopView::Render(GameState* state, Renderer* renderer) {
         ImGui::TextColored(ToImVec4(Color(0.6f, 0.6f, 0.6f, 1.0f)), "(Press ESC to close)");
         ImGui::Separator();
 
-        std::string singularityText = "Your Singularities: " + GameUtils::FormatNumber(state->m_Timeline.singularities, state->m_NumberFormat);
+        std::string singularityText = "Your Singularities: " + GameUtils::FormatNumber(state->m_Timeline.singularities, state->GetNumberFormat());
         ImGui::TextColored(ToImVec4(Color(0.8f, 0.0f, 1.0f, 1.0f) * 1.3f), "%s", singularityText.c_str());
 
         ImGui::Spacing();
@@ -2091,7 +2091,7 @@ void SingularityShopView::Render(GameState* state, Renderer* renderer) {
 
                     if (!maxed) {
                         f64 cost = upgrade.GetCurrentCost();
-                        std::string costStr = "Cost: " + GameUtils::FormatNumber(cost, state->m_NumberFormat) + " Singularities";
+                        std::string costStr = "Cost: " + GameUtils::FormatNumber(cost, state->GetNumberFormat()) + " Singularities";
                         Color costColor = canAfford ? Color(0.8f, 0.0f, 1.0f, 1.0f) * 1.3f : Color(0.7f, 0.5f, 0.5f, 1.0f);
                         ImGui::TextColored(ToImVec4(costColor), "%s", costStr.c_str());
 

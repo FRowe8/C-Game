@@ -336,6 +336,9 @@ public:
     FeatureUnlockManager& GetUnlockManager() { return m_UnlockManager; }
     const FeatureUnlockManager& GetUnlockManager() const { return m_UnlockManager; }
 
+    // Number Format
+    GameUtils::NumberFormat GetNumberFormat() const { return m_NumberFormat; }
+
     // Combo System (public so ResearchStation::Observe can use it)
     void AddComboPoint();
     f64 GetComboMultiplier() const;
