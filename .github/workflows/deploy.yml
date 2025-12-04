@@ -43,7 +43,8 @@ jobs:
           cd build
           emcmake cmake .. \
             -DCMAKE_BUILD_TYPE=Release \
-            -DPLATFORM_WEB=ON
+            -DPLATFORM_WEB=ON \
+            -DENABLE_RMLUI=ON
 
       - name: Build web version
         run: |
