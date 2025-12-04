@@ -39,6 +39,10 @@ namespace UITheme {
 
     // --- Layout Constants (scaled for mobile/desktop) ---
     struct LayoutMetrics {
+        float spacingBase = 4.0f;
+        float spacingSmall = 8.0f;
+        float spacingMedium = 12.0f;
+        float spacingLarge = 16.0f;
         float topBarHeight = 60.0f;
         float bottomBarHeight = 80.0f;
         float sidebarWidth = 250.0f;
@@ -54,6 +58,8 @@ namespace UITheme {
         float contentPadding = 18.0f;
         float safeAreaPadding = 14.0f;
         float cardPadding = 16.0f;
+        float dialogPaddingX = 18.0f;
+        float dialogPaddingY = 16.0f;
         float touchPadding = 8.0f;
         float navButtonHeight = 56.0f;
         float buttonRounding = 12.0f;
@@ -88,6 +94,10 @@ namespace UITheme {
     inline void ApplyLayoutScale(float scale) {
         auto& layout = GetLayout();
         layout.fontScale = scale;
+        layout.spacingBase = 4.0f * scale;
+        layout.spacingSmall = 8.0f * scale;
+        layout.spacingMedium = 12.0f * scale;
+        layout.spacingLarge = 16.0f * scale;
         layout.topBarHeight = 60.0f * scale;
         layout.bottomBarHeight = 80.0f * scale;
         layout.sidebarWidth = 250.0f * scale;
@@ -96,12 +106,14 @@ namespace UITheme {
         layout.frameRounding = 10.0f * scale;
         layout.grabRounding = 12.0f * scale;
         layout.scrollbarRounding = 12.0f * scale;
-        layout.itemSpacing = 12.0f * scale;
-        layout.framePaddingX = 12.0f * scale;
+        layout.itemSpacing = layout.spacingMedium;
+        layout.framePaddingX = layout.spacingMedium;
         layout.framePaddingY = 10.0f * scale;
-        layout.contentPadding = 18.0f * scale;
-        layout.safeAreaPadding = 14.0f * scale;
-        layout.cardPadding = 16.0f * scale;
+        layout.contentPadding = layout.spacingLarge + layout.spacingSmall;
+        layout.safeAreaPadding = layout.spacingLarge - layout.spacingSmall * 0.25f;
+        layout.cardPadding = layout.spacingLarge;
+        layout.dialogPaddingX = layout.spacingLarge + layout.spacingSmall * 0.5f;
+        layout.dialogPaddingY = layout.spacingLarge;
         layout.touchPadding = 8.0f * scale;
         layout.navButtonHeight = 56.0f * scale;
         layout.buttonRounding = 12.0f * scale;
@@ -117,12 +129,18 @@ namespace UITheme {
     inline float ItemSpacing() { return GetLayout().itemSpacing; }
     inline float ContentPadding() { return GetLayout().contentPadding; }
     inline float SafeAreaPadding() { return GetLayout().safeAreaPadding; }
+    inline float SpacingXS() { return GetLayout().spacingBase; }
+    inline float SpacingSM() { return GetLayout().spacingSmall; }
+    inline float SpacingMD() { return GetLayout().spacingMedium; }
+    inline float SpacingLG() { return GetLayout().spacingLarge; }
     inline float NavigationButtonHeight() { return GetLayout().navButtonHeight; }
     inline float NavigationButtonRounding() { return GetLayout().buttonRounding; }
     inline float BorderThickness() { return GetLayout().borderThickness; }
     inline float ScrollbarSize() { return GetLayout().scrollbarSize; }
     inline float CardRounding() { return GetLayout().cardRounding; }
     inline float CardPadding() { return GetLayout().cardPadding; }
+    inline ImVec2 CardPaddingVec2() { return ImVec2(GetLayout().cardPadding, GetLayout().cardPadding); }
+    inline ImVec2 DialogPadding() { return ImVec2(GetLayout().dialogPaddingX, GetLayout().dialogPaddingY); }
     inline float ProgressThickness() { return GetLayout().progressThickness; }
     inline float ShadowSoftness() { return GetLayout().shadowSoftness; }
     inline float TouchMinSize() { return GetLayout().touchMinSize; }
