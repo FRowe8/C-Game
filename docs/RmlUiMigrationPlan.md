@@ -3,9 +3,10 @@
 This document outlines a staged approach for introducing [RmlUi](https://github.com/mikke89/RmlUi) as the primary UI layer for Quantum Idle while keeping the game playable during the transition.
 
 ## Current status
-- **Build toggle**: `ENABLE_RMLUI` CMake option added with stub runtime wiring so builds stay stable until the library is linked. When RmlUi is available, defining `RMLUI_ENABLED` will activate the pipeline.
-- **Runtime scaffold**: `RmlUiSystem` placeholder is created and hooked into `Application` to receive events, resize notifications, and a render hook before ImGui. It is ready to host the real context once the backend is wired.
-- **Assets bootstrap**: `assets/ui/rml/hud.rml` and `hud.rcss` stand in as the first document/style pair to validate loading and layout once RmlUi rendering is enabled.
+- ✅ **Phase 0 Complete**: RmlUi 5.1 integrated via CMake FetchContent with SDL2/OpenGL3 backends. Build system supports `ENABLE_RMLUI` option.
+- ✅ **Phase 1 Complete**: Full runtime scaffolding with context management, SDL2 input routing, render integration, and data binding helpers implemented.
+- ✅ **Phase 2 Complete**: Comprehensive HUD document (`hud.rml`) with 5 view panels, resource bar, and navigation. Live game state updates for all resources (Qubits, Coherence, Entanglement, Photons, Singularities) with auto-formatting. Coexisting peacefully with ImGui.
+- 🚧 **Phase 3 In Progress**: Ready to implement interactive navigation, event handlers, and UX polish.
 
 ## Goals
 - Deliver a responsive, web-like UI suitable for idle/incremental gameplay (grid-heavy layouts, rich styling, and readable typography).

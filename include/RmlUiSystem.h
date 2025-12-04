@@ -41,6 +41,9 @@ private:
     // Forward declarations to avoid leaking RmlUi headers broadly.
     struct RmlUiBackend;
     Scope<RmlUiBackend> m_Backend;
+
+    // Internal helpers
+    void InstallEventListeners();
 #endif
 };
 

@@ -9,11 +9,34 @@
 #include "RmlUi_Platform_SDL.h"
 #include "RmlUi_Renderer_GL3.h"
 
+// Event listener for navigation button clicks
+class NavigationEventListener : public Rml::EventListener {
+public:
+    explicit NavigationEventListener(RmlUiSystem* system) : m_System(system) {}
+
+    void ProcessEvent(Rml::Event& event) override {
+        if (event.GetType() == "click") {
+            Rml::Element* element = event.GetTargetElement();
+            if (element) {
+                std::string dataView = element->GetAttribute<Rml::String>("data-view", "");
+                if (!dataView.empty()) {
+                    // Activate the corresponding view
+                    m_System->ActivateView("view-" + dataView);
+                }
+            }
+        }
+    }
+
+private:
+    RmlUiSystem* m_System;
+};
+
 struct RmlUiSystem::RmlUiBackend {
     Rml::Context* context = nullptr;
     bool debuggerInitialized = false;
     Scope<SystemInterface_SDL> systemInterface;
     Scope<RenderInterface_GL3> renderInterface;
+    Scope<NavigationEventListener> navigationListener;
 };
 #endif
 
@@ -75,6 +98,9 @@ bool RmlUiSystem::Initialize(SDL_Window* window, Renderer* renderer) {
     if (Rml::ElementDocument* document = m_Backend->context->LoadDocument("assets/ui/rml/hud.rml")) {
         document->Show();
         Log::Info("RmlUi HUD document loaded successfully");
+
+        // Install event listeners for interactive elements
+        InstallEventListeners();
     } else {
         Log::Warning("Failed to load HUD document, but continuing initialization");
     }
@@ -289,4 +315,28 @@ void RmlUiSystem::ActivateView(const std::string& viewId) {
     (void)viewId;
 #endif
 }
+
+// ========== Event Listener Installation ==========
+
+#ifdef RMLUI_ENABLED
+void RmlUiSystem::InstallEventListeners() {
+    if (!m_Initialized || !m_Backend || !m_Backend->context) return;
+
+    Rml::ElementDocument* document = m_Backend->context->GetDocument(0);
+    if (!document) return;
+
+    // Create navigation event listener
+    m_Backend->navigationListener = CreateScope<NavigationEventListener>(this);
+
+    // Attach to all navigation buttons
+    Rml::ElementList navButtons;
+    document->GetElementsByClassName(navButtons, "nav-btn");
+
+    for (Rml::Element* button : navButtons) {
+        button->AddEventListener(Rml::EventId::Click, m_Backend->navigationListener.get());
+    }
+
+    Log::Infof("Installed event listeners on ", navButtons.size(), " navigation buttons");
+}
+#endif
 
