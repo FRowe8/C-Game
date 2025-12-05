@@ -48,6 +48,7 @@ public:
     void UpdateBuyables(class GameState* gameState);
     void UpdateCombat(class GameState* gameState);
     void UpdateMenu(class GameState* gameState);
+    void UpdateCollection(class GameState* gameState);
     void SetGameState(class GameState* gameState) { m_GameState = gameState; }
 
 private:
