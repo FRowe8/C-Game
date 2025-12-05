@@ -2,6 +2,7 @@
 #include "Logger.h"
 #include "Renderer.h"
 #include "GameState.h"
+#include "Research.h"
 #include <SDL.h>
 #include <sstream>
 #include <iomanip>
@@ -155,6 +156,52 @@ private:
     GameState* m_GameState;
 };
 
+// Event listener for research purchase buttons
+class ResearchActionListener : public Rml::EventListener {
+public:
+    explicit ResearchActionListener(RmlUiSystem* system, GameState* gameState)
+        : m_System(system), m_GameState(gameState) {}
+
+    void ProcessEvent(Rml::Event& event) override {
+        if (event.GetType() == "click") {
+            Rml::Element* element = event.GetTargetElement();
+            if (!element || !m_GameState) return;
+
+            // Get research ID from data attribute
+            if (!element->HasAttribute("data-research-id")) return;
+
+            i32 researchIdInt = element->GetAttribute<int>("data-research-id", -1);
+            std::string action = element->GetAttribute<Rml::String>("data-action", "");
+
+            if (researchIdInt < 0 || action != "research") return;
+
+            ResearchID researchId = static_cast<ResearchID>(researchIdInt);
+            auto& researchTree = m_GameState->GetResearchTree();
+
+            // Attempt to purchase research
+            if (researchTree.Research(researchId)) {
+                auto* node = researchTree.GetNode(researchId);
+                if (node) {
+                    m_System->ShowToast("Research Complete!",
+                        node->name + " has been researched",
+                        RmlUiSystem::ToastType::Achievement);
+                }
+                // Refresh both research and stations (bonuses may have changed)
+                m_System->UpdateResearch(m_GameState);
+                m_System->UpdateStations(m_GameState);
+            } else {
+                m_System->ShowToast("Cannot Research",
+                    "Insufficient resources or prerequisites not met",
+                    RmlUiSystem::ToastType::Warning);
+            }
+        }
+    }
+
+private:
+    RmlUiSystem* m_System;
+    GameState* m_GameState;
+};
+
 struct RmlUiSystem::RmlUiBackend {
     Rml::Context* context = nullptr;
     bool debuggerInitialized = false;
@@ -164,6 +211,7 @@ struct RmlUiSystem::RmlUiBackend {
     Scope<TooltipEventListener> tooltipListener;
     Scope<KeyboardNavigationListener> keyboardListener;
     Scope<StationActionListener> stationActionListener;
+    Scope<ResearchActionListener> researchActionListener;
 };
 #endif
 
@@ -589,6 +637,75 @@ void RmlUiSystem::UpdateStations(GameState* gameState) {
 #endif
 }
 
+void RmlUiSystem::UpdateResearch(GameState* gameState) {
+#ifdef RMLUI_ENABLED
+    if (!m_Initialized || !m_Backend || !m_Backend->context || !gameState) return;
+
+    Rml::ElementDocument* document = m_Backend->context->GetDocument(0);
+    if (!document) return;
+
+    // Find the research grid container
+    Rml::Element* researchGrid = nullptr;
+    Rml::ElementList elements;
+    document->GetElementsByClassName(elements, "research-grid");
+    if (!elements.empty()) {
+        researchGrid = elements[0];
+    }
+
+    if (!researchGrid) return;
+
+    // Build research nodes HTML
+    std::stringstream html;
+    auto& researchTree = gameState->GetResearchTree();
+
+    // Get available and researched nodes
+    auto researchedNodes = researchTree.GetResearchedNodes();
+    auto availableNodes = researchTree.GetAvailableResearch(gameState->GetTimeline().completedResets);
+
+    // Show researched nodes first
+    for (const auto* node : researchedNodes) {
+        html << "<div class=\"research-node unlocked\">";
+        html << "  <h3 class=\"research-name\">" << node->name << "</h3>";
+        html << "  <p class=\"research-desc\">" << node->description << "</p>";
+        html << "  <p class=\"research-status\">✓ Researched</p>";
+        html << "</div>";
+    }
+
+    // Then show available research
+    for (const auto* node : availableNodes) {
+        if (node->researched) continue; // Already shown above
+
+        char costBuffer[64];
+        snprintf(costBuffer, sizeof(costBuffer), "Cost: %.0f Qubits", node->qubitCost);
+
+        html << "<div class=\"research-node\">";
+        html << "  <h3 class=\"research-name\">" << node->name << "</h3>";
+        html << "  <p class=\"research-desc\">" << node->description << "</p>";
+        html << "  <p class=\"research-cost\">" << costBuffer << "</p>";
+
+        // Add purchase button
+        html << "  <button class=\"btn-primary\" data-research-id=\"" << static_cast<i32>(node->id) << "\" data-action=\"research\">Research</button>";
+        html << "</div>";
+    }
+
+    // Update the research grid
+    researchGrid->SetInnerRML(html.str());
+
+    // Attach event listeners to research buttons
+    if (m_Backend->researchActionListener) {
+        Rml::ElementList buttons;
+        researchGrid->GetElementsByTagName(buttons, "button");
+        for (Rml::Element* button : buttons) {
+            if (button->HasAttribute("data-research-id")) {
+                button->AddEventListener(Rml::EventId::Click, m_Backend->researchActionListener.get());
+            }
+        }
+    }
+#else
+    (void)gameState;
+#endif
+}
+
 // ========== Event Listener Installation ==========
 
 #ifdef RMLUI_ENABLED
@@ -637,10 +754,11 @@ void RmlUiSystem::InstallEventListeners() {
 
     Log::Info("Installed keyboard navigation shortcuts (1-5 for views)");
 
-    // Create station action listener (will be attached when stations are created)
+    // Create game action listeners (will be attached when elements are created)
     if (m_GameState) {
         m_Backend->stationActionListener = CreateScope<StationActionListener>(this, m_GameState);
-        Log::Info("Station action listener created");
+        m_Backend->researchActionListener = CreateScope<ResearchActionListener>(this, m_GameState);
+        Log::Info("Game action listeners created (stations, research)");
     }
 }
 #endif

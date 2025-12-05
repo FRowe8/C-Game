@@ -441,3 +441,67 @@ scrollbarvertical sliderbar:active {
 .toast.achievement .toast-title {
   color: #d946ef;
 }
+
+/* ========== Research Tree View ========== */
+.research-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280dp, 1fr));
+  gap: 16dp;
+  padding: 16dp;
+}
+
+.research-node {
+  background: linear-gradient(135deg, rgba(15, 18, 28, 0.95) 0%, rgba(25, 30, 45, 0.95) 100%);
+  border: 2px solid rgba(59, 130, 246, 0.3);
+  border-radius: 12dp;
+  padding: 16dp;
+  transition: all 0.3s ease;
+}
+
+.research-node:hover {
+  border-color: rgba(59, 130, 246, 0.6);
+  box-shadow: 0 4px 16px rgba(59, 130, 246, 0.3);
+  transform: translateY(-2px);
+}
+
+.research-node.unlocked {
+  border-color: rgba(16, 185, 129, 0.5);
+  background: linear-gradient(135deg, rgba(5, 30, 20, 0.95) 0%, rgba(15, 40, 30, 0.95) 100%);
+}
+
+.research-node.locked {
+  opacity: 0.6;
+  border-color: rgba(148, 163, 184, 0.3);
+}
+
+.research-name {
+  font-size: 16dp;
+  font-weight: 700;
+  color: #60a5fa;
+  margin-bottom: 8dp;
+}
+
+.research-node.unlocked .research-name {
+  color: #10b981;
+}
+
+.research-desc {
+  font-size: 13dp;
+  color: rgba(255, 255, 255, 0.8);
+  line-height: 1.4;
+  margin-bottom: 12dp;
+}
+
+.research-cost {
+  font-size: 12dp;
+  color: #f59e0b;
+  font-weight: 600;
+  margin-bottom: 8dp;
+}
+
+.research-status {
+  font-size: 11dp;
+  color: #10b981;
+  font-weight: 600;
+  text-transform: uppercase;
+}

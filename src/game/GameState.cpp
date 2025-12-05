@@ -1028,6 +1028,8 @@ void GameState::Render(Renderer* renderer) {
 
     // --- RENDER IMGUI WINDOWS ---
     // Phase 1.1: GuiLayer now handles all UI rendering (decoupled from GameState logic)
+#ifndef RMLUI_ENABLED
+    // ImGui UI is hidden when RmlUi is enabled (Phase 4: UI Migration)
     if (m_GuiLayer) {
         m_GuiLayer->Render(this, renderer);
     } else if (m_UIManager) {
@@ -1038,6 +1040,7 @@ void GameState::Render(Renderer* renderer) {
         RenderResources(renderer);
         RenderUI(renderer);
     }
+#endif
 
     // If a window was closed via ImGui's close button, return to the base mode
     auto resetModeIfClosed = [&](GameMode mode, bool openFlag) {

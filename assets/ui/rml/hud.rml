@@ -61,7 +61,9 @@
           <!-- Research View -->
           <div id="view-research" class="view-panel">
             <h2 class="view-title">Research Tree</h2>
-            <p class="placeholder-text">Research tree will be implemented here</p>
+            <div class="research-grid">
+              <!-- Research nodes will be dynamically generated here -->
+            </div>
           </div>
 
           <!-- Upgrades/Buyables View -->
