@@ -27,8 +27,8 @@ public:
     bool IsInitialized() const { return m_Initialized; }
 
     // Data binding helpers - update UI elements with game state
-    void UpdateResource(const std::string& resourceName, f64 value);
-    void UpdateResourceFormatted(const std::string& resourceName, const std::string& formattedValue);
+    void UpdateUIResource(const std::string& resourceName, f64 value);
+    void UpdateUIResourceFormatted(const std::string& resourceName, const std::string& formattedValue);
     void SetElementText(const std::string& elementId, const std::string& text);
     void SetElementVisible(const std::string& elementId, bool visible);
     void ActivateView(const std::string& viewId);

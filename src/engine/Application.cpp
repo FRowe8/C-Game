@@ -264,11 +264,11 @@ void Application::Render() {
         m_RmlUi->BeginFrame();
 
         // Update RmlUi with current game state
-        m_RmlUi->UpdateResource("qubits", m_GameState->GetResource(QuantumResource::Qubits));
-        m_RmlUi->UpdateResource("coherence", m_GameState->GetCoherence());
-        m_RmlUi->UpdateResource("entanglement", m_GameState->GetResource(QuantumResource::Entanglement));
-        m_RmlUi->UpdateResource("photons", static_cast<f64>(m_GameState->GetTimeline().photons));
-        m_RmlUi->UpdateResource("singularities", static_cast<f64>(m_GameState->GetTimeline().singularities));
+        m_RmlUi->UpdateUIResource("qubits", m_GameState->GetResource(QuantumResource::Qubits));
+        m_RmlUi->UpdateUIResource("coherence", m_GameState->GetCoherence());
+        m_RmlUi->UpdateUIResource("entanglement", m_GameState->GetResource(QuantumResource::Entanglement));
+        m_RmlUi->UpdateUIResource("photons", static_cast<f64>(m_GameState->GetTimeline().photons));
+        m_RmlUi->UpdateUIResource("singularities", static_cast<f64>(m_GameState->GetTimeline().singularities));
     }
 
     m_Renderer->Clear(Color::DarkBackground()); // Modern dark cyberpunk background

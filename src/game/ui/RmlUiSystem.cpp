@@ -550,7 +550,7 @@ void RmlUiSystem::OnResize(int width, int height) {
 
 // ========== Data Binding Helpers ==========
 
-void RmlUiSystem::UpdateResource(const std::string& resourceName, f64 value) {
+void RmlUiSystem::UpdateUIResource(const std::string& resourceName, f64 value) {
 #ifdef RMLUI_ENABLED
     if (!m_Initialized || !m_Backend || !m_Backend->context) return;
 
@@ -570,14 +570,14 @@ void RmlUiSystem::UpdateResource(const std::string& resourceName, f64 value) {
         snprintf(buffer, sizeof(buffer), "%.2f", value);
     }
 
-    UpdateResourceFormatted(resourceName, buffer);
+    UpdateUIResourceFormatted(resourceName, buffer);
 #else
     (void)resourceName;
     (void)value;
 #endif
 }
 
-void RmlUiSystem::UpdateResourceFormatted(const std::string& resourceName, const std::string& formattedValue) {
+void RmlUiSystem::UpdateUIResourceFormatted(const std::string& resourceName, const std::string& formattedValue) {
 #ifdef RMLUI_ENABLED
     if (!m_Initialized || !m_Backend || !m_Backend->context) return;
 
