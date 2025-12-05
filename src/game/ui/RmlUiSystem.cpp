@@ -1004,11 +1004,9 @@ void RmlUiSystem::UpdateCombat(GameState* gameState) {
     Rml::ElementList playerHPBars;
     document->GetElementsByClassName(playerHPBars, "player-hp");
     for (Rml::Element* bar : playerHPBars) {
-        if (bar->GetParentNode() && bar->GetParentNode()->GetClassNames().find("hp-fill") != std::string::npos) {
-            char styleBuffer[32];
-            snprintf(styleBuffer, sizeof(styleBuffer), "width: %.1f%%;", playerHPPercent);
-            bar->SetAttribute("style", styleBuffer);
-        }
+        char styleBuffer[32];
+        snprintf(styleBuffer, sizeof(styleBuffer), "width: %.1f%%;", playerHPPercent);
+        bar->SetAttribute("style", styleBuffer);
     }
 
     // Update enemy stats
@@ -1026,11 +1024,9 @@ void RmlUiSystem::UpdateCombat(GameState* gameState) {
         Rml::ElementList enemyHPBars;
         document->GetElementsByClassName(enemyHPBars, "enemy-hp");
         for (Rml::Element* bar : enemyHPBars) {
-            if (bar->GetParentNode() && bar->GetParentNode()->GetClassNames().find("hp-fill") != std::string::npos) {
-                char styleBuffer[32];
-                snprintf(styleBuffer, sizeof(styleBuffer), "width: %.1f%%;", enemyHPPercent);
-                bar->SetAttribute("style", styleBuffer);
-            }
+            char styleBuffer[32];
+            snprintf(styleBuffer, sizeof(styleBuffer), "width: %.1f%%;", enemyHPPercent);
+            bar->SetAttribute("style", styleBuffer);
         }
     } else {
         updateText("enemy-name", "No Enemy");
