@@ -1,7 +1,10 @@
 #include "RmlUiSystem.h"
 #include "Logger.h"
 #include "Renderer.h"
+#include "GameState.h"
 #include <SDL.h>
+#include <sstream>
+#include <iomanip>
 
 #ifdef RMLUI_ENABLED
 #include <RmlUi/Core.h>
@@ -110,6 +113,48 @@ private:
     RmlUiSystem* m_System;
 };
 
+// Event listener for station action buttons
+class StationActionListener : public Rml::EventListener {
+public:
+    explicit StationActionListener(RmlUiSystem* system, GameState* gameState)
+        : m_System(system), m_GameState(gameState) {}
+
+    void ProcessEvent(Rml::Event& event) override {
+        if (event.GetType() == "click") {
+            Rml::Element* element = event.GetTargetElement();
+            if (!element || !m_GameState) return;
+
+            // Get station index from data attribute
+            if (!element->HasAttribute("data-station-id")) return;
+
+            i32 stationId = element->GetAttribute<int>("data-station-id", -1);
+            std::string action = element->GetAttribute<Rml::String>("data-action", "");
+
+            if (stationId < 0 || stationId >= static_cast<i32>(m_GameState->GetStations().size())) return;
+
+            auto& stations = m_GameState->GetStations();
+            auto& station = stations[stationId];
+
+            if (action == "observe") {
+                station.Observe(m_GameState);
+                m_System->UpdateStations(m_GameState);
+            } else if (action == "upgrade") {
+                if (m_GameState->SpendResource(QuantumResource::Qubits, station.upgradeCost)) {
+                    station.Upgrade();
+                    m_System->UpdateStations(m_GameState);
+                    m_System->ShowToast("Upgraded!",
+                        station.name + " upgraded to level " + std::to_string(station.level),
+                        RmlUiSystem::ToastType::Success);
+                }
+            }
+        }
+    }
+
+private:
+    RmlUiSystem* m_System;
+    GameState* m_GameState;
+};
+
 struct RmlUiSystem::RmlUiBackend {
     Rml::Context* context = nullptr;
     bool debuggerInitialized = false;
@@ -118,6 +163,7 @@ struct RmlUiSystem::RmlUiBackend {
     Scope<NavigationEventListener> navigationListener;
     Scope<TooltipEventListener> tooltipListener;
     Scope<KeyboardNavigationListener> keyboardListener;
+    Scope<StationActionListener> stationActionListener;
 };
 #endif
 
@@ -455,6 +501,94 @@ void RmlUiSystem::ShowToast(const std::string& title, const std::string& message
 #endif
 }
 
+// ========== Game State Integration ==========
+
+void RmlUiSystem::UpdateStations(GameState* gameState) {
+#ifdef RMLUI_ENABLED
+    if (!m_Initialized || !m_Backend || !m_Backend->context || !gameState) return;
+
+    Rml::ElementDocument* document = m_Backend->context->GetDocument(0);
+    if (!document) return;
+
+    // Find the stations grid container
+    Rml::Element* stationsGrid = nullptr;
+    Rml::ElementList elements;
+    document->GetElementsByClassName(elements, "stations-grid");
+    if (!elements.empty()) {
+        stationsGrid = elements[0];
+    }
+
+    if (!stationsGrid) return;
+
+    // Build station cards HTML
+    std::stringstream html;
+    const auto& stations = gameState->GetStations();
+
+    for (size_t i = 0; i < stations.size(); ++i) {
+        const auto& station = stations[i];
+
+        if (!station.unlocked) continue;
+
+        // Format numbers
+        char prodBuffer[32];
+        if (station.currentProduction >= 1e6) {
+            snprintf(prodBuffer, sizeof(prodBuffer), "%.2fM", station.currentProduction / 1e6);
+        } else if (station.currentProduction >= 1e3) {
+            snprintf(prodBuffer, sizeof(prodBuffer), "%.2fK", station.currentProduction / 1e3);
+        } else {
+            snprintf(prodBuffer, sizeof(prodBuffer), "%.1f", station.currentProduction);
+        }
+
+        char superposBuffer[32];
+        if (station.superpositionValue >= 1e6) {
+            snprintf(superposBuffer, sizeof(superposBuffer), "%.2fM", station.superpositionValue / 1e6);
+        } else if (station.superpositionValue >= 1e3) {
+            snprintf(superposBuffer, sizeof(superposBuffer), "%.2fK", station.superpositionValue / 1e3);
+        } else {
+            snprintf(superposBuffer, sizeof(superposBuffer), "%.1f", station.superpositionValue);
+        }
+
+        char costBuffer[32];
+        if (station.upgradeCost >= 1e6) {
+            snprintf(costBuffer, sizeof(costBuffer), "%.2fM", station.upgradeCost / 1e6);
+        } else if (station.upgradeCost >= 1e3) {
+            snprintf(costBuffer, sizeof(costBuffer), "%.2fK", station.upgradeCost / 1e3);
+        } else {
+            snprintf(costBuffer, sizeof(costBuffer), "%.0f", station.upgradeCost);
+        }
+
+        html << "<div class=\"station-card\">";
+        html << "  <h3 class=\"station-name\">" << station.name << " (Lv." << station.level << ")</h3>";
+        html << "  <p class=\"station-desc\">" << station.description << "</p>";
+        html << "  <p class=\"station-stat\">Production: " << prodBuffer << "/s</p>";
+        html << "  <p class=\"station-stat\">Superposition: " << superposBuffer << "</p>";
+
+        if (station.superpositionValue > 0) {
+            html << "  <button class=\"btn-primary\" data-station-id=\"" << i << "\" data-action=\"observe\">Observe (" << static_cast<i32>(station.superpositionProbability * 100) << "%)</button>";
+        }
+
+        html << "  <button class=\"btn-primary\" data-station-id=\"" << i << "\" data-action=\"upgrade\">Upgrade (Cost: " << costBuffer << ")</button>";
+        html << "</div>";
+    }
+
+    // Update the stations grid
+    stationsGrid->SetInnerRML(html.str());
+
+    // Reattach event listeners to new buttons
+    if (m_Backend->stationActionListener) {
+        Rml::ElementList buttons;
+        stationsGrid->GetElementsByTagName(buttons, "button");
+        for (Rml::Element* button : buttons) {
+            if (button->HasAttribute("data-station-id")) {
+                button->AddEventListener(Rml::EventId::Click, m_Backend->stationActionListener.get());
+            }
+        }
+    }
+#else
+    (void)gameState;
+#endif
+}
+
 // ========== Event Listener Installation ==========
 
 #ifdef RMLUI_ENABLED
@@ -502,6 +636,12 @@ void RmlUiSystem::InstallEventListeners() {
     document->AddEventListener(Rml::EventId::Keydown, m_Backend->keyboardListener.get());
 
     Log::Info("Installed keyboard navigation shortcuts (1-5 for views)");
+
+    // Create station action listener (will be attached when stations are created)
+    if (m_GameState) {
+        m_Backend->stationActionListener = CreateScope<StationActionListener>(this, m_GameState);
+        Log::Info("Station action listener created");
+    }
 }
 #endif
 

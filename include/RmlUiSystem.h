@@ -42,9 +42,14 @@ public:
     };
     void ShowToast(const std::string& title, const std::string& message, ToastType type = ToastType::Info, f32 duration = 4.0f);
 
+    // Game state integration
+    void UpdateStations(class GameState* gameState);
+    void SetGameState(class GameState* gameState) { m_GameState = gameState; }
+
 private:
     bool m_Initialized = false;
     SDL_Window* m_Window = nullptr;
+    class GameState* m_GameState = nullptr;
 
 #ifdef RMLUI_ENABLED
     // Forward declarations to avoid leaking RmlUi headers broadly.
