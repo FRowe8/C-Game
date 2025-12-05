@@ -156,6 +156,52 @@ private:
     GameState* m_GameState;
 };
 
+// Event listener for research purchase buttons
+class ResearchActionListener : public Rml::EventListener {
+public:
+    explicit ResearchActionListener(RmlUiSystem* system, GameState* gameState)
+        : m_System(system), m_GameState(gameState) {}
+
+    void ProcessEvent(Rml::Event& event) override {
+        if (event.GetType() == "click") {
+            Rml::Element* element = event.GetTargetElement();
+            if (!element || !m_GameState) return;
+
+            // Get research ID from data attribute
+            if (!element->HasAttribute("data-research-id")) return;
+
+            i32 researchIdInt = element->GetAttribute<int>("data-research-id", -1);
+            std::string action = element->GetAttribute<Rml::String>("data-action", "");
+
+            if (researchIdInt < 0 || action != "research") return;
+
+            ResearchID researchId = static_cast<ResearchID>(researchIdInt);
+            auto& researchTree = m_GameState->GetResearchTree();
+
+            // Attempt to purchase research
+            if (researchTree.Research(researchId)) {
+                auto* node = researchTree.GetNode(researchId);
+                if (node) {
+                    m_System->ShowToast("Research Complete!",
+                        node->name + " has been researched",
+                        RmlUiSystem::ToastType::Achievement);
+                }
+                // Refresh both research and stations (bonuses may have changed)
+                m_System->UpdateResearch(m_GameState);
+                m_System->UpdateStations(m_GameState);
+            } else {
+                m_System->ShowToast("Cannot Research",
+                    "Insufficient resources or prerequisites not met",
+                    RmlUiSystem::ToastType::Warning);
+            }
+        }
+    }
+
+private:
+    RmlUiSystem* m_System;
+    GameState* m_GameState;
+};
+
 struct RmlUiSystem::RmlUiBackend {
     Rml::Context* context = nullptr;
     bool debuggerInitialized = false;
@@ -165,6 +211,7 @@ struct RmlUiSystem::RmlUiBackend {
     Scope<TooltipEventListener> tooltipListener;
     Scope<KeyboardNavigationListener> keyboardListener;
     Scope<StationActionListener> stationActionListener;
+    Scope<ResearchActionListener> researchActionListener;
 };
 #endif
 
@@ -644,7 +691,16 @@ void RmlUiSystem::UpdateResearch(GameState* gameState) {
     // Update the research grid
     researchGrid->SetInnerRML(html.str());
 
-    // TODO: Attach event listeners for research buttons
+    // Attach event listeners to research buttons
+    if (m_Backend->researchActionListener) {
+        Rml::ElementList buttons;
+        researchGrid->GetElementsByTagName(buttons, "button");
+        for (Rml::Element* button : buttons) {
+            if (button->HasAttribute("data-research-id")) {
+                button->AddEventListener(Rml::EventId::Click, m_Backend->researchActionListener.get());
+            }
+        }
+    }
 #else
     (void)gameState;
 #endif
@@ -698,10 +754,11 @@ void RmlUiSystem::InstallEventListeners() {
 
     Log::Info("Installed keyboard navigation shortcuts (1-5 for views)");
 
-    // Create station action listener (will be attached when stations are created)
+    // Create game action listeners (will be attached when elements are created)
     if (m_GameState) {
         m_Backend->stationActionListener = CreateScope<StationActionListener>(this, m_GameState);
-        Log::Info("Station action listener created");
+        m_Backend->researchActionListener = CreateScope<ResearchActionListener>(this, m_GameState);
+        Log::Info("Game action listeners created (stations, research)");
     }
 }
 #endif
