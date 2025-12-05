@@ -610,6 +610,26 @@ void RmlUiSystem::UpdateUIResourceFormatted(const std::string& resourceName, con
 #endif
 }
 
+void RmlUiSystem::UpdateUIProgress(const std::string& elementId, f32 ratio) {
+#ifdef RMLUI_ENABLED
+    if (!m_Initialized || !m_Backend || !m_Backend->context) return;
+
+    ratio = std::clamp(ratio, 0.0f, 1.0f);
+
+    Rml::ElementDocument* document = m_Backend->context->GetDocument(0);
+    if (!document) return;
+
+    Rml::Element* element = document->GetElementById(elementId);
+    if (element) {
+        int percent = static_cast<int>(ratio * 100.0f);
+        element->SetProperty("width", std::to_string(percent) + "%");
+    }
+#else
+    (void)elementId;
+    (void)ratio;
+#endif
+}
+
 void RmlUiSystem::SetElementText(const std::string& elementId, const std::string& text) {
 #ifdef RMLUI_ENABLED
     if (!m_Initialized || !m_Backend || !m_Backend->context) return;

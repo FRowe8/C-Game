@@ -249,6 +249,7 @@ public:
 
     // Coherence getter
     f64 GetCoherence() const { return m_Coherence; }
+    f64 GetMaxCoherence() const { return m_MaxCoherence; }
 
     // Save/Load
     bool Save(const std::string& filepath);
@@ -423,7 +424,6 @@ private:
     void UpdateDynamicMusic();  // Phase 4.2: Switch music based on active modal
     void UpdateUI(Input* input);
     void RenderUI(Renderer* renderer);
-    void RenderResources(Renderer* renderer);
     void RenderStations(Renderer* renderer);
     void RenderParticleEffects(Renderer* renderer, f64 deltaTime);
     void RenderAchievements(Renderer* renderer);

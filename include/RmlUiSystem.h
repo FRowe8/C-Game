@@ -33,6 +33,7 @@ public:
     // Data binding helpers - update UI elements with game state
     void UpdateUIResource(const std::string& resourceName, f64 value);
     void UpdateUIResourceFormatted(const std::string& resourceName, const std::string& formattedValue);
+    void UpdateUIProgress(const std::string& elementId, f32 ratio);
     void SetElementText(const std::string& elementId, const std::string& text);
     void SetElementVisible(const std::string& elementId, bool visible);
     void ActivateView(const std::string& viewId);
