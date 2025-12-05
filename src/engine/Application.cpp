@@ -147,6 +147,11 @@ bool Application::Initialize() {
     m_RmlUi->UpdateBuyables(m_GameState.get());
     m_RmlUi->UpdateCombat(m_GameState.get());
     m_RmlUi->UpdateMenu(m_GameState.get());
+    m_RmlUi->UpdateAchievements(m_GameState.get());
+    m_RmlUi->UpdateStatistics(m_GameState.get());
+    m_RmlUi->UpdateSingularityShop(m_GameState.get());
+    m_RmlUi->UpdateSpaceship(m_GameState.get());
+    m_RmlUi->SyncPanels(m_GameState.get());
 
     m_Initialized = true;
     m_Running = true;
@@ -269,6 +274,11 @@ void Application::Render() {
         m_RmlUi->UpdateResource("entanglement", m_GameState->GetResource(QuantumResource::Entanglement));
         m_RmlUi->UpdateResource("photons", static_cast<f64>(m_GameState->GetTimeline().photons));
         m_RmlUi->UpdateResource("singularities", static_cast<f64>(m_GameState->GetTimeline().singularities));
+        m_RmlUi->UpdateAchievements(m_GameState.get());
+        m_RmlUi->UpdateStatistics(m_GameState.get());
+        m_RmlUi->UpdateSingularityShop(m_GameState.get());
+        m_RmlUi->UpdateSpaceship(m_GameState.get());
+        m_RmlUi->SyncPanels(m_GameState.get());
     }
 
     m_Renderer->Clear(Color::DarkBackground()); // Modern dark cyberpunk background
