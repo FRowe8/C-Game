@@ -372,10 +372,6 @@ void GameState::Initialize() {
         }
     }
 
-    // Give starting currency for gatcha system (for testing)
-    m_GatchaSystem.AddStellarShards(50); // Start with 50 shards for testing
-    m_GatchaSystem.AddSummonTickets(5);  // Start with 5 tickets
-
     // Initialize skill tree system
     m_SkillTree.Initialize();
 
@@ -1244,6 +1240,17 @@ void GameState::PerformPrestige() {
     m_Timeline.completedResets++;
     m_Timeline.photonBonus = 1.0 + (m_Timeline.photons * 0.1); // 10% per photon
 
+    // Prestige rewards flow into the gatcha economy
+    i32 shardPrestigeReward = std::max(1, static_cast<i32>(photons / 2.0));
+    m_GatchaSystem.AddStellarShards(shardPrestigeReward, CurrencySource::Prestige);
+
+    if (photons >= 10.0) {
+        i32 ticketsEarned = static_cast<i32>(std::floor(photons / 25.0));
+        if (ticketsEarned > 0) {
+            m_GatchaSystem.AddSummonTickets(ticketsEarned, CurrencySource::Prestige);
+        }
+    }
+
     // Reset resources
     for (int i = 0; i < 3; i++) {
         m_Resources[i] = 0;
@@ -1356,6 +1363,11 @@ bool GameState::Save(const std::string& filepath) {
 
     // Time
     body << "  \"timePlayed\": " << m_TotalTimePlayed << ",\n";
+
+    // Gatcha currencies and pity state
+    body << "  \"gatcha\": {\n";
+    m_GatchaSystem.SaveToJson(body);
+    body << "  },\n";
 
     // Stations
     body << "  \"stations\": [\n";
@@ -1534,6 +1546,7 @@ bool GameState::Load(const std::string& filepath) {
         bool inSpecializedSkills = false;
         bool inParticleCollection = false;  // Phase 4.1
         bool inMilestones = false;
+        bool inGatcha = false;
 
         std::istringstream contentStream(fileContent);
         while (std::getline(contentStream, line)) {
@@ -1544,6 +1557,7 @@ bool GameState::Load(const std::string& filepath) {
                 inResearch = false;
                 inSpecializedSkills = false;
                 inMilestones = false;
+                inGatcha = false;
                 continue;
             } else if (line.find("\"achievements\"") != std::string::npos) {
                 inStatistics = false;
@@ -1551,6 +1565,7 @@ bool GameState::Load(const std::string& filepath) {
                 inResearch = false;
                 inSpecializedSkills = false;
                 inMilestones = false;
+                inGatcha = false;
                 continue;
             } else if (line.find("\"milestones\"") != std::string::npos) {
                 inStatistics = false;
@@ -1558,6 +1573,7 @@ bool GameState::Load(const std::string& filepath) {
                 inResearch = false;
                 inSpecializedSkills = false;
                 inMilestones = true;
+                inGatcha = false;
                 continue;
             } else if (line.find("\"research\"") != std::string::npos) {
                 inStatistics = false;
@@ -1565,6 +1581,7 @@ bool GameState::Load(const std::string& filepath) {
                 inResearch = true;
                 inSpecializedSkills = false;
                 inMilestones = false;
+                inGatcha = false;
                 continue;
             } else if (line.find("\"specializedSkills\"") != std::string::npos) {
                 inStatistics = false;
@@ -1573,6 +1590,7 @@ bool GameState::Load(const std::string& filepath) {
                 inParticleCollection = false;  // Phase 4.1
                 inSpecializedSkills = true;
                 inMilestones = false;
+                inGatcha = false;
                 continue;
             } else if (line.find("\"particleCollection\"") != std::string::npos) {
                 // Phase 4.1
@@ -1582,6 +1600,16 @@ bool GameState::Load(const std::string& filepath) {
                 inSpecializedSkills = false;
                 inParticleCollection = true;
                 inMilestones = false;
+                inGatcha = false;
+                continue;
+            } else if (line.find("\"gatcha\"") != std::string::npos) {
+                inStatistics = false;
+                inAchievements = false;
+                inResearch = false;
+                inSpecializedSkills = false;
+                inParticleCollection = false;  // Phase 4.1
+                inMilestones = false;
+                inGatcha = true;
                 continue;
             } else if (line.find("}") != std::string::npos || line.find("]") != std::string::npos) {
                 if (line.find("},") == std::string::npos) {
@@ -1591,6 +1619,7 @@ bool GameState::Load(const std::string& filepath) {
                     inSpecializedSkills = false;
                     inParticleCollection = false;  // Phase 4.1
                     inMilestones = false;
+                    inGatcha = false;
                 }
             }
 
@@ -1701,6 +1730,8 @@ bool GameState::Load(const std::string& filepath) {
             } else if (inSpecializedSkills) {
                 // Parse specialized skills (delegate to LoadFromJson)
                 m_SpecializedSkills.LoadFromJson(line);
+            } else if (inGatcha) {
+                m_GatchaSystem.LoadFromJson(line);
             } else {
                 // Parse main game state
                 if (line.find("\"saveTimestamp\"") != std::string::npos) {
@@ -3552,6 +3583,19 @@ void GameState::EndCombat() {
         // Award XP
         AddXP(static_cast<f64>(m_CombatSystem.GetXPEarned()));
 
+        // Award gatcha currency based on combat tier and bosses
+        EnemyTier tier = m_CurrentEnemy.GetTier();
+        i32 shardReward = 1 + static_cast<i32>(tier);
+        if (m_CurrentEnemy.IsBoss()) {
+            shardReward += 2; // bosses feel special
+        }
+        m_GatchaSystem.AddStellarShards(shardReward, CurrencySource::Combat);
+
+        bool ticketDrop = m_CurrentEnemy.IsBoss() || tier >= EnemyTier::Tier3;
+        if (ticketDrop && (rand() % 100) < 35) { // 35% chance on tougher fights
+            m_GatchaSystem.AddSummonTickets(1, CurrencySource::Combat);
+        }
+
         // Award Command skill XP for combat victory
         m_SpecializedSkills.AddExperience(SkillCategory::Command, SkillXP::WIN_COMBAT);
 
@@ -3633,12 +3677,12 @@ void GameState::AddXP(f64 amount) {
 
         // Award Stellar Shards on level up!
         i32 shardsEarned = 1 + (m_PlayerLevel / 10); // 1 shard + bonus every 10 levels
-        m_GatchaSystem.AddStellarShards(shardsEarned);
+        m_GatchaSystem.AddStellarShards(shardsEarned, CurrencySource::LevelUps);
         Log::Infof("Earned ", shardsEarned, " Stellar Shards!");
 
         // Award Summon Tickets at milestone levels
         if (m_PlayerLevel % 10 == 0) {
-            m_GatchaSystem.AddSummonTickets(1);
+            m_GatchaSystem.AddSummonTickets(1, CurrencySource::LevelUps);
             Log::Info("Earned 1 Summon Ticket!");
         }
 
