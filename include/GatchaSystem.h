@@ -4,6 +4,7 @@
 #include "Spaceship.h"
 #include <vector>
 #include <string>
+#include <array>
 
 // Forward declarations
 class Renderer;
@@ -14,6 +15,16 @@ enum class SummonBanner {
     Basic,      // Costs Credits, standard rates
     Advanced,   // Costs Stellar Shards, better rates
     Elite       // Costs Tickets, guaranteed Rare+
+};
+
+// Currency source attribution for telemetry and balancing
+enum class CurrencySource {
+    LevelUps,
+    Combat,
+    Stations,
+    Prestige,
+    Milestones,
+    COUNT
 };
 
 // Summon result for a single pull
@@ -51,10 +62,12 @@ public:
     i32 GetTenSummonCost(SummonBanner banner) const;
 
     // Currency
-    void AddStellarShards(i32 amount) { m_StellarShards += amount; }
-    void AddSummonTickets(i32 amount) { m_SummonTickets += amount; }
+    void AddStellarShards(i32 amount, CurrencySource source = CurrencySource::LevelUps);
+    void AddSummonTickets(i32 amount, CurrencySource source = CurrencySource::LevelUps);
     i32 GetStellarShards() const { return m_StellarShards; }
     i32 GetSummonTickets() const { return m_SummonTickets; }
+    const std::array<i32, static_cast<size_t>(CurrencySource::COUNT)>& GetShardBreakdown() const { return m_ShardTelemetry; }
+    const std::array<i32, static_cast<size_t>(CurrencySource::COUNT)>& GetTicketBreakdown() const { return m_TicketTelemetry; }
 
     // Pity information
     const PityTracker& GetPityTracker(SummonBanner banner) const;
@@ -84,6 +97,8 @@ private:
     // Currencies
     i32 m_StellarShards;    // Premium currency (earned from achievements, milestones)
     i32 m_SummonTickets;    // Special tickets (earned from raids, events)
+    std::array<i32, static_cast<size_t>(CurrencySource::COUNT)> m_ShardTelemetry;
+    std::array<i32, static_cast<size_t>(CurrencySource::COUNT)> m_TicketTelemetry;
 
     // Pity tracking (one per banner)
     PityTracker m_BasicPity;
@@ -116,4 +131,8 @@ private:
     void RenderPityCounters(Renderer* renderer, f32 panelX, f32 panelY, f32 panelWidth);
     void RenderSummonAnimation(Renderer* renderer, GameState* state);
     void RenderRateInfo(Renderer* renderer, f32 panelX, f32 panelY, f32 panelWidth);
+    void RenderCurrencyBreakdown(f32 panelWidth) const;
+
+    static const char* GetSourceLabel(CurrencySource source);
+    static size_t GetSourceIndex(CurrencySource source);
 };

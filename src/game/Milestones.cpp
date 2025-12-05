@@ -2,6 +2,7 @@
 #include "GameState.h"
 #include "Logger.h"
 #include "Research.h"
+#include "GatchaSystem.h"
 
 // Milestone implementation
 Milestone::Milestone()
@@ -404,6 +405,28 @@ void MilestoneSystem::CompleteMilestone(MilestoneID id, GameState* state)
 
     if (milestone->rewardSingularities > 0) {
         state->GetTimeline().singularities += milestone->rewardSingularities;
+    }
+
+    // Feed shards/tickets into the summon economy for core milestones
+    if (milestone->id == MilestoneID::FiveStations || milestone->id == MilestoneID::TenStations ||
+        milestone->id == MilestoneID::MaxedStation || milestone->id == MilestoneID::AllStationsMaxed) {
+        i32 shardReward = 3;
+        if (milestone->id == MilestoneID::TenStations) shardReward = 5;
+        if (milestone->id == MilestoneID::MaxedStation) shardReward = 8;
+        if (milestone->id == MilestoneID::AllStationsMaxed) shardReward = 12;
+        state->GetGatchaSystem().AddStellarShards(shardReward, CurrencySource::Stations);
+
+        if (milestone->id == MilestoneID::AllStationsMaxed) {
+            state->GetGatchaSystem().AddSummonTickets(1, CurrencySource::Stations);
+        }
+    }
+
+    if (milestone->id == MilestoneID::FirstPrestige || milestone->id == MilestoneID::TenPrestiges ||
+        milestone->id == MilestoneID::FiftyPrestiges) {
+        state->GetGatchaSystem().AddStellarShards(4 + static_cast<i32>(milestone->rewardSingularities), CurrencySource::Prestige);
+        if (milestone->id != MilestoneID::FirstPrestige) {
+            state->GetGatchaSystem().AddSummonTickets(1, CurrencySource::Prestige);
+        }
     }
 
     Log::Info("Milestone completed: " + milestone->name);

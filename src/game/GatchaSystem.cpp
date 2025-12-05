@@ -3,12 +3,14 @@
 #include "Renderer.h" // Still needed for GameState dependency
 #include "Logger.h"
 #include "GameState.h"
+#include "GameUtils.h"
 #include "imgui.h"
 #include <cstdlib>
 #include <cmath>
 #include <fstream>
 #include <algorithm>
 #include <ctime> // For rand() seed if needed
+#include <sstream>
 
 // --- Local Helpers ---
 
@@ -33,6 +35,9 @@ GatchaSystem::GatchaSystem()
       m_CurrentRevealIndex(0),
       m_SelectedBanner(SummonBanner::Basic) {
 
+    m_ShardTelemetry.fill(0);
+    m_TicketTelemetry.fill(0);
+
     // Seed the random number generator if not done globally
     // srand(static_cast<unsigned int>(time(NULL)));
 }
@@ -42,7 +47,7 @@ GatchaSystem::GatchaSystem()
 i32 GatchaSystem::GetSingleSummonCost(SummonBanner banner) const {
     switch (banner) {
         case SummonBanner::Basic: return 100; // Credits
-        case SummonBanner::Advanced: return 20; // Shards
+        case SummonBanner::Advanced: return 15; // Shards (aligned to new earn rates)
         case SummonBanner::Elite: return 1; // Tickets
         default: return 999;
     }
@@ -109,6 +114,33 @@ PartRarity GatchaSystem::RollRarity(SummonBanner banner) {
             if (roll < 3210) return PartRarity::Uncommon; // 25.00%
             return PartRarity::Common;                   // 67.90%
     }
+}
+
+size_t GatchaSystem::GetSourceIndex(CurrencySource source) {
+    return static_cast<size_t>(source);
+}
+
+const char* GatchaSystem::GetSourceLabel(CurrencySource source) {
+    switch (source) {
+        case CurrencySource::LevelUps: return "Level Ups";
+        case CurrencySource::Combat: return "Combat Wins";
+        case CurrencySource::Stations: return "Stations";
+        case CurrencySource::Prestige: return "Prestige";
+        case CurrencySource::Milestones: return "Milestones";
+        default: return "Other";
+    }
+}
+
+void GatchaSystem::AddStellarShards(i32 amount, CurrencySource source) {
+    if (amount <= 0) return;
+    m_StellarShards += amount;
+    m_ShardTelemetry[GetSourceIndex(source)] += amount;
+}
+
+void GatchaSystem::AddSummonTickets(i32 amount, CurrencySource source) {
+    if (amount <= 0) return;
+    m_SummonTickets += amount;
+    m_TicketTelemetry[GetSourceIndex(source)] += amount;
 }
 
 void GatchaSystem::IncrementPity(SummonBanner banner) {
@@ -298,6 +330,9 @@ void GatchaSystem::RenderSummonButtons(Renderer* renderer, GameState* state, f32
     ImGui::Text("Available Currency: %d %s", currentCurrency, currencyName);
     ImGui::Spacing();
 
+    RenderCurrencyBreakdown(panelWidth);
+    ImGui::Spacing();
+
     // --- Single Summon Button ---
     bool canSummon1 = currentCurrency >= cost1;
     if (!canSummon1) ImGui::PushStyleVar(ImGuiStyleVar_Alpha, 0.5f);
@@ -335,6 +370,21 @@ void GatchaSystem::RenderSummonButtons(Renderer* renderer, GameState* state, f32
     }
 
     if (!canSummon10) ImGui::PopStyleVar();
+}
+
+void GatchaSystem::RenderCurrencyBreakdown(f32 panelWidth) const {
+    ImGui::TextColored(ToImVec4(Color::NeonCyan()), "EARNED THIS RUN:");
+    ImGui::Columns(3, "CurrencyBreakdown", false);
+    ImGui::SetColumnWidth(0, panelWidth * 0.35f);
+
+    for (size_t i = 0; i < static_cast<size_t>(CurrencySource::COUNT); i++) {
+        CurrencySource source = static_cast<CurrencySource>(i);
+        ImGui::Text("%s", GetSourceLabel(source)); ImGui::NextColumn();
+        ImGui::Text("Shards: %d", m_ShardTelemetry[i]); ImGui::NextColumn();
+        ImGui::Text("Tickets: %d", m_TicketTelemetry[i]); ImGui::NextColumn();
+    }
+
+    ImGui::Columns(1);
 }
 
 void GatchaSystem::RenderPityCounters(Renderer* renderer, f32 panelX, f32 panelY, f32 panelWidth) {
@@ -575,6 +625,22 @@ void GatchaSystem::SaveToJson(std::ofstream& file) const {
     file << "\"totalSummons\":" << m_TotalSummons << ",\n";
     file << "\"legendaryPulls\":" << m_LegendaryPulls << ",\n";
 
+    file << "\"currencySources\":{\n";
+    file << "\"shards\":[";
+    for (size_t i = 0; i < m_ShardTelemetry.size(); ++i) {
+        file << m_ShardTelemetry[i];
+        if (i < m_ShardTelemetry.size() - 1) file << ",";
+    }
+    file << "],\n";
+
+    file << "\"tickets\":[";
+    for (size_t i = 0; i < m_TicketTelemetry.size(); ++i) {
+        file << m_TicketTelemetry[i];
+        if (i < m_TicketTelemetry.size() - 1) file << ",";
+    }
+    file << "]\n";
+    file << "},\n";
+
     file << "\"basicPity\":{";
     file << "\"rare\":" << m_BasicPity.pullsSinceRare << ",";
     file << "\"epic\":" << m_BasicPity.pullsSinceEpic << ",";
@@ -595,6 +661,55 @@ void GatchaSystem::SaveToJson(std::ofstream& file) const {
 }
 
 void GatchaSystem::LoadFromJson(const std::string& line) {
-    (void)line; // Unused parameter - TODO: Implement JSON loading (parsing would go here)
-    Log::Info("GatchaSystem::LoadFromJson called");
+    if (line.find("\"stellarShards\"") != std::string::npos) {
+        m_StellarShards = static_cast<i32>(GameUtils::ParseJsonNumber(line, "stellarShards"));
+    } else if (line.find("\"summonTickets\"") != std::string::npos) {
+        m_SummonTickets = static_cast<i32>(GameUtils::ParseJsonNumber(line, "summonTickets"));
+    } else if (line.find("\"totalSummons\"") != std::string::npos) {
+        m_TotalSummons = static_cast<i32>(GameUtils::ParseJsonNumber(line, "totalSummons"));
+    } else if (line.find("\"legendaryPulls\"") != std::string::npos) {
+        m_LegendaryPulls = static_cast<i32>(GameUtils::ParseJsonNumber(line, "legendaryPulls"));
+    } else if (line.find("\"basicPity\"") != std::string::npos ||
+               line.find("\"advancedPity\"") != std::string::npos ||
+               line.find("\"elitePity\"") != std::string::npos) {
+        // no-op: handled by subsequent lines
+    } else if (line.find("\"rare\"") != std::string::npos && line.find("basicPity") != std::string::npos) {
+        m_BasicPity.pullsSinceRare = static_cast<i32>(GameUtils::ParseJsonNumber(line, "rare"));
+        m_BasicPity.pullsSinceEpic = static_cast<i32>(GameUtils::ParseJsonNumber(line, "epic"));
+        m_BasicPity.pullsSinceLegendary = static_cast<i32>(GameUtils::ParseJsonNumber(line, "legendary"));
+    } else if (line.find("\"rare\"") != std::string::npos && line.find("advancedPity") != std::string::npos) {
+        m_AdvancedPity.pullsSinceRare = static_cast<i32>(GameUtils::ParseJsonNumber(line, "rare"));
+        m_AdvancedPity.pullsSinceEpic = static_cast<i32>(GameUtils::ParseJsonNumber(line, "epic"));
+        m_AdvancedPity.pullsSinceLegendary = static_cast<i32>(GameUtils::ParseJsonNumber(line, "legendary"));
+    } else if (line.find("\"rare\"") != std::string::npos && line.find("elitePity") != std::string::npos) {
+        m_ElitePity.pullsSinceRare = static_cast<i32>(GameUtils::ParseJsonNumber(line, "rare"));
+        m_ElitePity.pullsSinceEpic = static_cast<i32>(GameUtils::ParseJsonNumber(line, "epic"));
+        m_ElitePity.pullsSinceLegendary = static_cast<i32>(GameUtils::ParseJsonNumber(line, "legendary"));
+    } else if (line.find("\"currencySources\"") != std::string::npos) {
+        // parent header, nothing to do
+    } else if (line.find("\"shards\"") != std::string::npos) {
+        size_t start = line.find('[');
+        size_t end = line.find(']');
+        if (start != std::string::npos && end != std::string::npos) {
+            std::string values = line.substr(start + 1, end - start - 1);
+            std::istringstream iss(values);
+            std::string val;
+            size_t idx = 0;
+            while (std::getline(iss, val, ',') && idx < m_ShardTelemetry.size()) {
+                m_ShardTelemetry[idx++] = std::stoi(val);
+            }
+        }
+    } else if (line.find("\"tickets\"") != std::string::npos) {
+        size_t start = line.find('[');
+        size_t end = line.find(']');
+        if (start != std::string::npos && end != std::string::npos) {
+            std::string values = line.substr(start + 1, end - start - 1);
+            std::istringstream iss(values);
+            std::string val;
+            size_t idx = 0;
+            while (std::getline(iss, val, ',') && idx < m_TicketTelemetry.size()) {
+                m_TicketTelemetry[idx++] = std::stoi(val);
+            }
+        }
+    }
 }
