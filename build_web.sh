@@ -35,6 +35,7 @@ echo "[2/4] Configuring CMake with Emscripten..."
 emcmake cmake .. \
     -DCMAKE_BUILD_TYPE=Release \
     -DPLATFORM_WEB=ON \
+    -DENABLE_RMLUI=ON \
     -G "Unix Makefiles"
 
 # Build
