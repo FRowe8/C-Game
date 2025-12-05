@@ -2,6 +2,7 @@
 #include "Logger.h"
 #include "Renderer.h"
 #include "GameState.h"
+#include "Research.h"
 #include <SDL.h>
 #include <sstream>
 #include <iomanip>
@@ -584,6 +585,66 @@ void RmlUiSystem::UpdateStations(GameState* gameState) {
             }
         }
     }
+#else
+    (void)gameState;
+#endif
+}
+
+void RmlUiSystem::UpdateResearch(GameState* gameState) {
+#ifdef RMLUI_ENABLED
+    if (!m_Initialized || !m_Backend || !m_Backend->context || !gameState) return;
+
+    Rml::ElementDocument* document = m_Backend->context->GetDocument(0);
+    if (!document) return;
+
+    // Find the research grid container
+    Rml::Element* researchGrid = nullptr;
+    Rml::ElementList elements;
+    document->GetElementsByClassName(elements, "research-grid");
+    if (!elements.empty()) {
+        researchGrid = elements[0];
+    }
+
+    if (!researchGrid) return;
+
+    // Build research nodes HTML
+    std::stringstream html;
+    auto& researchTree = gameState->GetResearchTree();
+
+    // Get available and researched nodes
+    auto researchedNodes = researchTree.GetResearchedNodes();
+    auto availableNodes = researchTree.GetAvailableResearch(gameState->GetTimeline().completedResets);
+
+    // Show researched nodes first
+    for (const auto* node : researchedNodes) {
+        html << "<div class=\"research-node unlocked\">";
+        html << "  <h3 class=\"research-name\">" << node->name << "</h3>";
+        html << "  <p class=\"research-desc\">" << node->description << "</p>";
+        html << "  <p class=\"research-status\">✓ Researched</p>";
+        html << "</div>";
+    }
+
+    // Then show available research
+    for (const auto* node : availableNodes) {
+        if (node->researched) continue; // Already shown above
+
+        char costBuffer[64];
+        snprintf(costBuffer, sizeof(costBuffer), "Cost: %.0f Qubits", node->qubitCost);
+
+        html << "<div class=\"research-node\">";
+        html << "  <h3 class=\"research-name\">" << node->name << "</h3>";
+        html << "  <p class=\"research-desc\">" << node->description << "</p>";
+        html << "  <p class=\"research-cost\">" << costBuffer << "</p>";
+
+        // Add purchase button
+        html << "  <button class=\"btn-primary\" data-research-id=\"" << static_cast<i32>(node->id) << "\" data-action=\"research\">Research</button>";
+        html << "</div>";
+    }
+
+    // Update the research grid
+    researchGrid->SetInnerRML(html.str());
+
+    // TODO: Attach event listeners for research buttons
 #else
     (void)gameState;
 #endif

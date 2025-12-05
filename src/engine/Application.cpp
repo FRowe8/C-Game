@@ -141,8 +141,9 @@ bool Application::Initialize() {
     m_RmlUi->Initialize(m_Window, m_Renderer.get());
     m_RmlUi->SetGameState(m_GameState.get());
 
-    // Populate initial station data in UI
+    // Populate initial game data in UI
     m_RmlUi->UpdateStations(m_GameState.get());
+    m_RmlUi->UpdateResearch(m_GameState.get());
 
     m_Initialized = true;
     m_Running = true;
