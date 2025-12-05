@@ -1,0 +1,75 @@
+<rml>
+  <head>
+    <title>Summon Interface</title>
+    <link type="text/rcss" href="summon.rcss" />
+  </head>
+  <body>
+    <div id="summon-overlay">
+      <div class="summon-panel">
+        <div class="panel-header">
+          <div class="panel-title">Parts Exchange</div>
+          <button id="close-summon" class="btn-icon summon-action" data-action="close-summon">✖</button>
+        </div>
+
+        <div class="banner-row">
+          <button id="banner-basic" class="banner-card summon-action" data-action="select-banner" data-banner="basic">
+            <div class="banner-name">Basic</div>
+            <div class="banner-meta">Credits</div>
+          </button>
+          <button id="banner-advanced" class="banner-card summon-action" data-action="select-banner" data-banner="advanced">
+            <div class="banner-name">Advanced</div>
+            <div class="banner-meta">Stellar Shards</div>
+          </button>
+          <button id="banner-elite" class="banner-card summon-action" data-action="select-banner" data-banner="elite">
+            <div class="banner-name">Elite</div>
+            <div class="banner-meta">Tickets</div>
+          </button>
+        </div>
+
+        <div class="currency-grid">
+          <div class="stat-card">
+            <div class="stat-label">Credits</div>
+            <div class="stat-value" id="currency-basic">0</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Stellar Shards</div>
+            <div class="stat-value" id="currency-advanced">0</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Summon Tickets</div>
+            <div class="stat-value" id="currency-elite">0</div>
+          </div>
+        </div>
+
+        <div class="pity-grid">
+          <div class="pity-item">
+            <div class="pity-label">Rare Guarantee</div>
+            <div class="pity-value" id="pity-rare">0 / 10</div>
+          </div>
+          <div class="pity-item">
+            <div class="pity-label">Epic Guarantee</div>
+            <div class="pity-value" id="pity-epic">-</div>
+          </div>
+          <div class="pity-item">
+            <div class="pity-label">Legendary Guarantee</div>
+            <div class="pity-value" id="pity-legendary">-</div>
+          </div>
+        </div>
+
+        <div class="actions-row">
+          <button class="btn-primary summon-action" data-action="summon-single">
+            Summon x1 — <span id="cost-single">0</span>
+          </button>
+          <button class="btn-accent summon-action" data-action="summon-ten">
+            Summon x10 — <span id="cost-ten">0</span>
+          </button>
+          <button class="btn-outline summon-action" data-action="claim-results">Claim Results</button>
+        </div>
+
+        <div id="summon-results" class="results-grid">
+          <div class="summon-empty">No recent summons</div>
+        </div>
+      </div>
+    </div>
+  </body>
+</rml>

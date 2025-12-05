@@ -4,6 +4,10 @@
 #include <SDL_events.h>
 #include <string>
 
+namespace Rml {
+    class ElementDocument;
+}
+
 class Renderer;
 struct SDL_Window;
 
@@ -27,8 +31,8 @@ public:
     bool IsInitialized() const { return m_Initialized; }
 
     // Data binding helpers - update UI elements with game state
-    void UpdateResource(const std::string& resourceName, f64 value);
-    void UpdateResourceFormatted(const std::string& resourceName, const std::string& formattedValue);
+    void UpdateUIResource(const std::string& resourceName, f64 value);
+    void UpdateUIResourceFormatted(const std::string& resourceName, const std::string& formattedValue);
     void SetElementText(const std::string& elementId, const std::string& text);
     void SetElementVisible(const std::string& elementId, bool visible);
     void ActivateView(const std::string& viewId);
@@ -49,6 +53,11 @@ public:
     void UpdateCombat(class GameState* gameState);
     void UpdateMenu(class GameState* gameState);
     void UpdateCollection(class GameState* gameState);
+    void UpdateAchievements(class GameState* gameState);
+    void UpdateStatistics(class GameState* gameState);
+    void UpdateSingularityShop(class GameState* gameState);
+    void UpdateSpaceship(class GameState* gameState);
+    void SyncPanels(class GameState* gameState);
     void SetGameState(class GameState* gameState) { m_GameState = gameState; }
 
 private:
@@ -59,6 +68,8 @@ private:
 #ifdef RMLUI_ENABLED
     // Forward declarations to avoid leaking RmlUi headers broadly.
     struct RmlUiBackend;
+    class Rml::ElementDocument* m_HudDocument = nullptr;
+    class Rml::ElementDocument* m_PanelDocument = nullptr;
     Scope<RmlUiBackend> m_Backend;
 
     // Internal helpers

@@ -333,6 +333,9 @@ public:
     // Phase 4.1: Particle Collection System
     ParticleCollection& GetParticleCollection() { return m_ParticleCollection; }
 
+    // Achievements
+    const std::vector<Achievement>& GetAchievements() const { return m_Achievements; }
+
     // Specialized Skills System
     SpecializedSkillsSystem& GetSpecializedSkills() { return m_SpecializedSkills; }
 

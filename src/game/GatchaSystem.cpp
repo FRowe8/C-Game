@@ -4,6 +4,9 @@
 #include "Logger.h"
 #include "GameState.h"
 #include "imgui.h"
+#ifdef RMLUI_ENABLED
+#include <RmlUi/Core.h>
+#endif
 #include <cstdlib>
 #include <cmath>
 #include <fstream>
@@ -22,6 +25,46 @@ ImVec4 GetRarityColorImVec4(PartRarity rarity) {
         default: return ImVec4(1.0f, 1.0f, 1.0f, 1.0f);
     }
 }
+
+#ifdef RMLUI_ENABLED
+class GatchaSystem::RmlSummonListener : public Rml::EventListener {
+public:
+    RmlSummonListener(GatchaSystem* system, GameState* gameState)
+        : m_System(system), m_GameState(gameState) {}
+
+    void ProcessEvent(Rml::Event& event) override {
+        Rml::Element* element = event.GetTargetElement();
+        if (!element || !m_System) return;
+
+        std::string action = element->GetAttribute<Rml::String>("data-action", "");
+        if (action == "select-banner") {
+            std::string banner = element->GetAttribute<Rml::String>("data-banner", "basic");
+            if (banner == "advanced") {
+                m_System->SetSelectedBanner(SummonBanner::Advanced);
+            } else if (banner == "elite") {
+                m_System->SetSelectedBanner(SummonBanner::Elite);
+            } else {
+                m_System->SetSelectedBanner(SummonBanner::Basic);
+            }
+        } else if (action == "summon-single") {
+            m_System->ExecuteSummon(1, m_GameState);
+        } else if (action == "summon-ten") {
+            m_System->ExecuteSummon(10, m_GameState);
+        } else if (action == "claim-results") {
+            m_System->ClaimResults(m_GameState);
+        } else if (action == "close-summon" && m_GameState) {
+            m_GameState->SetActiveModal(ActiveModal::None);
+            m_System->HideSummonDocument();
+        }
+
+        m_System->UpdateSummonDocument(m_GameState);
+    }
+
+private:
+    GatchaSystem* m_System;
+    GameState* m_GameState;
+};
+#endif
 
 
 // --- GatchaSystem Implementation ---
@@ -246,6 +289,153 @@ void GatchaSystem::Update(f64 deltaTime) {
 
     // After all parts are revealed, the animation continues to show results until dismissed by click/button.
 }
+
+void GatchaSystem::ClaimResults(GameState* state) {
+    if (state) {
+        for (const auto& result : m_CurrentResults) {
+            state->GetSpaceship().AddPart(result.part);
+        }
+    }
+    ClearResults();
+}
+
+void GatchaSystem::HideSummonDocument() {
+#ifdef RMLUI_ENABLED
+    if (m_SummonDocument) {
+        m_SummonDocument->Hide();
+    }
+#endif
+}
+
+#ifdef RMLUI_ENABLED
+static std::string GetRarityClass(const ShipPart& part) {
+    switch (part.rarity) {
+        case PartRarity::Legendary: return "legendary";
+        case PartRarity::Epic: return "epic";
+        case PartRarity::Rare: return "rare";
+        case PartRarity::Uncommon: return "uncommon";
+        default: return "common";
+    }
+}
+
+void GatchaSystem::ExecuteSummon(i32 count, GameState* state) {
+    if (count != 1 && count != 10) return;
+
+    i32 cost = (count == 1) ? GetSingleSummonCost(m_SelectedBanner) : GetTenSummonCost(m_SelectedBanner);
+
+    switch (m_SelectedBanner) {
+        case SummonBanner::Basic: {
+            if (!state || state->GetPlayerCredits() < cost) return;
+            state->DeductPlayerCredits(cost);
+            break;
+        }
+        case SummonBanner::Advanced: {
+            if (m_StellarShards < cost) return;
+            m_StellarShards -= cost;
+            break;
+        }
+        case SummonBanner::Elite: {
+            if (m_SummonTickets < cost) return;
+            m_SummonTickets -= cost;
+            break;
+        }
+    }
+
+    if (count == 1) {
+        m_CurrentResults.clear();
+        m_CurrentResults.push_back(PerformSingleSummon(m_SelectedBanner));
+    } else {
+        m_CurrentResults = PerformTenSummon(m_SelectedBanner);
+    }
+
+    m_IsAnimating = true;
+    m_AnimationTimer = 0.0;
+    m_CurrentRevealIndex = 0;
+}
+
+void GatchaSystem::InitializeSummonDocument(GameState* state) {
+    Rml::Context* context = Rml::GetContext("main");
+    if (!context) return;
+
+    if (!m_SummonDocument) {
+        m_SummonDocument = context->LoadDocument("assets/ui/rml/summon.rml");
+        if (m_SummonDocument) {
+            m_SummonDocument->Show();
+
+            Rml::ElementList actionButtons;
+            m_SummonDocument->GetElementsByClassName(actionButtons, "summon-action");
+
+            if (!m_SummonListener) {
+                m_SummonListener = CreateScope<RmlSummonListener>(this, state);
+            }
+
+            for (Rml::Element* button : actionButtons) {
+                button->AddEventListener(Rml::EventId::Click, m_SummonListener.get());
+            }
+        }
+    }
+
+    if (m_SummonDocument) {
+        m_SummonDocument->Show();
+    }
+}
+
+void GatchaSystem::UpdateSummonDocument(GameState* state) {
+    if (!m_SummonDocument) return;
+
+    auto setText = [this](const std::string& id, const std::string& text) {
+        if (Rml::Element* element = m_SummonDocument->GetElementById(id)) {
+            element->SetInnerRML(text);
+        }
+    };
+
+    // Banner highlighting
+    if (Rml::Element* basic = m_SummonDocument->GetElementById("banner-basic")) {
+        basic->SetClass("active", m_SelectedBanner == SummonBanner::Basic);
+    }
+    if (Rml::Element* adv = m_SummonDocument->GetElementById("banner-advanced")) {
+        adv->SetClass("active", m_SelectedBanner == SummonBanner::Advanced);
+    }
+    if (Rml::Element* elite = m_SummonDocument->GetElementById("banner-elite")) {
+        elite->SetClass("active", m_SelectedBanner == SummonBanner::Elite);
+    }
+
+    setText("currency-basic", std::to_string(state ? state->GetPlayerCredits() : 0));
+    setText("currency-advanced", std::to_string(m_StellarShards));
+    setText("currency-elite", std::to_string(m_SummonTickets));
+
+    const PityTracker& pity = GetPityTracker(m_SelectedBanner);
+    setText("pity-rare", std::to_string(pity.pullsSinceRare) + " / 10");
+    if (m_SelectedBanner == SummonBanner::Advanced) {
+        setText("pity-epic", std::to_string(pity.pullsSinceEpic) + " / 30");
+        setText("pity-legendary", std::to_string(pity.pullsSinceLegendary) + " / 100");
+    } else {
+        setText("pity-epic", "-");
+        setText("pity-legendary", "-");
+    }
+
+    setText("cost-single", std::to_string(GetSingleSummonCost(m_SelectedBanner)));
+    setText("cost-ten", std::to_string(GetTenSummonCost(m_SelectedBanner)));
+
+    if (Rml::Element* results = m_SummonDocument->GetElementById("summon-results")) {
+        std::string html;
+        if (m_CurrentResults.empty()) {
+            html = "<div class='summon-empty'>No recent summons</div>";
+        } else {
+            for (const auto& result : m_CurrentResults) {
+                html += "<div class='result-card " + GetRarityClass(result.part) + "'>";
+                html += "<div class='result-name'>" + result.part.name + "</div>";
+                html += "<div class='result-rarity'>" + std::string(result.part.GetRarityName()) + "</div>";
+                if (result.isPityDrop) {
+                    html += "<div class='result-badge'>Pity</div>";
+                }
+                html += "</div>";
+            }
+        }
+        results->SetInnerRML(html);
+    }
+}
+#endif
 
 // --- IMGUI RENDERING IMPLEMENTATIONS ---
 
@@ -493,6 +683,12 @@ void GatchaSystem::RenderSummonAnimation(Renderer* renderer, GameState* state) {
 
 void GatchaSystem::RenderSummonUI(Renderer* renderer, GameState* state) {
     (void)renderer;
+
+#ifdef RMLUI_ENABLED
+    InitializeSummonDocument(state);
+    UpdateSummonDocument(state);
+    return;
+#endif
 
     ImGui::SetNextWindowSize(ImVec2(800, 700), ImGuiCond_Once);
 
