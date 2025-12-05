@@ -270,6 +270,13 @@ void Application::Render() {
         m_RmlUi->UpdateUIResource("entanglement", m_GameState->GetResource(QuantumResource::Entanglement));
         m_RmlUi->UpdateUIResource("photons", static_cast<f64>(m_GameState->GetTimeline().photons));
         m_RmlUi->UpdateUIResource("singularities", static_cast<f64>(m_GameState->GetTimeline().singularities));
+
+        f64 maxCoherence = m_GameState->GetMaxCoherence();
+        f32 coherenceRatio = (maxCoherence > 0.0) ? static_cast<f32>(m_GameState->GetCoherence() / maxCoherence) : 0.0f;
+        m_RmlUi->UpdateUIProgress("coherence-progress", coherenceRatio);
+
+        int coherencePercent = static_cast<int>(coherenceRatio * 100.0f + 0.5f);
+        m_RmlUi->UpdateUIResourceFormatted("coherence-percent", std::to_string(coherencePercent) + "%");
     }
 
     m_Renderer->Clear(Color::DarkBackground()); // Modern dark cyberpunk background

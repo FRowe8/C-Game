@@ -1032,8 +1032,6 @@ void GameState::Render(Renderer* renderer) {
         // Fallback to UIManager if GuiLayer not initialized
         m_UIManager->Render(renderer);
     } else {
-        // Legacy fallback
-        RenderResources(renderer);
         RenderUI(renderer);
     }
 #endif
@@ -1052,11 +1050,6 @@ void GameState::Render(Renderer* renderer) {
         );
     }
 }
-
-void GameState::RenderResources(Renderer* renderer) {
-    (void)renderer;
-}
-
 
 // In src/game/GameState.cpp (Around line 870)
 

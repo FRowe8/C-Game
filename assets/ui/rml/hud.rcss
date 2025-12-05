@@ -18,6 +18,90 @@ body {
   box-sizing: border-box;
 }
 
+/* Fixed HUD Resource Bar */
+#resource-hud {
+  position: fixed;
+  top: 16dp;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 86vw;
+  max-width: 1480dp;
+  z-index: 1000;
+  background: rgba(10, 12, 18, 0.92);
+  border: 1dp solid rgba(59, 130, 246, 0.28);
+  box-shadow: 0 12dp 36dp rgba(0, 0, 0, 0.35), 0 0 24dp rgba(59, 130, 246, 0.15);
+  border-radius: 14dp;
+  padding: 14dp 18dp;
+  backdrop-filter: blur(8dp);
+  box-sizing: border-box;
+}
+
+.resource-row {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12dp;
+  align-items: stretch;
+}
+
+.resource-chip {
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.02));
+  border: 1dp solid rgba(255, 255, 255, 0.06);
+  border-radius: 10dp;
+  padding: 10dp 12dp;
+  box-shadow: inset 0 1dp 0 rgba(255, 255, 255, 0.05);
+  display: flex;
+  flex-direction: column;
+  gap: 6dp;
+}
+
+.resource-chip.wide {
+  grid-column: span 2;
+}
+
+.chip-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.resource-label {
+  font-size: 12dp;
+  font-weight: 700;
+  letter-spacing: 0.5dp;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.resource-value {
+  font-size: 18dp;
+  font-weight: 700;
+  font-family: "Courier New", monospace;
+  color: #e5e7eb;
+}
+
+.progress-shell {
+  width: 100%;
+  height: 12dp;
+  border-radius: 999dp;
+  background: rgba(255, 255, 255, 0.06);
+  overflow: hidden;
+  border: 1dp solid rgba(255, 255, 255, 0.08);
+}
+
+.progress-fill {
+  height: 100%;
+  width: 100%;
+  background: linear-gradient(90deg, #10b981, #3b82f6);
+  box-shadow: 0 0 12dp rgba(16, 185, 129, 0.45);
+  transition: width 0.2s ease-out;
+}
+
+.progress-text {
+  font-size: 11dp;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.65);
+}
+
 /* ========== Bar Containers (Top & Bottom) ========== */
 .bar-container {
   background-color: rgba(10, 12, 18, 0.95);
