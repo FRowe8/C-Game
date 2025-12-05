@@ -87,23 +87,23 @@
       <!-- Bottom Navigation Bar -->
       <div id="bottom-nav" class="bar-container">
         <div class="nav-buttons">
-          <button class="nav-btn active" data-view="stations">
+          <button class="nav-btn active" data-view="stations" data-tooltip="Stations (Press 1)">
             <span class="nav-icon">🏠</span>
             <span class="nav-label">STATIONS</span>
           </button>
-          <button class="nav-btn" data-view="research">
+          <button class="nav-btn" data-view="research" data-tooltip="Research Tree (Press 2)">
             <span class="nav-icon">🔬</span>
             <span class="nav-label">RESEARCH</span>
           </button>
-          <button class="nav-btn" data-view="upgrades">
+          <button class="nav-btn" data-view="upgrades" data-tooltip="Upgrades & Buyables (Press 3)">
             <span class="nav-icon">⬆️</span>
             <span class="nav-label">UPGRADES</span>
           </button>
-          <button class="nav-btn" data-view="combat">
+          <button class="nav-btn" data-view="combat" data-tooltip="Combat System (Press 4)">
             <span class="nav-icon">⚔️</span>
             <span class="nav-label">COMBAT</span>
           </button>
-          <button class="nav-btn" data-view="menu">
+          <button class="nav-btn" data-view="menu" data-tooltip="Settings & Menu (Press 5)">
             <span class="nav-icon">☰</span>
             <span class="nav-label">MENU</span>
           </button>

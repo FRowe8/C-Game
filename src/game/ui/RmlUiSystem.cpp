@@ -74,6 +74,42 @@ private:
     Rml::Context* m_Context;
 };
 
+// Event listener for keyboard navigation
+class KeyboardNavigationListener : public Rml::EventListener {
+public:
+    explicit KeyboardNavigationListener(RmlUiSystem* system) : m_System(system) {}
+
+    void ProcessEvent(Rml::Event& event) override {
+        if (event.GetType() == "keydown") {
+            auto keyIdentifier = event.GetParameter<Rml::Input::KeyIdentifier>("key_identifier", Rml::Input::KI_UNKNOWN);
+
+            // Number keys 1-5 for quick navigation
+            switch (keyIdentifier) {
+                case Rml::Input::KI_1:
+                    m_System->ActivateView("view-stations");
+                    break;
+                case Rml::Input::KI_2:
+                    m_System->ActivateView("view-research");
+                    break;
+                case Rml::Input::KI_3:
+                    m_System->ActivateView("view-upgrades");
+                    break;
+                case Rml::Input::KI_4:
+                    m_System->ActivateView("view-combat");
+                    break;
+                case Rml::Input::KI_5:
+                    m_System->ActivateView("view-menu");
+                    break;
+                default:
+                    break;
+            }
+        }
+    }
+
+private:
+    RmlUiSystem* m_System;
+};
+
 struct RmlUiSystem::RmlUiBackend {
     Rml::Context* context = nullptr;
     bool debuggerInitialized = false;
@@ -81,6 +117,7 @@ struct RmlUiSystem::RmlUiBackend {
     Scope<RenderInterface_GL3> renderInterface;
     Scope<NavigationEventListener> navigationListener;
     Scope<TooltipEventListener> tooltipListener;
+    Scope<KeyboardNavigationListener> keyboardListener;
 };
 #endif
 
@@ -457,6 +494,14 @@ void RmlUiSystem::InstallEventListeners() {
     }
 
     Log::Infof("Installed tooltip listeners on ", tooltipCount, " elements");
+
+    // Create keyboard navigation listener
+    m_Backend->keyboardListener = CreateScope<KeyboardNavigationListener>(this);
+
+    // Attach to document for global keyboard shortcuts
+    document->AddEventListener(Rml::EventId::Keydown, m_Backend->keyboardListener.get());
+
+    Log::Info("Installed keyboard navigation shortcuts (1-5 for views)");
 }
 #endif
 
