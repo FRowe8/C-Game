@@ -146,6 +146,7 @@ bool Application::Initialize() {
     m_RmlUi->UpdateResearch(m_GameState.get());
     m_RmlUi->UpdateBuyables(m_GameState.get());
     m_RmlUi->UpdateCombat(m_GameState.get());
+    m_RmlUi->UpdateMenu(m_GameState.get());
 
     m_Initialized = true;
     m_Running = true;

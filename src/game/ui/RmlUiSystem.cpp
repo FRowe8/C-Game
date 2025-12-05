@@ -310,6 +310,70 @@ private:
     GameState* m_GameState;
 };
 
+// Event listener for menu action buttons
+class MenuActionListener : public Rml::EventListener {
+public:
+    explicit MenuActionListener(RmlUiSystem* system, GameState* gameState)
+        : m_System(system), m_GameState(gameState) {}
+
+    void ProcessEvent(Rml::Event& event) override {
+        if (event.GetType() == "click") {
+            Rml::Element* element = event.GetTargetElement();
+            if (!element || !m_GameState) return;
+
+            std::string action = element->GetAttribute<Rml::String>("data-action", "");
+            if (action.empty()) return;
+
+            if (action == "save-game") {
+                if (m_GameState->Save("savegame.dat")) {
+                    m_System->ShowToast("Game Saved", "Progress saved successfully", RmlUiSystem::ToastType::Success);
+                } else {
+                    m_System->ShowToast("Save Failed", "Could not save game", RmlUiSystem::ToastType::Warning);
+                }
+            } else if (action == "load-game") {
+                if (m_GameState->Load("savegame.dat")) {
+                    m_System->ShowToast("Game Loaded", "Save file loaded successfully", RmlUiSystem::ToastType::Success);
+                    // Refresh all views with loaded data
+                    m_System->UpdateStations(m_GameState);
+                    m_System->UpdateResearch(m_GameState);
+                    m_System->UpdateBuyables(m_GameState);
+                    m_System->UpdateCombat(m_GameState);
+                    m_System->UpdateMenu(m_GameState);
+                } else {
+                    m_System->ShowToast("Load Failed", "No save file found", RmlUiSystem::ToastType::Warning);
+                }
+            } else if (action == "export-save") {
+                m_System->ShowToast("Export Save", "Feature coming soon", RmlUiSystem::ToastType::Info);
+            } else if (action == "import-save") {
+                m_System->ShowToast("Import Save", "Feature coming soon", RmlUiSystem::ToastType::Info);
+            } else if (action == "prestige-reset") {
+                // TODO: Add confirmation dialog
+                m_GameState->PerformPrestige();
+                m_System->ShowToast("Prestige Reset!", "Starting fresh with bonuses", RmlUiSystem::ToastType::Achievement);
+                // Refresh all views
+                m_System->UpdateStations(m_GameState);
+                m_System->UpdateResearch(m_GameState);
+                m_System->UpdateBuyables(m_GameState);
+                m_System->UpdateCombat(m_GameState);
+                m_System->UpdateMenu(m_GameState);
+            } else if (action == "toggle-notifications") {
+                // Toggle setting (placeholder for now)
+                m_System->UpdateMenu(m_GameState);
+            } else if (action == "toggle-autosave") {
+                // Toggle setting (placeholder for now)
+                m_System->UpdateMenu(m_GameState);
+            } else if (action == "toggle-tooltips") {
+                // Toggle setting (placeholder for now)
+                m_System->UpdateMenu(m_GameState);
+            }
+        }
+    }
+
+private:
+    RmlUiSystem* m_System;
+    GameState* m_GameState;
+};
+
 struct RmlUiSystem::RmlUiBackend {
     Rml::Context* context = nullptr;
     bool debuggerInitialized = false;
@@ -322,6 +386,7 @@ struct RmlUiSystem::RmlUiBackend {
     Scope<ResearchActionListener> researchActionListener;
     Scope<BuyableActionListener> buyableActionListener;
     Scope<CombatActionListener> combatActionListener;
+    Scope<MenuActionListener> menuActionListener;
 };
 #endif
 
@@ -1077,6 +1142,86 @@ void RmlUiSystem::UpdateCombat(GameState* gameState) {
 #endif
 }
 
+void RmlUiSystem::UpdateMenu(GameState* gameState) {
+#ifdef RMLUI_ENABLED
+    if (!m_Initialized || !m_Backend || !m_Backend->context || !gameState) return;
+
+    Rml::ElementDocument* document = m_Backend->context->GetDocument(0);
+    if (!document) return;
+
+    // Helper lambda to update text content
+    auto updateText = [&](const std::string& bindAttr, const std::string& value) {
+        Rml::ElementList elements;
+        document->GetElementsByTagName(elements, "*");
+        for (Rml::Element* elem : elements) {
+            if (elem->GetAttribute<Rml::String>("data-bind", "") == bindAttr) {
+                elem->SetInnerRML(value);
+            }
+        }
+    };
+
+    // Update prestige info
+    i32 prestigeCount = gameState->GetTimeline().completedResets;
+    updateText("prestige-count", std::to_string(prestigeCount));
+
+    // Calculate next prestige gain (simplified formula)
+    f64 currentQubits = gameState->GetResource(QuantumResource::Qubits);
+    i32 photonGain = static_cast<i32>(std::sqrt(currentQubits / 1000.0));
+    updateText("prestige-gain", "+" + std::to_string(photonGain));
+
+    // Update statistics (using current qubits as total for now)
+    char qubitsBuffer[64];
+    if (currentQubits >= 1e9) {
+        snprintf(qubitsBuffer, sizeof(qubitsBuffer), "%.2fB", currentQubits / 1e9);
+    } else if (currentQubits >= 1e6) {
+        snprintf(qubitsBuffer, sizeof(qubitsBuffer), "%.2fM", currentQubits / 1e6);
+    } else if (currentQubits >= 1e3) {
+        snprintf(qubitsBuffer, sizeof(qubitsBuffer), "%.2fK", currentQubits / 1e3);
+    } else {
+        snprintf(qubitsBuffer, sizeof(qubitsBuffer), "%.0f", currentQubits);
+    }
+    updateText("total-qubits", qubitsBuffer);
+
+    // Play time placeholder (no time tracking available in GameState yet)
+    updateText("play-time", "0:00:00");
+
+    // Research completed count
+    auto& researchTree = gameState->GetResearchTree();
+    i32 researchCount = static_cast<i32>(researchTree.GetResearchedNodes().size());
+    updateText("research-count", std::to_string(researchCount));
+
+    // Battles won (placeholder - would come from combat stats)
+    updateText("battles-won", "0");
+
+    // Settings states (placeholder - would come from settings manager)
+    updateText("notifications-state", "ON");
+    updateText("autosave-state", "ON");
+    updateText("tooltips-state", "ON");
+
+    // Game version
+    updateText("game-version", "1.0.0");
+
+    // Attach event listeners to all menu buttons
+    if (m_Backend->menuActionListener) {
+        Rml::ElementList buttons;
+        document->GetElementsByClassName(buttons, "menu-btn");
+        for (Rml::Element* button : buttons) {
+            button->AddEventListener(Rml::EventId::Click, m_Backend->menuActionListener.get());
+        }
+
+        // Also attach to toggle buttons
+        Rml::ElementList toggleButtons;
+        document->GetElementsByClassName(toggleButtons, "btn-toggle");
+        for (Rml::Element* button : toggleButtons) {
+            button->AddEventListener(Rml::EventId::Click, m_Backend->menuActionListener.get());
+        }
+    }
+
+#else
+    (void)gameState;
+#endif
+}
+
 // ========== Event Listener Installation ==========
 
 #ifdef RMLUI_ENABLED
@@ -1131,7 +1276,8 @@ void RmlUiSystem::InstallEventListeners() {
         m_Backend->researchActionListener = CreateScope<ResearchActionListener>(this, m_GameState);
         m_Backend->buyableActionListener = CreateScope<BuyableActionListener>(this, m_GameState);
         m_Backend->combatActionListener = CreateScope<CombatActionListener>(this, m_GameState);
-        Log::Info("Game action listeners created (stations, research, buyables, combat)");
+        m_Backend->menuActionListener = CreateScope<MenuActionListener>(this, m_GameState);
+        Log::Info("Game action listeners created (stations, research, buyables, combat, menu)");
     }
 }
 #endif

@@ -145,8 +145,84 @@
 
           <!-- Menu View -->
           <div id="view-menu" class="view-panel">
-            <h2 class="view-title">Menu</h2>
-            <p class="placeholder-text">Menu options will be implemented here</p>
+            <h2 class="view-title">Menu & Settings</h2>
+
+            <div class="menu-grid">
+              <!-- Game Controls Section -->
+              <div class="menu-section">
+                <h3 class="section-title">Game Controls</h3>
+                <button class="btn-primary menu-btn" data-action="save-game">💾 Save Game</button>
+                <button class="btn-secondary menu-btn" data-action="load-game">📂 Load Game</button>
+                <button class="btn-secondary menu-btn" data-action="export-save">📤 Export Save</button>
+                <button class="btn-secondary menu-btn" data-action="import-save">📥 Import Save</button>
+              </div>
+
+              <!-- Prestige Section -->
+              <div class="menu-section">
+                <h3 class="section-title">Prestige</h3>
+                <div class="prestige-info">
+                  <p class="info-text">Current Resets: <span class="highlight" data-bind="prestige-count">0</span></p>
+                  <p class="info-text">Next Reset: <span class="highlight" data-bind="prestige-gain">+0</span> Photons</p>
+                </div>
+                <button class="btn-warning menu-btn" data-action="prestige-reset">🔄 Prestige Reset</button>
+              </div>
+
+              <!-- Statistics Section -->
+              <div class="menu-section">
+                <h3 class="section-title">Statistics</h3>
+                <div class="stats-list">
+                  <div class="stat-row">
+                    <span class="stat-label">Total Qubits:</span>
+                    <span class="stat-value" data-bind="total-qubits">0</span>
+                  </div>
+                  <div class="stat-row">
+                    <span class="stat-label">Play Time:</span>
+                    <span class="stat-value" data-bind="play-time">0:00:00</span>
+                  </div>
+                  <div class="stat-row">
+                    <span class="stat-label">Research Completed:</span>
+                    <span class="stat-value" data-bind="research-count">0</span>
+                  </div>
+                  <div class="stat-row">
+                    <span class="stat-label">Battles Won:</span>
+                    <span class="stat-value" data-bind="battles-won">0</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Settings Section -->
+              <div class="menu-section">
+                <h3 class="section-title">Settings</h3>
+                <div class="setting-row">
+                  <span class="setting-label">Notifications:</span>
+                  <button class="btn-toggle" data-action="toggle-notifications">
+                    <span data-bind="notifications-state">ON</span>
+                  </button>
+                </div>
+                <div class="setting-row">
+                  <span class="setting-label">Auto-Save:</span>
+                  <button class="btn-toggle" data-action="toggle-autosave">
+                    <span data-bind="autosave-state">ON</span>
+                  </button>
+                </div>
+                <div class="setting-row">
+                  <span class="setting-label">Show Tooltips:</span>
+                  <button class="btn-toggle" data-action="toggle-tooltips">
+                    <span data-bind="tooltips-state">ON</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- About Section -->
+              <div class="menu-section full-width">
+                <h3 class="section-title">About</h3>
+                <p class="about-text">
+                  <strong>Quantum Idle</strong> - A quantum-themed incremental game<br/>
+                  Version: <span data-bind="game-version">1.0.0</span><br/>
+                  Built with RmlUi & SDL2
+                </p>
+              </div>
+            </div>
           </div>
         </div>
       </div>

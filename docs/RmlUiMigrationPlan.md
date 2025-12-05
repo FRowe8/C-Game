@@ -12,14 +12,14 @@ This document outlines a staged approach for introducing [RmlUi](https://github.
   - Toast notification system (4 types: Info, Success, Warning, Achievement) with animations
   - Keyboard navigation (keys 1-5 for view switching)
   - All CSS animations and visual feedback polished
-- 🚧 **Phase 4 In Progress**: ImGui decommissioning and gameplay expansion underway:
+- ✅ **Phase 4 Complete**: ImGui decommissioned and all 5 core views fully interactive:
   - ✅ ImGui UI hidden when RmlUi enabled (conditional compilation)
-  - ✅ Stations View: Fully interactive with Observe/Upgrade buttons
+  - ✅ Stations View: Fully interactive with Observe/Upgrade buttons and resource display
   - ✅ Research View: Fully interactive with purchase buttons and live feedback
-  - ✅ Web build configured (WebGL 2.0, ENABLE_RMLUI in build script)
   - ✅ Upgrades View: Fully interactive with purchase buttons and live cost updates
-  - ⏳ Combat View: Coming next
-  - ⏳ Menu/Settings View: Coming next
+  - ✅ Combat View: Full combat system with player/enemy stats, actions, and combat log
+  - ✅ Menu/Settings View: Save/load, prestige, statistics, and settings toggles
+  - ✅ Web build configured (WebGL 2.0, ENABLE_RMLUI in build script)
 
 ## Goals
 - Deliver a responsive, web-like UI suitable for idle/incremental gameplay (grid-heavy layouts, rich styling, and readable typography).
