@@ -253,11 +253,6 @@ public:
     ~CollectionView() override = default;
 
     void Render(GameState* state, Renderer* renderer) override;
-
-private:
-    void RenderParticleSlot(GameState* state, Particle* particle, bool discovered);
-    void RenderEquippedParticles(GameState* state);
-    void RenderCollectionStats(GameState* state);
 };
 
 /**

@@ -7,6 +7,7 @@
 #include <array>
 
 // Forward declarations
+namespace Rml { class ElementDocument; }
 class Renderer;
 class GameState;
 
@@ -82,6 +83,12 @@ public:
     const std::vector<SummonResult>& GetCurrentResults() const { return m_CurrentResults; }
     void ClearResults() { m_CurrentResults.clear(); m_IsAnimating = false; }
 
+    // UI helpers
+    void SetSelectedBanner(SummonBanner banner) { m_SelectedBanner = banner; }
+    SummonBanner GetSelectedBanner() const { return m_SelectedBanner; }
+    void ClaimResults(GameState* state);
+    void HideSummonDocument();
+
     // Rendering
     void RenderSummonUI(Renderer* renderer, GameState* state);
     void Update(f64 deltaTime);
@@ -118,6 +125,12 @@ private:
     // UI state
     SummonBanner m_SelectedBanner;
 
+#ifdef RMLUI_ENABLED
+    class RmlSummonListener;
+    class Rml::ElementDocument* m_SummonDocument = nullptr;
+    Scope<RmlSummonListener> m_SummonListener;
+#endif
+
     // Helper methods
     ShipPart GeneratePartForBanner(SummonBanner banner, bool forcedRarity = false, PartRarity rarity = PartRarity::Common);
     PartRarity RollRarity(SummonBanner banner);
@@ -135,4 +148,10 @@ private:
 
     static const char* GetSourceLabel(CurrencySource source);
     static size_t GetSourceIndex(CurrencySource source);
+
+#ifdef RMLUI_ENABLED
+    void UpdateSummonDocument(GameState* state);
+    void InitializeSummonDocument(GameState* state);
+    void ExecuteSummon(i32 count, GameState* state);
+#endif
 };
