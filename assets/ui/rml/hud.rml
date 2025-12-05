@@ -8,23 +8,23 @@
       <!-- Top Resource Bar -->
       <div id="top-bar" class="bar-container">
         <div class="resource-grid">
-          <div class="resource-item" data-resource="qubits">
+          <div class="resource-item" data-resource="qubits" data-tooltip="Qubits: Primary currency. Earned by observing quantum states.">
             <span class="resource-label">[Q]</span>
             <span class="resource-value quantum-blue" data-bind="qubits">0</span>
           </div>
-          <div class="resource-item" data-resource="coherence">
+          <div class="resource-item" data-resource="coherence" data-tooltip="Coherence: Quantum stability. Required for certain upgrades and research.">
             <span class="resource-label">[C]</span>
             <span class="resource-value coherence-green" data-bind="coherence">100.0</span>
           </div>
-          <div class="resource-item" data-resource="entanglement">
+          <div class="resource-item" data-resource="entanglement" data-tooltip="Entanglement: Quantum connections. Used to link stations for bonuses.">
             <span class="resource-label">[E]</span>
             <span class="resource-value entanglement-orange" data-bind="entanglement">0</span>
           </div>
-          <div class="resource-item" data-resource="photons">
+          <div class="resource-item" data-resource="photons" data-tooltip="Photons: Prestige currency. Earned by performing prestige resets.">
             <span class="resource-label">[P]</span>
             <span class="resource-value photon-cyan" data-bind="photons">0</span>
           </div>
-          <div class="resource-item" data-resource="singularities">
+          <div class="resource-item" data-resource="singularities" data-tooltip="Singularities: Ultimate currency. Earned through collapse events.">
             <span class="resource-label">[S]</span>
             <span class="resource-value singularity-magenta" data-bind="singularities">0</span>
           </div>
@@ -87,28 +87,36 @@
       <!-- Bottom Navigation Bar -->
       <div id="bottom-nav" class="bar-container">
         <div class="nav-buttons">
-          <button class="nav-btn active" data-view="stations">
+          <button class="nav-btn active" data-view="stations" data-tooltip="Stations (Press 1)">
             <span class="nav-icon">🏠</span>
             <span class="nav-label">STATIONS</span>
           </button>
-          <button class="nav-btn" data-view="research">
+          <button class="nav-btn" data-view="research" data-tooltip="Research Tree (Press 2)">
             <span class="nav-icon">🔬</span>
             <span class="nav-label">RESEARCH</span>
           </button>
-          <button class="nav-btn" data-view="upgrades">
+          <button class="nav-btn" data-view="upgrades" data-tooltip="Upgrades & Buyables (Press 3)">
             <span class="nav-icon">⬆️</span>
             <span class="nav-label">UPGRADES</span>
           </button>
-          <button class="nav-btn" data-view="combat">
+          <button class="nav-btn" data-view="combat" data-tooltip="Combat System (Press 4)">
             <span class="nav-icon">⚔️</span>
             <span class="nav-label">COMBAT</span>
           </button>
-          <button class="nav-btn" data-view="menu">
+          <button class="nav-btn" data-view="menu" data-tooltip="Settings & Menu (Press 5)">
             <span class="nav-icon">☰</span>
             <span class="nav-label">MENU</span>
           </button>
         </div>
       </div>
+
+      <!-- Global Tooltip -->
+      <div id="global-tooltip" class="tooltip">
+        <div class="tooltip-content"></div>
+      </div>
+
+      <!-- Toast Notification Container -->
+      <div id="toast-container"></div>
     </div>
   </body>
 </rml>

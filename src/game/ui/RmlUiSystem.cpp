@@ -9,11 +9,115 @@
 #include "RmlUi_Platform_SDL.h"
 #include "RmlUi_Renderer_GL3.h"
 
+// Event listener for navigation button clicks
+class NavigationEventListener : public Rml::EventListener {
+public:
+    explicit NavigationEventListener(RmlUiSystem* system) : m_System(system) {}
+
+    void ProcessEvent(Rml::Event& event) override {
+        if (event.GetType() == "click") {
+            Rml::Element* element = event.GetTargetElement();
+            if (element) {
+                std::string dataView = element->GetAttribute<Rml::String>("data-view", "");
+                if (!dataView.empty()) {
+                    // Activate the corresponding view
+                    m_System->ActivateView("view-" + dataView);
+                }
+            }
+        }
+    }
+
+private:
+    RmlUiSystem* m_System;
+};
+
+// Event listener for tooltip display
+class TooltipEventListener : public Rml::EventListener {
+public:
+    explicit TooltipEventListener(Rml::Context* context) : m_Context(context) {}
+
+    void ProcessEvent(Rml::Event& event) override {
+        Rml::Element* element = event.GetTargetElement();
+        if (!element) return;
+
+        Rml::ElementDocument* document = m_Context->GetDocument(0);
+        if (!document) return;
+
+        Rml::Element* tooltip = document->GetElementById("global-tooltip");
+        if (!tooltip) return;
+
+        if (event.GetType() == "mouseenter" || event.GetType() == "mouseover") {
+            // Get tooltip text from data attribute
+            std::string tooltipText = element->GetAttribute<Rml::String>("data-tooltip", "");
+            if (!tooltipText.empty()) {
+                // Set tooltip content
+                Rml::Element* content = tooltip->GetFirstChild();
+                if (content) {
+                    content->SetInnerRML(tooltipText);
+                }
+
+                // Position tooltip near mouse
+                auto mousePos = event.GetParameter<Rml::Vector2i>("mouse_x", Rml::Vector2i(0, 0));
+                tooltip->SetProperty("left", std::to_string(mousePos.x + 10) + "px");
+                tooltip->SetProperty("top", std::to_string(mousePos.y + 10) + "px");
+
+                // Show tooltip
+                tooltip->SetClass("visible", true);
+            }
+        } else if (event.GetType() == "mouseleave" || event.GetType() == "mouseout") {
+            // Hide tooltip
+            tooltip->SetClass("visible", false);
+        }
+    }
+
+private:
+    Rml::Context* m_Context;
+};
+
+// Event listener for keyboard navigation
+class KeyboardNavigationListener : public Rml::EventListener {
+public:
+    explicit KeyboardNavigationListener(RmlUiSystem* system) : m_System(system) {}
+
+    void ProcessEvent(Rml::Event& event) override {
+        if (event.GetType() == "keydown") {
+            auto keyIdentifier = event.GetParameter<Rml::Input::KeyIdentifier>("key_identifier", Rml::Input::KI_UNKNOWN);
+
+            // Number keys 1-5 for quick navigation
+            switch (keyIdentifier) {
+                case Rml::Input::KI_1:
+                    m_System->ActivateView("view-stations");
+                    break;
+                case Rml::Input::KI_2:
+                    m_System->ActivateView("view-research");
+                    break;
+                case Rml::Input::KI_3:
+                    m_System->ActivateView("view-upgrades");
+                    break;
+                case Rml::Input::KI_4:
+                    m_System->ActivateView("view-combat");
+                    break;
+                case Rml::Input::KI_5:
+                    m_System->ActivateView("view-menu");
+                    break;
+                default:
+                    break;
+            }
+        }
+    }
+
+private:
+    RmlUiSystem* m_System;
+};
+
 struct RmlUiSystem::RmlUiBackend {
     Rml::Context* context = nullptr;
     bool debuggerInitialized = false;
     Scope<SystemInterface_SDL> systemInterface;
     Scope<RenderInterface_GL3> renderInterface;
+    Scope<NavigationEventListener> navigationListener;
+    Scope<TooltipEventListener> tooltipListener;
+    Scope<KeyboardNavigationListener> keyboardListener;
 };
 #endif
 
@@ -75,6 +179,9 @@ bool RmlUiSystem::Initialize(SDL_Window* window, Renderer* renderer) {
     if (Rml::ElementDocument* document = m_Backend->context->LoadDocument("assets/ui/rml/hud.rml")) {
         document->Show();
         Log::Info("RmlUi HUD document loaded successfully");
+
+        // Install event listeners for interactive elements
+        InstallEventListeners();
     } else {
         Log::Warning("Failed to load HUD document, but continuing initialization");
     }
@@ -289,4 +396,112 @@ void RmlUiSystem::ActivateView(const std::string& viewId) {
     (void)viewId;
 #endif
 }
+
+// ========== Toast Notifications ==========
+
+void RmlUiSystem::ShowToast(const std::string& title, const std::string& message, ToastType type, f32 duration) {
+#ifdef RMLUI_ENABLED
+    if (!m_Initialized || !m_Backend || !m_Backend->context) return;
+
+    Rml::ElementDocument* document = m_Backend->context->GetDocument(0);
+    if (!document) return;
+
+    Rml::Element* container = document->GetElementById("toast-container");
+    if (!container) return;
+
+    // Determine toast class and icon based on type
+    std::string toastClass = "toast";
+    std::string icon = "ℹ️";
+
+    switch (type) {
+        case ToastType::Success:
+            toastClass += " success";
+            icon = "✅";
+            break;
+        case ToastType::Warning:
+            toastClass += " warning";
+            icon = "⚠️";
+            break;
+        case ToastType::Achievement:
+            toastClass += " achievement";
+            icon = "🏆";
+            break;
+        default:
+            break;
+    }
+
+    // Create toast HTML structure
+    std::string toastHTML =
+        "<div class=\"" + toastClass + "\">"
+        "  <div class=\"toast-header\">"
+        "    <span class=\"toast-icon\">" + icon + "</span>"
+        "    <span class=\"toast-title\">" + title + "</span>"
+        "  </div>"
+        "  <div class=\"toast-message\">" + message + "</div>"
+        "</div>";
+
+    // Append the toast to the container
+    container->SetInnerRML(container->GetInnerRML() + toastHTML);
+
+    // TODO: Add auto-removal after duration (would need timer system)
+    // For now, toasts will stay until manually cleared or document reloads
+
+    Log::Infof("Toast notification: ", title);
+#else
+    (void)title;
+    (void)message;
+    (void)type;
+    (void)duration;
+#endif
+}
+
+// ========== Event Listener Installation ==========
+
+#ifdef RMLUI_ENABLED
+void RmlUiSystem::InstallEventListeners() {
+    if (!m_Initialized || !m_Backend || !m_Backend->context) return;
+
+    Rml::ElementDocument* document = m_Backend->context->GetDocument(0);
+    if (!document) return;
+
+    // Create navigation event listener
+    m_Backend->navigationListener = CreateScope<NavigationEventListener>(this);
+
+    // Attach to all navigation buttons
+    Rml::ElementList navButtons;
+    document->GetElementsByClassName(navButtons, "nav-btn");
+
+    for (Rml::Element* button : navButtons) {
+        button->AddEventListener(Rml::EventId::Click, m_Backend->navigationListener.get());
+    }
+
+    Log::Infof("Installed click listeners on ", navButtons.size(), " navigation buttons");
+
+    // Create tooltip event listener
+    m_Backend->tooltipListener = CreateScope<TooltipEventListener>(m_Backend->context);
+
+    // Attach to all elements with data-tooltip attribute
+    Rml::ElementList allElements;
+    document->GetElementsByTagName(allElements, "*");
+
+    i32 tooltipCount = 0;
+    for (Rml::Element* element : allElements) {
+        if (element->HasAttribute("data-tooltip")) {
+            element->AddEventListener(Rml::EventId::Mouseover, m_Backend->tooltipListener.get());
+            element->AddEventListener(Rml::EventId::Mouseout, m_Backend->tooltipListener.get());
+            tooltipCount++;
+        }
+    }
+
+    Log::Infof("Installed tooltip listeners on ", tooltipCount, " elements");
+
+    // Create keyboard navigation listener
+    m_Backend->keyboardListener = CreateScope<KeyboardNavigationListener>(this);
+
+    // Attach to document for global keyboard shortcuts
+    document->AddEventListener(Rml::EventId::Keydown, m_Backend->keyboardListener.get());
+
+    Log::Info("Installed keyboard navigation shortcuts (1-5 for views)");
+}
+#endif
 
