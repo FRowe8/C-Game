@@ -308,6 +308,10 @@ public:
     // Spaceship System
     Spaceship& GetSpaceship() { return m_Spaceship; }
 
+    // Station access
+    const std::vector<ResearchStation>& GetStations() const { return m_Stations; }
+    std::vector<ResearchStation>& GetStations() { return m_Stations; }
+
     // Combat System
     CombatSystem& GetCombatSystem() { return m_CombatSystem; }
     void StartRandomCombat();
