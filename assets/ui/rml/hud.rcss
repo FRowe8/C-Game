@@ -581,6 +581,223 @@ scrollbarvertical sliderbar:active {
   text-transform: uppercase;
 }
 
+/* ========== Particle Collection View ========== */
+.collection-layout {
+  display: grid;
+  grid-template-columns: 1.1fr 1.2fr;
+  gap: 16dp;
+  align-items: start;
+}
+
+.collection-column {
+  display: flex;
+  flex-direction: column;
+  gap: 16dp;
+}
+
+.collection-card {
+  background: linear-gradient(135deg, rgba(15, 18, 28, 0.9) 0%, rgba(18, 22, 34, 0.95) 100%);
+  border: 1dp solid rgba(59, 130, 246, 0.25);
+  border-radius: 12dp;
+  padding: 14dp;
+  box-shadow: 0 6dp 18dp rgba(0, 0, 0, 0.35);
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10dp;
+}
+
+.helper-text {
+  font-size: 12dp;
+  color: rgba(255, 255, 255, 0.6);
+  text-transform: uppercase;
+  letter-spacing: 0.6dp;
+}
+
+.collection-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180dp, 1fr));
+  gap: 12dp;
+}
+
+.stat-card {
+  padding: 12dp;
+  border-radius: 10dp;
+  background: rgba(33, 38, 54, 0.8);
+  border: 1dp solid rgba(59, 130, 246, 0.25);
+  box-shadow: inset 0 1dp 0 rgba(255, 255, 255, 0.05);
+}
+
+.stat-label {
+  font-size: 12dp;
+  letter-spacing: 0.5dp;
+  color: rgba(255, 255, 255, 0.6);
+  text-transform: uppercase;
+}
+
+.stat-value {
+  font-size: 24dp;
+  font-weight: 800;
+  color: #60a5fa;
+  margin-top: 4dp;
+}
+
+.stat-subvalue {
+  font-size: 12dp;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.tier-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10dp;
+}
+
+.tier-row {
+  background: rgba(23, 27, 40, 0.75);
+  border: 1dp solid rgba(96, 165, 250, 0.25);
+  border-radius: 10dp;
+  padding: 10dp;
+}
+
+.tier-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6dp;
+}
+
+.tier-name {
+  font-weight: 700;
+  color: #a5b4fc;
+}
+
+.tier-bonus {
+  font-size: 12dp;
+  color: #fbbf24;
+  font-weight: 700;
+}
+
+.tier-progress-text {
+  font-size: 12dp;
+  color: rgba(255, 255, 255, 0.7);
+  margin-top: 6dp;
+}
+
+.equipped-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8dp;
+}
+
+.particle-chip {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4dp;
+  padding: 10dp 12dp;
+  border-radius: 10dp;
+  background: rgba(59, 130, 246, 0.12);
+  border: 1dp solid rgba(59, 130, 246, 0.4);
+  color: #e5e7eb;
+  min-width: 160dp;
+  cursor: pointer;
+  transition: transform 0.2s, border-color 0.2s;
+}
+
+.particle-chip:hover {
+  transform: translateY(-2dp);
+  border-color: rgba(59, 130, 246, 0.8);
+}
+
+.chip-name {
+  font-weight: 700;
+}
+
+.chip-meta {
+  font-size: 11dp;
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.collection-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140dp, 1fr));
+  gap: 12dp;
+}
+
+.particle-tile {
+  padding: 12dp;
+  border-radius: 10dp;
+  background: rgba(20, 24, 36, 0.85);
+  border: 1dp solid rgba(255, 255, 255, 0.08);
+  color: #e5e7eb;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s;
+}
+
+.particle-tile.discovered:hover {
+  border-color: rgba(59, 130, 246, 0.7);
+  box-shadow: 0 6dp 18dp rgba(59, 130, 246, 0.25);
+  transform: translateY(-2dp);
+}
+
+.particle-tile.hidden {
+  opacity: 0.6;
+  border-style: dashed;
+}
+
+.particle-tile.equipped {
+  border-color: rgba(16, 185, 129, 0.7);
+  box-shadow: 0 6dp 18dp rgba(16, 185, 129, 0.25);
+}
+
+.particle-name {
+  font-weight: 700;
+  font-size: 14dp;
+  margin-bottom: 6dp;
+}
+
+.particle-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12dp;
+}
+
+.rarity-badge {
+  padding: 4dp 8dp;
+  border-radius: 12dp;
+  font-size: 11dp;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.rarity-Common { background: rgba(148, 163, 184, 0.25); color: #e2e8f0; }
+.rarity-Uncommon { background: rgba(34, 197, 94, 0.2); color: #bbf7d0; }
+.rarity-Rare { background: rgba(59, 130, 246, 0.2); color: #bfdbfe; }
+.rarity-Exotic { background: rgba(217, 70, 239, 0.2); color: #f5d0fe; }
+.rarity-Legendary { background: rgba(234, 179, 8, 0.2); color: #fef9c3; }
+.rarity-Mythical { background: rgba(236, 72, 153, 0.2); color: #fbcfe8; }
+
+.particle-count {
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.bonus-line {
+  color: #bef264;
+  font-size: 12dp;
+}
+
+.hint {
+  color: #93c5fd;
+  font-size: 11dp;
+  margin-top: 4dp;
+}
+
 /* ========== COMBAT VIEW ========== */
 
 .combat-arena {

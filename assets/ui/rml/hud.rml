@@ -74,6 +74,42 @@
             </div>
           </div>
 
+          <!-- Particle Collection View -->
+          <div id="view-collection" class="view-panel">
+            <h2 class="view-title">Particle Collection</h2>
+            <div class="collection-layout">
+              <div class="collection-column">
+                <div id="collection-stats" class="collection-card"></div>
+
+                <div class="collection-card">
+                  <div class="card-header">
+                    <h3 class="section-title">Discovery Tiers</h3>
+                    <span class="helper-text" data-tooltip="Earn passive bonuses as you discover more particles">Progress</span>
+                  </div>
+                  <div id="discovery-tiers"></div>
+                </div>
+
+                <div class="collection-card">
+                  <div class="card-header">
+                    <h3 class="section-title">Equipped Particles</h3>
+                    <span class="helper-text" data-tooltip="Equipped particles provide passive bonuses">Active bonuses</span>
+                  </div>
+                  <div id="equipped-particles"></div>
+                </div>
+              </div>
+
+              <div class="collection-column">
+                <div class="collection-card">
+                  <div class="card-header">
+                    <h3 class="section-title">Discovery Grid</h3>
+                    <span class="helper-text" data-tooltip="Click a discovered particle to equip or unequip it">Equip & Manage</span>
+                  </div>
+                  <div id="particle-grid"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <!-- Combat View -->
           <div id="view-combat" class="view-panel">
             <h2 class="view-title">Combat System</h2>
@@ -242,11 +278,15 @@
             <span class="nav-icon">⬆️</span>
             <span class="nav-label">UPGRADES</span>
           </button>
-          <button class="nav-btn" data-view="combat" data-tooltip="Combat System (Press 4)">
+          <button class="nav-btn" data-view="collection" data-tooltip="Particle Collection (Press 4)">
+            <span class="nav-icon">🧬</span>
+            <span class="nav-label">COLLECTION</span>
+          </button>
+          <button class="nav-btn" data-view="combat" data-tooltip="Combat System (Press 5)">
             <span class="nav-icon">⚔️</span>
             <span class="nav-label">COMBAT</span>
           </button>
-          <button class="nav-btn" data-view="menu" data-tooltip="Settings & Menu (Press 5)">
+          <button class="nav-btn" data-view="menu" data-tooltip="Settings & Menu (Press 6)">
             <span class="nav-icon">☰</span>
             <span class="nav-label">MENU</span>
           </button>

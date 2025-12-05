@@ -138,8 +138,8 @@ bool Application::Initialize() {
     m_GameState->Initialize();
 
     m_RmlUi = CreateScope<RmlUiSystem>();
-    m_RmlUi->Initialize(m_Window, m_Renderer.get());
     m_RmlUi->SetGameState(m_GameState.get());
+    m_RmlUi->Initialize(m_Window, m_Renderer.get());
 
     // Populate initial game data in UI
     m_RmlUi->UpdateStations(m_GameState.get());
@@ -147,6 +147,7 @@ bool Application::Initialize() {
     m_RmlUi->UpdateBuyables(m_GameState.get());
     m_RmlUi->UpdateCombat(m_GameState.get());
     m_RmlUi->UpdateMenu(m_GameState.get());
+    m_RmlUi->UpdateCollection(m_GameState.get());
 
     m_Initialized = true;
     m_Running = true;

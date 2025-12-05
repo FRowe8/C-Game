@@ -7,6 +7,7 @@
 #include "CombatSystem.h"
 #include "Enemy.h"
 #include "Spaceship.h"
+#include "ParticleCollection.h"
 #include <SDL.h>
 #include <sstream>
 #include <iomanip>
@@ -104,9 +105,12 @@ public:
                     m_System->ActivateView("view-upgrades");
                     break;
                 case Rml::Input::KI_4:
-                    m_System->ActivateView("view-combat");
+                    m_System->ActivateView("view-collection");
                     break;
                 case Rml::Input::KI_5:
+                    m_System->ActivateView("view-combat");
+                    break;
+                case Rml::Input::KI_6:
                     m_System->ActivateView("view-menu");
                     break;
                 default:
@@ -375,6 +379,46 @@ private:
     GameState* m_GameState;
 };
 
+// Event listener for particle collection interactions
+class CollectionActionListener : public Rml::EventListener {
+public:
+    explicit CollectionActionListener(RmlUiSystem* system, GameState* gameState)
+        : m_System(system), m_GameState(gameState) {}
+
+    void ProcessEvent(Rml::Event& event) override {
+        if (event.GetType() != "click") return;
+        if (!m_GameState) return;
+
+        Rml::Element* element = event.GetTargetElement();
+        if (!element || !element->HasAttribute("data-particle-id")) return;
+
+        i32 particleIndex = element->GetAttribute<int>("data-particle-id", -1);
+        if (particleIndex < 0 || particleIndex >= static_cast<i32>(ParticleType::COUNT)) return;
+
+        ParticleCollection& collection = m_GameState->GetParticleCollection();
+        ParticleType type = static_cast<ParticleType>(particleIndex);
+
+        if (!collection.IsDiscovered(type)) {
+            m_System->ShowToast("Not Discovered", "Keep observing to find this particle", RmlUiSystem::ToastType::Warning);
+            return;
+        }
+
+        if (collection.IsEquipped(type)) {
+            collection.UnequipParticle(type);
+            m_System->ShowToast("Unequipped", "Particle unequipped", RmlUiSystem::ToastType::Info);
+        } else {
+            collection.EquipParticle(type);
+            m_System->ShowToast("Equipped", "Particle equipped", RmlUiSystem::ToastType::Success);
+        }
+
+        m_System->UpdateCollection(m_GameState);
+    }
+
+private:
+    RmlUiSystem* m_System;
+    GameState* m_GameState;
+};
+
 struct RmlUiSystem::RmlUiBackend {
     Rml::Context* context = nullptr;
     bool debuggerInitialized = false;
@@ -388,6 +432,7 @@ struct RmlUiSystem::RmlUiBackend {
     Scope<BuyableActionListener> buyableActionListener;
     Scope<CombatActionListener> combatActionListener;
     Scope<MenuActionListener> menuActionListener;
+    Scope<CollectionActionListener> collectionActionListener;
 };
 #endif
 
@@ -1229,6 +1274,221 @@ void RmlUiSystem::UpdateMenu(GameState* gameState) {
 #endif
 }
 
+void RmlUiSystem::UpdateCollection(GameState* gameState) {
+#ifdef RMLUI_ENABLED
+    if (!m_Initialized || !m_Backend || !m_Backend->context || !gameState) return;
+
+    Rml::ElementDocument* document = m_Backend->context->GetDocument(0);
+    if (!document) return;
+
+    Rml::Element* statsContainer = document->GetElementById("collection-stats");
+    Rml::Element* tiersContainer = document->GetElementById("discovery-tiers");
+    Rml::Element* equippedContainer = document->GetElementById("equipped-particles");
+    Rml::Element* gridContainer = document->GetElementById("particle-grid");
+
+    if (!statsContainer || !tiersContainer || !equippedContainer || !gridContainer) return;
+
+    ParticleCollection& collection = gameState->GetParticleCollection();
+
+    // -------- Collection stats --------
+    i32 discovered = collection.GetDiscoveredCount();
+    i32 total = collection.GetTotalParticles();
+    f64 percentage = collection.GetCompletionPercentage();
+    f64 prodBonus = collection.GetTotalProductionBonus() * 100.0;
+    f64 obsBonus = collection.GetTotalObservationBonus() * 100.0;
+    f64 photonBonus = collection.GetTotalPhotonBonus() * 100.0;
+    f64 eventBonus = collection.GetTotalEventChanceBonus() * 100.0;
+    f64 discoveryProd = collection.GetDiscoveryProductionBonus() * 100.0;
+    f64 discoveryObs = collection.GetDiscoveryObservationBonus() * 100.0;
+
+    std::stringstream statsHtml;
+    statsHtml << "<div class=\\"collection-stat-grid\\">";
+    statsHtml << "  <div class=\\"stat-card\\" data-tooltip=\\"Discover particles by observing research stations. 0.5% chance per observation.\\">";
+    statsHtml << "    <div class=\\"stat-label\\">Discovered</div>";
+    statsHtml << "    <div class=\\"stat-value\\">" << discovered << " / " << total << "</div>";
+    statsHtml << "    <div class=\\"stat-subvalue\\">" << std::fixed << std::setprecision(1) << percentage << "% complete</div>";
+    statsHtml << "  </div>";
+
+    statsHtml << "  <div class=\\"stat-card\\" data-tooltip=\\"Equipment slots limit how many particle bonuses you can keep active.\\">";
+    statsHtml << "    <div class=\\"stat-label\\">Equipment Slots</div>";
+    statsHtml << "    <div class=\\"stat-value\\">" << collection.GetMaxEquipmentSlots() << "</div>";
+    statsHtml << "    <div class=\\"stat-subvalue\\">" << collection.GetEquippedParticles().size() << " equipped</div>";
+    statsHtml << "  </div>";
+
+    statsHtml << "  <div class=\\"stat-card\\">";
+    statsHtml << "    <div class=\\"stat-label\\">Equipped Bonuses</div>";
+    statsHtml << "    <div class=\\"stat-value\\">" << std::fixed << std::setprecision(1) << prodBonus << "% PROD</div>";
+    statsHtml << "    <div class=\\"stat-subvalue\\">" << obsBonus << "% OBS | " << photonBonus << "% PHT | " << eventBonus << "% EVENT</div>";
+    statsHtml << "  </div>";
+
+    statsHtml << "  <div class=\\"stat-card\\" data-tooltip=\\"Discovery tiers grant passive bonuses based on total particles found.\\">";
+    statsHtml << "    <div class=\\"stat-label\\">Discovery Tree</div>";
+    statsHtml << "    <div class=\\"stat-value\\">" << discoveryProd << "% PROD</div>";
+    statsHtml << "    <div class=\\"stat-subvalue\\">" << discoveryObs << "% OBS</div>";
+    statsHtml << "  </div>";
+    statsHtml << "</div>";
+
+    statsContainer->SetInnerRML(statsHtml.str());
+
+    // -------- Discovery tiers --------
+    std::stringstream tiersHtml;
+    tiersHtml << "<div class=\\"tier-list\\">";
+    for (const auto& tier : collection.GetDiscoveryTiers()) {
+        f32 progress = static_cast<f32>(discovered) / static_cast<f32>(tier.requiredDiscoveries);
+        progress = std::min(progress, 1.0f);
+
+        tiersHtml << "  <div class=\\"tier-row\\" data-tooltip=\\"" << tier.name << " bonuses scale with discoveries.\\">";
+        tiersHtml << "    <div class=\\"tier-header\\">";
+        tiersHtml << "      <span class=\\"tier-name\\">" << tier.name << "</span>";
+        tiersHtml << "      <span class=\\"tier-bonus\\">+" << std::fixed << std::setprecision(0) << tier.productionBonus * 100.0
+                 << "% PROD / +" << tier.observationBonus * 100.0 << "% OBS</span>";
+        tiersHtml << "    </div>";
+        tiersHtml << "    <div class=\\"progress-bar\\">";
+        tiersHtml << "      <div class=\\"progress-fill\\" style=\\"width: " << progress * 100.0f
+                 << "%;\\"></div>";
+        tiersHtml << "    </div>";
+        tiersHtml << "    <div class=\\"tier-progress-text\\">" << discovered << " / " << tier.requiredDiscoveries << " discovered</div>";
+        tiersHtml << "  </div>";
+    }
+    tiersHtml << "</div>";
+    tiersContainer->SetInnerRML(tiersHtml.str());
+
+    // -------- Equipped particles --------
+    auto equipped = collection.GetEquippedParticles();
+    std::stringstream equippedHtml;
+    if (equipped.empty()) {
+        equippedHtml << "<div class=\\"placeholder-text\\">No particles equipped</div>";
+    } else {
+        equippedHtml << "<div class=\\"equipped-grid\\">";
+        const char* rarityNames[] = {"Common", "Uncommon", "Rare", "Exotic", "Legendary", "Mythical"};
+        for (Particle* p : equipped) {
+            std::stringstream tooltip;
+            tooltip << "<strong>" << p->name << "</strong><br/>";
+            tooltip << "<span class=\\"rarity-badge rarity-" << rarityNames[static_cast<i32>(p->rarity)]
+                    << "\\">" << rarityNames[static_cast<i32>(p->rarity)] << "</span><br/>";
+            tooltip << p->description << "<br/>";
+            if (p->productionBonus > 0.0) {
+                tooltip << "<div class=\\"bonus-line\\">+" << std::fixed << std::setprecision(1) << p->productionBonus * 100.0
+                        << "% Production</div>";
+            }
+            if (p->observationBonus > 0.0) {
+                tooltip << "<div class=\\"bonus-line\\">+" << std::fixed << std::setprecision(1) << p->observationBonus * 100.0
+                        << "% Observation</div>";
+            }
+            if (p->photonBonus > 0.0) {
+                tooltip << "<div class=\\"bonus-line\\">+" << std::fixed << std::setprecision(1) << p->photonBonus * 100.0
+                        << "% Photons</div>";
+            }
+            if (p->eventChanceBonus > 0.0) {
+                tooltip << "<div class=\\"bonus-line\\">+" << std::fixed << std::setprecision(1)
+                        << p->eventChanceBonus * 100.0 << "% Event Chance</div>";
+            }
+            tooltip << "<div class=\\"hint\\">Click to unequip</div>";
+
+            equippedHtml << "  <button class=\\"particle-chip\\" data-particle-id=\\"" << static_cast<i32>(p->type)
+                         << "\\" data-action=\\"toggle-equip\\" data-tooltip=\\"" << tooltip.str() << "\\">";
+            equippedHtml << "    <span class=\\"chip-name\\">" << p->name << "</span>";
+            equippedHtml << "    <span class=\\"chip-meta\\">" << rarityNames[static_cast<i32>(p->rarity)] << "</span>";
+            equippedHtml << "  </button>";
+        }
+        equippedHtml << "</div>";
+    }
+    equippedContainer->SetInnerRML(equippedHtml.str());
+
+    // -------- Particle grid --------
+    std::stringstream gridHtml;
+    gridHtml << "<div class=\\"collection-grid\\">";
+
+    const char* rarityNames[] = {"Common", "Uncommon", "Rare", "Exotic", "Legendary", "Mythical"};
+
+    for (i32 index = 0; index < static_cast<i32>(ParticleType::COUNT); ++index) {
+        ParticleType type = static_cast<ParticleType>(index);
+        Particle* particle = collection.GetParticle(type);
+        if (!particle) continue;
+
+        bool isDiscovered = collection.IsDiscovered(type);
+        bool isEquipped = collection.IsEquipped(type);
+
+        std::string tileClass = "particle-tile";
+        tileClass += isDiscovered ? " discovered" : " hidden";
+        tileClass += isEquipped ? " equipped" : "";
+
+        std::stringstream tooltip;
+        if (isDiscovered) {
+            tooltip << "<strong>" << particle->name << "</strong><br/>";
+            tooltip << "<span class=\\"rarity-badge rarity-" << rarityNames[static_cast<i32>(particle->rarity)]
+                    << "\\">" << rarityNames[static_cast<i32>(particle->rarity)] << "</span><br/>";
+            tooltip << particle->description << "<br/>";
+            tooltip << "<div class=\\"bonus-line\\">Found: " << particle->count << "</div>";
+            if (particle->productionBonus > 0.0) {
+                tooltip << "<div class=\\"bonus-line\\">+" << std::fixed << std::setprecision(1) << particle->productionBonus * 100.0
+                        << "% Production</div>";
+            }
+            if (particle->observationBonus > 0.0) {
+                tooltip << "<div class=\\"bonus-line\\">+" << std::fixed << std::setprecision(1) << particle->observationBonus * 100.0
+                        << "% Observation</div>";
+            }
+            if (particle->photonBonus > 0.0) {
+                tooltip << "<div class=\\"bonus-line\\">+" << std::fixed << std::setprecision(1) << particle->photonBonus * 100.0
+                        << "% Photons</div>";
+            }
+            if (particle->eventChanceBonus > 0.0) {
+                tooltip << "<div class=\\"bonus-line\\">+" << std::fixed << std::setprecision(1)
+                        << particle->eventChanceBonus * 100.0 << "% Event Chance</div>";
+            }
+            tooltip << "<div class=\\"hint\\">" << (isEquipped ? "Click to unequip" : "Click to equip") << "</div>";
+        } else {
+            tooltip << "Not yet discovered. Keep observing to find new particles!";
+        }
+
+        gridHtml << "  <button class=\\"" << tileClass << "\\" data-particle-id=\\"" << index
+                 << "\\" data-action=\\"toggle-equip\\" data-tooltip=\\"" << tooltip.str() << "\\">";
+        gridHtml << "    <div class=\\"particle-name\\">" << (isDiscovered ? particle->name : "???") << "</div>";
+        gridHtml << "    <div class=\\"particle-meta\\">";
+        gridHtml << "      <span class=\\"rarity-badge rarity-" << rarityNames[static_cast<i32>(particle->rarity)]
+                 << "\\">" << rarityNames[static_cast<i32>(particle->rarity)] << "</span>";
+        gridHtml << "      <span class=\\"particle-count\\">x" << (isDiscovered ? particle->count : 0) << "</span>";
+        gridHtml << "    </div>";
+        gridHtml << "  </button>";
+    }
+
+    gridHtml << "</div>";
+    gridContainer->SetInnerRML(gridHtml.str());
+
+    // -------- Event listeners --------
+    if (m_Backend->collectionActionListener) {
+        Rml::ElementList buttons;
+        document->GetElementsByTagName(buttons, "button");
+        for (Rml::Element* button : buttons) {
+            if (button->GetAttribute<Rml::String>("data-action", "") == "toggle-equip") {
+                button->AddEventListener(Rml::EventId::Click, m_Backend->collectionActionListener.get());
+            }
+        }
+    }
+
+    if (m_Backend->tooltipListener) {
+        auto attachTooltips = [&](Rml::Element* container) {
+            if (!container) return;
+            Rml::ElementList tooltipTargets;
+            container->GetElementsByTagName(tooltipTargets, "*");
+            for (Rml::Element* element : tooltipTargets) {
+                if (element->HasAttribute("data-tooltip")) {
+                    element->AddEventListener(Rml::EventId::Mouseover, m_Backend->tooltipListener.get());
+                    element->AddEventListener(Rml::EventId::Mouseout, m_Backend->tooltipListener.get());
+                }
+            }
+        };
+
+        attachTooltips(statsContainer);
+        attachTooltips(tiersContainer);
+        attachTooltips(equippedContainer);
+        attachTooltips(gridContainer);
+    }
+#else
+    (void)gameState;
+#endif
+}
+
 // ========== Event Listener Installation ==========
 
 #ifdef RMLUI_ENABLED
@@ -1275,7 +1535,7 @@ void RmlUiSystem::InstallEventListeners() {
     // Attach to document for global keyboard shortcuts
     document->AddEventListener(Rml::EventId::Keydown, m_Backend->keyboardListener.get());
 
-    Log::Info("Installed keyboard navigation shortcuts (1-5 for views)");
+    Log::Info("Installed keyboard navigation shortcuts (1-6 for views)");
 
     // Create game action listeners (will be attached when elements are created)
     if (m_GameState) {
@@ -1284,7 +1544,8 @@ void RmlUiSystem::InstallEventListeners() {
         m_Backend->buyableActionListener = CreateScope<BuyableActionListener>(this, m_GameState);
         m_Backend->combatActionListener = CreateScope<CombatActionListener>(this, m_GameState);
         m_Backend->menuActionListener = CreateScope<MenuActionListener>(this, m_GameState);
-        Log::Info("Game action listeners created (stations, research, buyables, combat, menu)");
+        m_Backend->collectionActionListener = CreateScope<CollectionActionListener>(this, m_GameState);
+        Log::Info("Game action listeners created (stations, research, buyables, combat, menu, collection)");
     }
 }
 

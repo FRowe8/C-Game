@@ -52,6 +52,7 @@ public:
     void UpdateBuyables(class GameState* gameState);
     void UpdateCombat(class GameState* gameState);
     void UpdateMenu(class GameState* gameState);
+    void UpdateCollection(class GameState* gameState);
     void UpdateAchievements(class GameState* gameState);
     void UpdateStatistics(class GameState* gameState);
     void UpdateSingularityShop(class GameState* gameState);
