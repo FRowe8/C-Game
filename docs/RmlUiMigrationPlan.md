@@ -15,11 +15,11 @@ This document outlines a staged approach for introducing [RmlUi](https://github.
 - 🚧 **Phase 4 In Progress**: ImGui decommissioning and gameplay expansion underway:
   - ✅ ImGui UI hidden when RmlUi enabled (conditional compilation)
   - ✅ Stations View: Fully interactive with Observe/Upgrade buttons
-  - ✅ Research View: Displaying researched & available research nodes
-  - ⏳ Upgrades View: Coming next
+  - ✅ Research View: Fully interactive with purchase buttons and live feedback
+  - ✅ Web build configured (WebGL 2.0, ENABLE_RMLUI in build script)
+  - 🚧 Upgrades View: In progress
   - ⏳ Combat View: Coming next
-  - ⏳ Event handlers for research purchase buttons
-  - ⏳ Web build verified (WebGL 2.0 configured)
+  - ⏳ Menu/Settings View: Coming next
 
 ## Goals
 - Deliver a responsive, web-like UI suitable for idle/incremental gameplay (grid-heavy layouts, rich styling, and readable typography).

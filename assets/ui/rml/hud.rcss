@@ -505,3 +505,78 @@ scrollbarvertical sliderbar:active {
   font-weight: 600;
   text-transform: uppercase;
 }
+
+/* ========== Upgrades/Buyables View ========== */
+.buyables-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300dp, 1fr));
+  gap: 16dp;
+  padding: 16dp;
+}
+
+.buyable-card {
+  background: linear-gradient(135deg, rgba(15, 18, 28, 0.95) 0%, rgba(25, 30, 45, 0.95) 100%);
+  border: 2px solid rgba(245, 158, 11, 0.4);
+  border-radius: 12dp;
+  padding: 16dp;
+  transition: all 0.3s ease;
+}
+
+.buyable-card:hover {
+  border-color: rgba(245, 158, 11, 0.7);
+  box-shadow: 0 4px 16px rgba(245, 158, 11, 0.3);
+  transform: translateY(-2dp);
+}
+
+.buyable-card.maxed {
+  border-color: rgba(16, 185, 129, 0.5);
+  opacity: 0.8;
+}
+
+.buyable-name {
+  font-size: 17dp;
+  font-weight: 700;
+  color: #f59e0b;
+  margin-bottom: 8dp;
+}
+
+.buyable-card.maxed .buyable-name {
+  color: #10b981;
+}
+
+.buyable-desc {
+  font-size: 13dp;
+  color: rgba(255, 255, 255, 0.8);
+  line-height: 1.4;
+  margin-bottom: 12dp;
+}
+
+.buyable-stats {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12dp;
+  font-size: 12dp;
+}
+
+.buyable-cost {
+  color: #f59e0b;
+  font-weight: 600;
+}
+
+.buyable-progress {
+  color: #60a5fa;
+  font-weight: 600;
+}
+
+.buyable-maxed {
+  font-size: 12dp;
+  color: #10b981;
+  font-weight: 600;
+  text-align: center;
+  padding: 8dp;
+  background: rgba(16, 185, 129, 0.1);
+  border-radius: 6dp;
+  text-transform: uppercase;
+}

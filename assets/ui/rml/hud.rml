@@ -68,8 +68,10 @@
 
           <!-- Upgrades/Buyables View -->
           <div id="view-upgrades" class="view-panel">
-            <h2 class="view-title">Upgrades</h2>
-            <p class="placeholder-text">Upgrades will be implemented here</p>
+            <h2 class="view-title">Upgrades & Buyables</h2>
+            <div class="buyables-grid">
+              <!-- Buyable cards will be dynamically generated here -->
+            </div>
           </div>
 
           <!-- Combat View -->

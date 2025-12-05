@@ -3,6 +3,7 @@
 #include "Renderer.h"
 #include "GameState.h"
 #include "Research.h"
+#include "Buyables.h"
 #include <SDL.h>
 #include <sstream>
 #include <iomanip>
@@ -701,6 +702,77 @@ void RmlUiSystem::UpdateResearch(GameState* gameState) {
             }
         }
     }
+#else
+    (void)gameState;
+#endif
+}
+
+void RmlUiSystem::UpdateBuyables(GameState* gameState) {
+#ifdef RMLUI_ENABLED
+    if (!m_Initialized || !m_Backend || !m_Backend->context || !gameState) return;
+
+    Rml::ElementDocument* document = m_Backend->context->GetDocument(0);
+    if (!document) return;
+
+    // Find the buyables grid container
+    Rml::Element* buyablesGrid = nullptr;
+    Rml::ElementList elements;
+    document->GetElementsByClassName(elements, "buyables-grid");
+    if (!elements.empty()) {
+        buyablesGrid = elements[0];
+    }
+
+    if (!buyablesGrid) return;
+
+    // Build buyable cards HTML
+    std::stringstream html;
+    auto& buyableManager = gameState->GetBuyableManager();
+    const auto& buyables = buyableManager.GetBuyables();
+    f64 currentQubits = gameState->GetResource(QuantumResource::Qubits);
+
+    for (const auto& buyable : buyables) {
+        // Determine if maxed or can afford
+        bool isMaxed = buyable.IsMaxed();
+        bool canAfford = !isMaxed && buyable.CanAfford(currentQubits);
+
+        std::string cardClass = isMaxed ? "buyable-card maxed" : "buyable-card";
+
+        html << "<div class=\"" << cardClass << "\">";
+        html << "  <h3 class=\"buyable-name\">" << buyable.name << "</h3>";
+        html << "  <p class=\"buyable-desc\">" << buyable.description << "</p>";
+
+        if (isMaxed) {
+            html << "  <div class=\"buyable-maxed\">✓ Maxed Out</div>";
+        } else {
+            // Show stats (cost and progress)
+            f64 cost = buyable.GetCurrentCost();
+            char costBuffer[64];
+            if (cost >= 1e9) {
+                snprintf(costBuffer, sizeof(costBuffer), "%.2fB", cost / 1e9);
+            } else if (cost >= 1e6) {
+                snprintf(costBuffer, sizeof(costBuffer), "%.2fM", cost / 1e6);
+            } else if (cost >= 1e3) {
+                snprintf(costBuffer, sizeof(costBuffer), "%.2fK", cost / 1e3);
+            } else {
+                snprintf(costBuffer, sizeof(costBuffer), "%.0f", cost);
+            }
+
+            html << "  <div class=\"buyable-stats\">";
+            html << "    <span class=\"buyable-cost\">Cost: " << costBuffer << " Qubits</span>";
+            html << "    <span class=\"buyable-progress\">" << buyable.GetProgressString() << "</span>";
+            html << "  </div>";
+
+            // Add purchase button
+            html << "  <button class=\"btn-primary\" data-buyable-id=\"" << buyable.id << "\" data-action=\"buyable\">Purchase</button>";
+        }
+
+        html << "</div>";
+    }
+
+    // Update the buyables grid
+    buyablesGrid->SetInnerRML(html.str());
+
+    // TODO: Attach event listeners for buyable buttons
 #else
     (void)gameState;
 #endif
