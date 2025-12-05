@@ -5,7 +5,7 @@ body {
   margin: 0;
   padding: 0;
   color: #e5e7eb;
-  font-size: 14px;
+  font-size: 14dp;
 }
 
 /* ========== Root Container ========== */
@@ -21,19 +21,19 @@ body {
 /* ========== Bar Containers (Top & Bottom) ========== */
 .bar-container {
   background-color: rgba(10, 12, 18, 0.95);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1dp solid rgba(255, 255, 255, 0.08);
   padding: 12dp 16dp;
   flex-shrink: 0;
 }
 
 #top-bar {
-  border-bottom: 2px solid #3b82f6;
-  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+  border-bottom: 2dp solid #3b82f6;
+  box-shadow: 0 2dp 8dp rgba(59, 130, 246, 0.3);
 }
 
 #bottom-nav {
-  border-top: 2px solid #3b82f6;
-  box-shadow: 0 -2px 8px rgba(59, 130, 246, 0.3);
+  border-top: 2dp solid #3b82f6;
+  box-shadow: 0 -2dp 8dp rgba(59, 130, 246, 0.3);
 }
 
 /* ========== Resource Grid ========== */
@@ -106,7 +106,7 @@ body {
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(10px); }
+  from { opacity: 0; transform: translateY(10dp); }
   to { opacity: 1; transform: translateY(0); }
 }
 
@@ -116,8 +116,8 @@ body {
   color: #3b82f6;
   margin: 0 0 20dp 0;
   text-transform: uppercase;
-  letter-spacing: 1px;
-  text-shadow: 0 0 10px rgba(59, 130, 246, 0.5);
+  letter-spacing: 1dp;
+  text-shadow: 0 0 10dp rgba(59, 130, 246, 0.5);
 }
 
 .placeholder-text {
@@ -136,16 +136,16 @@ body {
 
 .station-card {
   background-color: rgba(10, 12, 18, 0.85);
-  border: 1px solid rgba(59, 130, 246, 0.3);
+  border: 1dp solid rgba(59, 130, 246, 0.3);
   border-radius: 12dp;
   padding: 16dp;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 4dp 12dp rgba(0, 0, 0, 0.3);
   transition: border-color 0.2s, box-shadow 0.2s;
 }
 
 .station-card:hover {
   border-color: rgba(59, 130, 246, 0.6);
-  box-shadow: 0 6px 16px rgba(59, 130, 246, 0.2);
+  box-shadow: 0 6dp 16dp rgba(59, 130, 246, 0.2);
 }
 
 .station-name {
@@ -179,18 +179,18 @@ button {
   cursor: pointer;
   transition: all 0.2s;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.5dp;
 }
 
 .btn-primary {
   background-color: #3b82f6;
   color: white;
-  border: 1px solid #2563eb;
+  border: 1dp solid #2563eb;
 }
 
 .btn-primary:hover {
   background-color: #2563eb;
-  box-shadow: 0 0 16px rgba(59, 130, 246, 0.5);
+  box-shadow: 0 0 16dp rgba(59, 130, 246, 0.5);
 }
 
 .btn-primary:active {
@@ -215,7 +215,7 @@ button {
   gap: 4dp;
   padding: 12dp 8dp;
   background-color: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1dp solid rgba(255, 255, 255, 0.1);
   border-radius: 10dp;
   min-height: 60dp;
   cursor: pointer;
@@ -225,7 +225,7 @@ button {
 .nav-btn:hover {
   background-color: rgba(59, 130, 246, 0.1);
   border-color: rgba(59, 130, 246, 0.3);
-  transform: translateY(-2px);
+  transform: translateY(-2dp);
 }
 
 .nav-btn:active {
@@ -235,7 +235,7 @@ button {
 .nav-btn.active {
   background-color: rgba(59, 130, 246, 0.2);
   border-color: #3b82f6;
-  box-shadow: 0 0 12px rgba(59, 130, 246, 0.4);
+  box-shadow: 0 0 12dp rgba(59, 130, 246, 0.4);
 }
 
 .nav-icon {
@@ -247,7 +247,7 @@ button {
   font-size: 11dp;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.5dp;
   color: rgba(255, 255, 255, 0.9);
 }
 
@@ -258,14 +258,14 @@ button {
   background-color: rgba(255, 255, 255, 0.1);
   border-radius: 6dp;
   overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  border: 1dp solid rgba(255, 255, 255, 0.15);
 }
 
 .progress-fill {
   height: 100%;
   background: linear-gradient(90deg, #10b981 0%, #059669 100%);
   transition: width 0.3s;
-  box-shadow: 0 0 8px rgba(16, 185, 129, 0.6);
+  box-shadow: 0 0 8dp rgba(16, 185, 129, 0.6);
 }
 
 /* ========== Scrollbar Styling ========== */
@@ -296,7 +296,7 @@ scrollbarvertical sliderbar:active {
   position: absolute;
   display: none;
   background-color: rgba(10, 12, 18, 0.95);
-  border: 1px solid rgba(59, 130, 246, 0.5);
+  border: 1dp solid rgba(59, 130, 246, 0.5);
   border-radius: 6dp;
   padding: 8dp 12dp;
   font-size: 13dp;
@@ -304,7 +304,7 @@ scrollbarvertical sliderbar:active {
   max-width: 250dp;
   z-index: 1000;
   pointer-events: none;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 4dp 12dp rgba(0, 0, 0, 0.5);
 }
 
 .tooltip.visible {
@@ -313,7 +313,7 @@ scrollbarvertical sliderbar:active {
 }
 
 @keyframes tooltipFadeIn {
-  from { opacity: 0; transform: translateY(-5px); }
+  from { opacity: 0; transform: translateY(-5dp); }
   to { opacity: 1; transform: translateY(0); }
 }
 
@@ -351,10 +351,10 @@ scrollbarvertical sliderbar:active {
 
 .toast {
   background: linear-gradient(135deg, rgba(10, 12, 18, 0.95) 0%, rgba(20, 25, 35, 0.95) 100%);
-  border: 2px solid rgba(59, 130, 246, 0.6);
+  border: 2dp solid rgba(59, 130, 246, 0.6);
   border-radius: 12dp;
   padding: 16dp;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6), 0 0 20px rgba(59, 130, 246, 0.3);
+  box-shadow: 0 8dp 24dp rgba(59, 130, 246, 0.4);
   opacity: 0;
   transform: translateX(100%);
   animation: toastSlideIn 0.4s ease-out forwards;
@@ -406,7 +406,7 @@ scrollbarvertical sliderbar:active {
   color: #60a5fa;
   flex: 1;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.5dp;
 }
 
 .toast-message {
@@ -417,7 +417,7 @@ scrollbarvertical sliderbar:active {
 
 .toast.success {
   border-color: rgba(16, 185, 129, 0.6);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6), 0 0 20px rgba(16, 185, 129, 0.3);
+  box-shadow: 0 8dp 24dp rgba(16, 185, 129, 0.4);
 }
 
 .toast.success .toast-title {
@@ -426,7 +426,7 @@ scrollbarvertical sliderbar:active {
 
 .toast.warning {
   border-color: rgba(245, 158, 11, 0.6);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6), 0 0 20px rgba(245, 158, 11, 0.3);
+  box-shadow: 0 8dp 24dp rgba(245, 158, 11, 0.4);
 }
 
 .toast.warning .toast-title {
@@ -435,7 +435,7 @@ scrollbarvertical sliderbar:active {
 
 .toast.achievement {
   border-color: rgba(217, 70, 239, 0.6);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6), 0 0 20px rgba(217, 70, 239, 0.3);
+  box-shadow: 0 8dp 24dp rgba(217, 70, 239, 0.4);
 }
 
 .toast.achievement .toast-title {
@@ -452,7 +452,7 @@ scrollbarvertical sliderbar:active {
 
 .research-node {
   background: linear-gradient(135deg, rgba(15, 18, 28, 0.95) 0%, rgba(25, 30, 45, 0.95) 100%);
-  border: 2px solid rgba(59, 130, 246, 0.3);
+  border: 2dp solid rgba(59, 130, 246, 0.3);
   border-radius: 12dp;
   padding: 16dp;
   transition: all 0.3s ease;
@@ -460,8 +460,8 @@ scrollbarvertical sliderbar:active {
 
 .research-node:hover {
   border-color: rgba(59, 130, 246, 0.6);
-  box-shadow: 0 4px 16px rgba(59, 130, 246, 0.3);
-  transform: translateY(-2px);
+  box-shadow: 0 4dp 16dp rgba(59, 130, 246, 0.3);
+  transform: translateY(-2dp);
 }
 
 .research-node.unlocked {
@@ -516,7 +516,7 @@ scrollbarvertical sliderbar:active {
 
 .buyable-card {
   background: linear-gradient(135deg, rgba(15, 18, 28, 0.95) 0%, rgba(25, 30, 45, 0.95) 100%);
-  border: 2px solid rgba(245, 158, 11, 0.4);
+  border: 2dp solid rgba(245, 158, 11, 0.4);
   border-radius: 12dp;
   padding: 16dp;
   transition: all 0.3s ease;
@@ -524,7 +524,7 @@ scrollbarvertical sliderbar:active {
 
 .buyable-card:hover {
   border-color: rgba(245, 158, 11, 0.7);
-  box-shadow: 0 4px 16px rgba(245, 158, 11, 0.3);
+  box-shadow: 0 4dp 16dp rgba(245, 158, 11, 0.3);
   transform: translateY(-2dp);
 }
 
