@@ -17,7 +17,7 @@ This document outlines a staged approach for introducing [RmlUi](https://github.
   - ✅ Stations View: Fully interactive with Observe/Upgrade buttons
   - ✅ Research View: Fully interactive with purchase buttons and live feedback
   - ✅ Web build configured (WebGL 2.0, ENABLE_RMLUI in build script)
-  - 🚧 Upgrades View: In progress
+  - ✅ Upgrades View: Fully interactive with purchase buttons and live cost updates
   - ⏳ Combat View: Coming next
   - ⏳ Menu/Settings View: Coming next
 

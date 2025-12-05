@@ -203,6 +203,54 @@ private:
     GameState* m_GameState;
 };
 
+// Event listener for buyable purchase buttons
+class BuyableActionListener : public Rml::EventListener {
+public:
+    explicit BuyableActionListener(RmlUiSystem* system, GameState* gameState)
+        : m_System(system), m_GameState(gameState) {}
+
+    void ProcessEvent(Rml::Event& event) override {
+        if (event.GetType() == "click") {
+            Rml::Element* element = event.GetTargetElement();
+            if (!element || !m_GameState) return;
+
+            // Get buyable ID from data attribute
+            if (!element->HasAttribute("data-buyable-id")) return;
+
+            std::string buyableId = element->GetAttribute<Rml::String>("data-buyable-id", "");
+            std::string action = element->GetAttribute<Rml::String>("data-action", "");
+
+            if (buyableId.empty() || action != "buyable") return;
+
+            auto& buyableManager = m_GameState->GetBuyableManager();
+
+            // Attempt to purchase buyable
+            if (buyableManager.Purchase(buyableId, m_GameState)) {
+                // Find the buyable to get its name for the toast
+                const auto& buyables = buyableManager.GetBuyables();
+                auto it = std::find_if(buyables.begin(), buyables.end(),
+                    [&buyableId](const BuyableUpgrade& b) { return b.id == buyableId; });
+
+                if (it != buyables.end()) {
+                    m_System->ShowToast("Purchase Successful!",
+                        it->name + " purchased",
+                        RmlUiSystem::ToastType::Success);
+                }
+                // Refresh the buyables view
+                m_System->UpdateBuyables(m_GameState);
+            } else {
+                m_System->ShowToast("Cannot Purchase",
+                    "Insufficient resources",
+                    RmlUiSystem::ToastType::Warning);
+            }
+        }
+    }
+
+private:
+    RmlUiSystem* m_System;
+    GameState* m_GameState;
+};
+
 struct RmlUiSystem::RmlUiBackend {
     Rml::Context* context = nullptr;
     bool debuggerInitialized = false;
@@ -213,6 +261,7 @@ struct RmlUiSystem::RmlUiBackend {
     Scope<KeyboardNavigationListener> keyboardListener;
     Scope<StationActionListener> stationActionListener;
     Scope<ResearchActionListener> researchActionListener;
+    Scope<BuyableActionListener> buyableActionListener;
 };
 #endif
 
@@ -772,7 +821,23 @@ void RmlUiSystem::UpdateBuyables(GameState* gameState) {
     // Update the buyables grid
     buyablesGrid->SetInnerRML(html.str());
 
-    // TODO: Attach event listeners for buyable buttons
+    // Attach event listeners for buyable purchase buttons
+    if (m_Backend->buyableActionListener) {
+        Rml::ElementList buttons;
+        buyablesGrid->GetElementsByTagName(buttons, "button");
+
+        i32 attachedCount = 0;
+        for (Rml::Element* button : buttons) {
+            if (button->GetAttribute<Rml::String>("data-action", "") == "buyable") {
+                button->AddEventListener(Rml::EventId::Click, m_Backend->buyableActionListener.get());
+                attachedCount++;
+            }
+        }
+
+        if (attachedCount > 0) {
+            Log::Debugf("Attached buyable action listeners to ", attachedCount, " buttons");
+        }
+    }
 #else
     (void)gameState;
 #endif
@@ -830,7 +895,8 @@ void RmlUiSystem::InstallEventListeners() {
     if (m_GameState) {
         m_Backend->stationActionListener = CreateScope<StationActionListener>(this, m_GameState);
         m_Backend->researchActionListener = CreateScope<ResearchActionListener>(this, m_GameState);
-        Log::Info("Game action listeners created (stations, research)");
+        m_Backend->buyableActionListener = CreateScope<BuyableActionListener>(this, m_GameState);
+        Log::Info("Game action listeners created (stations, research, buyables)");
     }
 }
 #endif
