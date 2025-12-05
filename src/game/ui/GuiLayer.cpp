@@ -2239,9 +2239,11 @@ void CombatView::Render(GameState* state, Renderer* renderer) {
 }
 
 void GatchaView::Render(GameState* state, Renderer* renderer) {
-    if (state->GetActiveModal() != ActiveModal::Gatcha) return;
+    if (state->GetActiveModal() != ActiveModal::Gatcha) {
+        state->m_GatchaSystem.HideSummonDocument();
+        return;
+    }
 
-    // GatchaSystem handles its own ImGui window creation
     state->m_GatchaSystem.RenderSummonUI(renderer, state);
 }
 
