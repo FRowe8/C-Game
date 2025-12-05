@@ -10,6 +10,7 @@
 #include <SDL.h>
 #include <sstream>
 #include <iomanip>
+#include <algorithm>
 
 #ifdef RMLUI_ENABLED
 #include <RmlUi/Core.h>
@@ -445,14 +446,24 @@ bool RmlUiSystem::Initialize(SDL_Window* window, Renderer* renderer) {
     // Rml::LoadFontFace("assets/fonts/Inter-Regular.ttf");
 
     // Load the initial HUD document
-    if (Rml::ElementDocument* document = m_Backend->context->LoadDocument("assets/ui/rml/hud.rml")) {
-        document->Show();
+    m_HudDocument = m_Backend->context->LoadDocument("assets/ui/rml/hud.rml");
+    if (m_HudDocument) {
+        m_HudDocument->Show();
         Log::Info("RmlUi HUD document loaded successfully");
 
         // Install event listeners for interactive elements
         InstallEventListeners();
     } else {
         Log::Warning("Failed to load HUD document, but continuing initialization");
+    }
+
+    // Load overlay/panel document
+    m_PanelDocument = m_Backend->context->LoadDocument("assets/ui/rml/panels.rml");
+    if (m_PanelDocument) {
+        m_PanelDocument->Show();
+        Log::Info("RmlUi panel document loaded successfully");
+    } else {
+        Log::Warning("Failed to load panel document");
     }
 
     m_Initialized = true;
@@ -1275,6 +1286,167 @@ void RmlUiSystem::InstallEventListeners() {
         m_Backend->menuActionListener = CreateScope<MenuActionListener>(this, m_GameState);
         Log::Info("Game action listeners created (stations, research, buyables, combat, menu)");
     }
+}
+
+void RmlUiSystem::UpdateAchievements(GameState* gameState) {
+#ifdef RMLUI_ENABLED
+    if (!m_PanelDocument || !gameState) return;
+
+    Rml::Element* container = m_PanelDocument->GetElementById("achievements-list");
+    if (!container) return;
+
+    std::ostringstream body;
+    for (const auto& achievement : gameState->GetAchievements()) {
+        f64 progressRatio = (achievement.target > 0.0) ? achievement.progress / achievement.target : 0.0;
+        progressRatio = std::clamp(progressRatio, 0.0, 1.0);
+
+        body << "<div class=\"achievement-card\">";
+        body << "<div class=\"title\">" << achievement.name << "</div>";
+        body << "<div class=\"desc\">" << achievement.description << "</div>";
+        body << "<div class=\"status-badge" << (achievement.unlocked ? "" : " locked") << "\">";
+        body << (achievement.unlocked ? "Unlocked" : "Locked") << "</div>";
+        if (!achievement.unlocked) {
+            body << "<div class=\"progress-bar\"><div class=\"progress-fill\" style=\"width: "
+                 << static_cast<int>(progressRatio * 100.0) << "%;\"></div></div>";
+        }
+        body << "</div>";
+    }
+
+    container->SetInnerRML(body.str());
+#else
+    (void)gameState;
+#endif
+}
+
+void RmlUiSystem::UpdateStatistics(GameState* gameState) {
+#ifdef RMLUI_ENABLED
+    if (!m_PanelDocument || !gameState) return;
+
+    Rml::Element* grid = m_PanelDocument->GetElementById("statistics-list");
+    if (!grid) return;
+
+    const auto& stats = gameState->GetStatistics();
+    auto formatNumber = [](f64 value) {
+        std::ostringstream ss;
+        if (value >= 1'000'000.0) {
+            ss << std::fixed << std::setprecision(2) << value / 1'000'000.0 << "M";
+        } else if (value >= 1'000.0) {
+            ss << std::fixed << std::setprecision(2) << value / 1'000.0 << "K";
+        } else {
+            ss << std::fixed << std::setprecision(0) << value;
+        }
+        return ss.str();
+    };
+
+    std::ostringstream body;
+    auto addRow = [&body](const std::string& label, const std::string& value) {
+        body << "<div class=\"stat-row\">";
+        body << "<span class=\"stat-label\">" << label << "</span>";
+        body << "<span class=\"stat-value\">" << value << "</span>";
+        body << "</div>";
+    };
+
+    addRow("Total Qubits", formatNumber(stats.totalQubitsEarned));
+    addRow("Total Coherence", formatNumber(stats.totalCoherenceEarned));
+    addRow("Total Entanglement", formatNumber(stats.totalEntanglementEarned));
+    addRow("Observations", std::to_string(stats.totalObservations));
+    addRow("Upgrades Purchased", std::to_string(stats.totalUpgrades));
+    addRow("Prestiges", std::to_string(stats.totalPrestigesPerformed));
+    addRow("Session Qubits", formatNumber(stats.sessionQubits));
+    addRow("Session Observations", std::to_string(stats.sessionObservations));
+    addRow("Highest Qubits", formatNumber(stats.highestQubits));
+    addRow("Fastest Prestige (s)", stats.fastestPrestige > 0 ? std::to_string(static_cast<int>(stats.fastestPrestige)) : "-" );
+
+    grid->SetInnerRML(body.str());
+#else
+    (void)gameState;
+#endif
+}
+
+void RmlUiSystem::UpdateSingularityShop(GameState* gameState) {
+#ifdef RMLUI_ENABLED
+    if (!m_PanelDocument || !gameState) return;
+
+    Rml::Element* list = m_PanelDocument->GetElementById("singularity-upgrades");
+    if (!list) return;
+
+    auto& manager = gameState->GetSingularityShopManager();
+    auto& upgrades = manager.GetUpgrades();
+
+    std::ostringstream body;
+    for (const auto& upgrade : upgrades) {
+        body << "<div class=\"upgrade-card\">";
+        body << "<div class=\"title\">" << upgrade.name << "</div>";
+        body << "<div class=\"desc\">" << upgrade.description << "</div>";
+        body << "<div class=\"upgrade-meta\">";
+        body << "<span>Cost: " << static_cast<int>(upgrade.GetCurrentCost()) << " S</span>";
+        body << "<span>" << upgrade.GetProgressString() << "</span>";
+        body << "</div>";
+        body << "</div>";
+    }
+
+    list->SetInnerRML(body.str());
+#else
+    (void)gameState;
+#endif
+}
+
+void RmlUiSystem::UpdateSpaceship(GameState* gameState) {
+#ifdef RMLUI_ENABLED
+    if (!m_PanelDocument || !gameState) return;
+
+    Rml::Element* repairBar = m_PanelDocument->GetElementById("ship-repair");
+    Rml::Element* repairText = m_PanelDocument->GetElementById("ship-repair-text");
+    Rml::Element* stats = m_PanelDocument->GetElementById("ship-stats");
+    Rml::Element* inventory = m_PanelDocument->GetElementById("ship-inventory");
+    if (!repairBar || !repairText || !stats || !inventory) return;
+
+    auto& ship = gameState->GetSpaceship();
+    f64 repair = ship.GetRepairProgress();
+    repairBar->SetAttribute("style", "width: " + std::to_string(static_cast<int>(repair)) + "%;");
+    repairText->SetInnerRML(std::to_string(static_cast<int>(repair)) + "%");
+
+    std::ostringstream statsBody;
+    statsBody << "<div class=\"stat-row\"><span class=\"stat-label\">Power Bonus</span><span class=\"stat-value\">+"
+              << std::fixed << std::setprecision(1) << ship.GetTotalPowerBonus() << "%</span></div>";
+    statsBody << "<div class=\"stat-row\"><span class=\"stat-label\">Combat Bonus</span><span class=\"stat-value\">+"
+              << std::fixed << std::setprecision(1) << ship.GetTotalCombatBonus() << "%</span></div>";
+    statsBody << "<div class=\"stat-row\"><span class=\"stat-label\">Drop Rate</span><span class=\"stat-value\">+"
+              << std::fixed << std::setprecision(1) << ship.GetTotalDropRateBonus() << "%</span></div>";
+    stats->SetInnerRML(statsBody.str());
+
+    std::ostringstream invBody;
+    for (const auto& part : ship.GetInventory()) {
+        invBody << "<div class=\"inventory-card\">";
+        invBody << "<div class=\"title\">" << part.name << "</div>";
+        invBody << "<div class=\"meta\">" << part.GetSlotName() << " · " << part.GetRarityName() << "</div>";
+        invBody << "<div class=\"desc\">" << part.description << "</div>";
+        invBody << "</div>";
+    }
+    inventory->SetInnerRML(invBody.str());
+#else
+    (void)gameState;
+#endif
+}
+
+void RmlUiSystem::SyncPanels(GameState* gameState) {
+#ifdef RMLUI_ENABLED
+    if (!m_PanelDocument || !gameState) return;
+
+    auto setVisible = [&](const std::string& id, bool visible) {
+        if (auto* element = m_PanelDocument->GetElementById(id)) {
+            element->SetClass("hidden", !visible);
+        }
+    };
+
+    GameMode mode = gameState->GetGameMode();
+    setVisible("panel-achievements", mode == GameMode::Achievements);
+    setVisible("panel-statistics", mode == GameMode::Statistics);
+    setVisible("panel-singularity", mode == GameMode::SingularityShop);
+    setVisible("panel-spaceship", mode == GameMode::Spaceship);
+#else
+    (void)gameState;
+#endif
 }
 #endif
 
