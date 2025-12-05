@@ -68,20 +68,161 @@
 
           <!-- Upgrades/Buyables View -->
           <div id="view-upgrades" class="view-panel">
-            <h2 class="view-title">Upgrades</h2>
-            <p class="placeholder-text">Upgrades will be implemented here</p>
+            <h2 class="view-title">Upgrades & Buyables</h2>
+            <div class="buyables-grid">
+              <!-- Buyable cards will be dynamically generated here -->
+            </div>
           </div>
 
           <!-- Combat View -->
           <div id="view-combat" class="view-panel">
-            <h2 class="view-title">Combat</h2>
-            <p class="placeholder-text">Combat UI will be implemented here</p>
+            <h2 class="view-title">Combat System</h2>
+
+            <!-- Combat Arena -->
+            <div class="combat-arena">
+              <!-- Player Section -->
+              <div class="combatant-card player">
+                <h3 class="combatant-name">Player Ship</h3>
+                <div class="combatant-level">Level <span data-bind="player-level">1</span></div>
+                <div class="hp-bar-container">
+                  <div class="hp-bar">
+                    <div class="hp-fill player-hp" style="width: 100%;"></div>
+                  </div>
+                  <div class="hp-text"><span data-bind="player-hp">100</span> / <span data-bind="player-max-hp">100</span> HP</div>
+                </div>
+                <div class="stats-grid">
+                  <div class="stat-item">⚔️ ATK: <span data-bind="player-attack">10</span></div>
+                  <div class="stat-item">🛡️ DEF: <span data-bind="player-defense">5</span></div>
+                  <div class="stat-item">⚡ SPD: <span data-bind="player-speed">15</span></div>
+                </div>
+              </div>
+
+              <!-- VS Indicator -->
+              <div class="vs-indicator">VS</div>
+
+              <!-- Enemy Section -->
+              <div class="combatant-card enemy">
+                <h3 class="combatant-name" data-bind="enemy-name">No Enemy</h3>
+                <div class="combatant-level">Level <span data-bind="enemy-level">-</span></div>
+                <div class="hp-bar-container">
+                  <div class="hp-bar">
+                    <div class="hp-fill enemy-hp" style="width: 100%;"></div>
+                  </div>
+                  <div class="hp-text"><span data-bind="enemy-hp">-</span> / <span data-bind="enemy-max-hp">-</span> HP</div>
+                </div>
+                <div class="stats-grid">
+                  <div class="stat-item">⚔️ ATK: <span data-bind="enemy-attack">-</span></div>
+                  <div class="stat-item">🛡️ DEF: <span data-bind="enemy-defense">-</span></div>
+                  <div class="stat-item">⚡ SPD: <span data-bind="enemy-speed">-</span></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Combat Status -->
+            <div class="combat-status">
+              <div class="status-text" data-bind="combat-status">Not in combat</div>
+            </div>
+
+            <!-- Combat Actions -->
+            <div class="combat-actions">
+              <!-- Action buttons will be dynamically generated here -->
+            </div>
+
+            <!-- Combat Controls -->
+            <div class="combat-controls">
+              <button class="btn-secondary" data-action="toggle-auto">Auto-Battle: <span data-bind="auto-battle">OFF</span></button>
+              <button class="btn-secondary" data-action="battle-speed">Speed: <span data-bind="battle-speed">1x</span></button>
+            </div>
+
+            <!-- Combat Log -->
+            <div class="combat-log">
+              <h3 class="log-title">Combat Log</h3>
+              <div class="log-entries">
+                <!-- Log entries will be dynamically generated here -->
+              </div>
+            </div>
           </div>
 
           <!-- Menu View -->
           <div id="view-menu" class="view-panel">
-            <h2 class="view-title">Menu</h2>
-            <p class="placeholder-text">Menu options will be implemented here</p>
+            <h2 class="view-title">Menu & Settings</h2>
+
+            <div class="menu-grid">
+              <!-- Game Controls Section -->
+              <div class="menu-section">
+                <h3 class="section-title">Game Controls</h3>
+                <button class="btn-primary menu-btn" data-action="save-game">💾 Save Game</button>
+                <button class="btn-secondary menu-btn" data-action="load-game">📂 Load Game</button>
+                <button class="btn-secondary menu-btn" data-action="export-save">📤 Export Save</button>
+                <button class="btn-secondary menu-btn" data-action="import-save">📥 Import Save</button>
+              </div>
+
+              <!-- Prestige Section -->
+              <div class="menu-section">
+                <h3 class="section-title">Prestige</h3>
+                <div class="prestige-info">
+                  <p class="info-text">Current Resets: <span class="highlight" data-bind="prestige-count">0</span></p>
+                  <p class="info-text">Next Reset: <span class="highlight" data-bind="prestige-gain">+0</span> Photons</p>
+                </div>
+                <button class="btn-warning menu-btn" data-action="prestige-reset">🔄 Prestige Reset</button>
+              </div>
+
+              <!-- Statistics Section -->
+              <div class="menu-section">
+                <h3 class="section-title">Statistics</h3>
+                <div class="stats-list">
+                  <div class="stat-row">
+                    <span class="stat-label">Total Qubits:</span>
+                    <span class="stat-value" data-bind="total-qubits">0</span>
+                  </div>
+                  <div class="stat-row">
+                    <span class="stat-label">Play Time:</span>
+                    <span class="stat-value" data-bind="play-time">0:00:00</span>
+                  </div>
+                  <div class="stat-row">
+                    <span class="stat-label">Research Completed:</span>
+                    <span class="stat-value" data-bind="research-count">0</span>
+                  </div>
+                  <div class="stat-row">
+                    <span class="stat-label">Battles Won:</span>
+                    <span class="stat-value" data-bind="battles-won">0</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Settings Section -->
+              <div class="menu-section">
+                <h3 class="section-title">Settings</h3>
+                <div class="setting-row">
+                  <span class="setting-label">Notifications:</span>
+                  <button class="btn-toggle" data-action="toggle-notifications">
+                    <span data-bind="notifications-state">ON</span>
+                  </button>
+                </div>
+                <div class="setting-row">
+                  <span class="setting-label">Auto-Save:</span>
+                  <button class="btn-toggle" data-action="toggle-autosave">
+                    <span data-bind="autosave-state">ON</span>
+                  </button>
+                </div>
+                <div class="setting-row">
+                  <span class="setting-label">Show Tooltips:</span>
+                  <button class="btn-toggle" data-action="toggle-tooltips">
+                    <span data-bind="tooltips-state">ON</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- About Section -->
+              <div class="menu-section full-width">
+                <h3 class="section-title">About</h3>
+                <p class="about-text">
+                  <strong>Quantum Idle</strong> - A quantum-themed incremental game<br/>
+                  Version: <span data-bind="game-version">1.0.0</span><br/>
+                  Built with RmlUi & SDL2
+                </p>
+              </div>
+            </div>
           </div>
         </div>
       </div>
