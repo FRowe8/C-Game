@@ -4,6 +4,9 @@
 #include "GameState.h"
 #include "Research.h"
 #include "Buyables.h"
+#include "CombatSystem.h"
+#include "Enemy.h"
+#include "Spaceship.h"
 #include <SDL.h>
 #include <sstream>
 #include <iomanip>
@@ -251,6 +254,62 @@ private:
     GameState* m_GameState;
 };
 
+// Event listener for combat action buttons
+class CombatActionListener : public Rml::EventListener {
+public:
+    explicit CombatActionListener(RmlUiSystem* system, GameState* gameState)
+        : m_System(system), m_GameState(gameState) {}
+
+    void ProcessEvent(Rml::Event& event) override {
+        if (event.GetType() == "click") {
+            Rml::Element* element = event.GetTargetElement();
+            if (!element || !m_GameState) return;
+
+            std::string action = element->GetAttribute<Rml::String>("data-action", "");
+            if (action.empty()) return;
+
+            auto& combat = m_GameState->GetCombatSystem();
+
+            if (action == "combat-attack") {
+                combat.PlayerAttack();
+                m_System->UpdateCombat(m_GameState);
+            } else if (action == "combat-defend") {
+                combat.PlayerDefend();
+                m_System->UpdateCombat(m_GameState);
+            } else if (action == "combat-special") {
+                combat.PlayerSpecialAttack();
+                m_System->UpdateCombat(m_GameState);
+            } else if (action == "start-combat") {
+                // Start combat with a test enemy (level 1 Scout)
+                // In a real game, this would come from zone/encounter selection
+                Enemy* testEnemy = new Enemy(EnemyType::Scout, EnemyTier::Tier1, 1);
+                combat.StartCombat(testEnemy, m_GameState->GetPlayerLevel(),
+                    &m_GameState->GetSpaceship(), nullptr, m_GameState);
+                m_System->ShowToast("Combat Started!",
+                    std::string("Engaging ") + testEnemy->GetName(),
+                    RmlUiSystem::ToastType::Info);
+                m_System->UpdateCombat(m_GameState);
+            } else if (action == "end-combat") {
+                combat.EndCombat();
+                m_System->UpdateCombat(m_GameState);
+            } else if (action == "toggle-auto") {
+                combat.SetAutoBattle(!combat.IsAutoBattle());
+                m_System->UpdateCombat(m_GameState);
+            } else if (action == "battle-speed") {
+                // Cycle through speeds: 1x -> 2x -> 4x -> 1x
+                f32 currentSpeed = combat.GetBattleSpeed();
+                f32 newSpeed = currentSpeed >= 4.0f ? 1.0f : currentSpeed * 2.0f;
+                combat.SetBattleSpeed(newSpeed);
+                m_System->UpdateCombat(m_GameState);
+            }
+        }
+    }
+
+private:
+    RmlUiSystem* m_System;
+    GameState* m_GameState;
+};
+
 struct RmlUiSystem::RmlUiBackend {
     Rml::Context* context = nullptr;
     bool debuggerInitialized = false;
@@ -262,6 +321,7 @@ struct RmlUiSystem::RmlUiBackend {
     Scope<StationActionListener> stationActionListener;
     Scope<ResearchActionListener> researchActionListener;
     Scope<BuyableActionListener> buyableActionListener;
+    Scope<CombatActionListener> combatActionListener;
 };
 #endif
 
@@ -843,6 +903,180 @@ void RmlUiSystem::UpdateBuyables(GameState* gameState) {
 #endif
 }
 
+void RmlUiSystem::UpdateCombat(GameState* gameState) {
+#ifdef RMLUI_ENABLED
+    if (!m_Initialized || !m_Backend || !m_Backend->context || !gameState) return;
+
+    Rml::ElementDocument* document = m_Backend->context->GetDocument(0);
+    if (!document) return;
+
+    auto& combat = gameState->GetCombatSystem();
+    bool inCombat = combat.IsInCombat();
+    Enemy* enemy = combat.GetCurrentEnemy();
+
+    // Helper lambda to update text content
+    auto updateText = [&](const std::string& bindAttr, const std::string& value) {
+        Rml::ElementList elements;
+        document->GetElementsByTagName(elements, "*");
+        for (Rml::Element* elem : elements) {
+            if (elem->GetAttribute<Rml::String>("data-bind", "") == bindAttr) {
+                elem->SetInnerRML(value);
+            }
+        }
+    };
+
+    // Update player stats
+    updateText("player-level", std::to_string(gameState->GetPlayerLevel()));
+    updateText("player-hp", std::to_string(static_cast<i32>(combat.GetPlayerCurrentHP())));
+    updateText("player-max-hp", std::to_string(static_cast<i32>(combat.GetPlayerMaxHP())));
+    updateText("player-attack", std::to_string(static_cast<i32>(combat.GetPlayerAttack())));
+    updateText("player-defense", std::to_string(static_cast<i32>(combat.GetPlayerDefense())));
+    updateText("player-speed", std::to_string(static_cast<i32>(combat.GetPlayerSpeed())));
+
+    // Update player HP bar
+    f64 playerHPPercent = combat.GetPlayerMaxHP() > 0 ?
+        (combat.GetPlayerCurrentHP() / combat.GetPlayerMaxHP()) * 100.0 : 0.0;
+    Rml::ElementList playerHPBars;
+    document->GetElementsByClassName(playerHPBars, "player-hp");
+    for (Rml::Element* bar : playerHPBars) {
+        if (bar->GetParentNode() && bar->GetParentNode()->GetClassNames().find("hp-fill") != std::string::npos) {
+            char styleBuffer[32];
+            snprintf(styleBuffer, sizeof(styleBuffer), "width: %.1f%%;", playerHPPercent);
+            bar->SetAttribute("style", styleBuffer);
+        }
+    }
+
+    // Update enemy stats
+    if (inCombat && enemy) {
+        updateText("enemy-name", enemy->GetName());
+        updateText("enemy-level", std::to_string(enemy->GetLevel()));
+        updateText("enemy-hp", std::to_string(static_cast<i32>(enemy->GetCurrentHealth())));
+        updateText("enemy-max-hp", std::to_string(static_cast<i32>(enemy->GetMaxHealth())));
+        updateText("enemy-attack", std::to_string(static_cast<i32>(enemy->GetAttack())));
+        updateText("enemy-defense", std::to_string(static_cast<i32>(enemy->GetDefense())));
+        updateText("enemy-speed", std::to_string(static_cast<i32>(enemy->GetSpeed())));
+
+        // Update enemy HP bar
+        f64 enemyHPPercent = enemy->GetHealthPercent();
+        Rml::ElementList enemyHPBars;
+        document->GetElementsByClassName(enemyHPBars, "enemy-hp");
+        for (Rml::Element* bar : enemyHPBars) {
+            if (bar->GetParentNode() && bar->GetParentNode()->GetClassNames().find("hp-fill") != std::string::npos) {
+                char styleBuffer[32];
+                snprintf(styleBuffer, sizeof(styleBuffer), "width: %.1f%%;", enemyHPPercent);
+                bar->SetAttribute("style", styleBuffer);
+            }
+        }
+    } else {
+        updateText("enemy-name", "No Enemy");
+        updateText("enemy-level", "-");
+        updateText("enemy-hp", "-");
+        updateText("enemy-max-hp", "-");
+        updateText("enemy-attack", "-");
+        updateText("enemy-defense", "-");
+        updateText("enemy-speed", "-");
+    }
+
+    // Update combat status
+    std::string statusText;
+    switch (combat.GetState()) {
+        case CombatState::NotInCombat:
+            statusText = "Not in combat";
+            break;
+        case CombatState::PlayerTurn:
+            statusText = "Your Turn - Choose an action!";
+            break;
+        case CombatState::EnemyTurn:
+            statusText = "Enemy Turn...";
+            break;
+        case CombatState::Victory:
+            statusText = "Victory! +" + std::to_string(combat.GetXPEarned()) + " XP";
+            break;
+        case CombatState::Defeat:
+            statusText = "Defeat - Try again";
+            break;
+    }
+    updateText("combat-status", statusText);
+
+    // Update auto-battle and battle speed
+    updateText("auto-battle", combat.IsAutoBattle() ? "ON" : "OFF");
+    char speedBuffer[16];
+    snprintf(speedBuffer, sizeof(speedBuffer), "%.0fx", combat.GetBattleSpeed());
+    updateText("battle-speed", speedBuffer);
+
+    // Build combat action buttons
+    Rml::Element* actionsContainer = nullptr;
+    Rml::ElementList actionElements;
+    document->GetElementsByClassName(actionElements, "combat-actions");
+    if (!actionElements.empty()) {
+        actionsContainer = actionElements[0];
+    }
+
+    if (actionsContainer) {
+        std::stringstream html;
+
+        if (combat.GetState() == CombatState::PlayerTurn) {
+            html << "<button class=\"btn-primary\" data-action=\"combat-attack\">⚔️ Attack</button>";
+            html << "<button class=\"btn-secondary\" data-action=\"combat-defend\">🛡️ Defend</button>";
+            html << "<button class=\"btn-primary\" data-action=\"combat-special\">✨ Special</button>";
+        } else if (combat.GetState() == CombatState::NotInCombat) {
+            html << "<button class=\"btn-primary\" data-action=\"start-combat\">Start Combat</button>";
+        } else if (combat.GetState() == CombatState::Victory || combat.GetState() == CombatState::Defeat) {
+            html << "<button class=\"btn-primary\" data-action=\"end-combat\">Continue</button>";
+        }
+
+        actionsContainer->SetInnerRML(html.str());
+
+        // Attach event listeners to combat action buttons
+        if (m_Backend->combatActionListener) {
+            Rml::ElementList buttons;
+            actionsContainer->GetElementsByTagName(buttons, "button");
+            for (Rml::Element* button : buttons) {
+                button->AddEventListener(Rml::EventId::Click, m_Backend->combatActionListener.get());
+            }
+        }
+    }
+
+    // Attach event listeners to combat control buttons
+    if (m_Backend->combatActionListener) {
+        Rml::ElementList controlButtons;
+        document->GetElementsByClassName(controlButtons, "combat-controls");
+        if (!controlButtons.empty()) {
+            Rml::Element* controls = controlButtons[0];
+            Rml::ElementList buttons;
+            controls->GetElementsByTagName(buttons, "button");
+            for (Rml::Element* button : buttons) {
+                button->AddEventListener(Rml::EventId::Click, m_Backend->combatActionListener.get());
+            }
+        }
+    }
+
+    // Update combat log
+    Rml::Element* logContainer = nullptr;
+    Rml::ElementList logElements;
+    document->GetElementsByClassName(logElements, "log-entries");
+    if (!logElements.empty()) {
+        logContainer = logElements[0];
+    }
+
+    if (logContainer) {
+        std::stringstream html;
+        const auto& log = combat.GetCombatLog();
+
+        // Show last 10 entries
+        size_t startIdx = log.size() > 10 ? log.size() - 10 : 0;
+        for (size_t i = startIdx; i < log.size(); i++) {
+            html << "<div class=\"log-entry\">" << log[i].message << "</div>";
+        }
+
+        logContainer->SetInnerRML(html.str());
+    }
+
+#else
+    (void)gameState;
+#endif
+}
+
 // ========== Event Listener Installation ==========
 
 #ifdef RMLUI_ENABLED
@@ -896,7 +1130,8 @@ void RmlUiSystem::InstallEventListeners() {
         m_Backend->stationActionListener = CreateScope<StationActionListener>(this, m_GameState);
         m_Backend->researchActionListener = CreateScope<ResearchActionListener>(this, m_GameState);
         m_Backend->buyableActionListener = CreateScope<BuyableActionListener>(this, m_GameState);
-        Log::Info("Game action listeners created (stations, research, buyables)");
+        m_Backend->combatActionListener = CreateScope<CombatActionListener>(this, m_GameState);
+        Log::Info("Game action listeners created (stations, research, buyables, combat)");
     }
 }
 #endif

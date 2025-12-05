@@ -580,3 +580,220 @@ scrollbarvertical sliderbar:active {
   border-radius: 6dp;
   text-transform: uppercase;
 }
+
+/* ========== COMBAT VIEW ========== */
+
+.combat-arena {
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  gap: 24dp;
+  margin-bottom: 24dp;
+  padding: 20dp;
+  background: linear-gradient(135deg, rgba(10, 10, 30, 0.6) 0%, rgba(20, 10, 40, 0.6) 100%);
+  border-radius: 12dp;
+  border: 1dp solid rgba(139, 92, 246, 0.3);
+}
+
+.combatant-card {
+  flex: 1;
+  padding: 20dp;
+  background: linear-gradient(135deg, rgba(15, 15, 35, 0.9) 0%, rgba(25, 15, 45, 0.9) 100%);
+  border-radius: 10dp;
+  border: 2dp solid rgba(100, 100, 150, 0.3);
+  transition: all 0.3s ease;
+}
+
+.combatant-card.player {
+  border-color: rgba(59, 130, 246, 0.5);
+  box-shadow: 0dp 0dp 20dp rgba(59, 130, 246, 0.2);
+}
+
+.combatant-card.enemy {
+  border-color: rgba(239, 68, 68, 0.5);
+  box-shadow: 0dp 0dp 20dp rgba(239, 68, 68, 0.2);
+}
+
+.combatant-name {
+  font-size: 18dp;
+  font-weight: 700;
+  margin: 0dp 0dp 8dp 0dp;
+  text-align: center;
+  color: #e0e0ff;
+}
+
+.combatant-level {
+  font-size: 12dp;
+  text-align: center;
+  color: #a0a0c0;
+  margin-bottom: 12dp;
+}
+
+.hp-bar-container {
+  margin-bottom: 12dp;
+}
+
+.hp-bar {
+  width: 100%;
+  height: 20dp;
+  background: rgba(50, 50, 70, 0.8);
+  border-radius: 10dp;
+  overflow: hidden;
+  margin-bottom: 4dp;
+  border: 1dp solid rgba(100, 100, 150, 0.4);
+}
+
+.hp-fill {
+  height: 100%;
+  transition: width 0.5s ease;
+  border-radius: 10dp;
+}
+
+.hp-fill.player-hp {
+  background: linear-gradient(90deg, #10b981 0%, #34d399 100%);
+  box-shadow: 0dp 0dp 10dp rgba(16, 185, 129, 0.5);
+}
+
+.hp-fill.enemy-hp {
+  background: linear-gradient(90deg, #ef4444 0%, #f87171 100%);
+  box-shadow: 0dp 0dp 10dp rgba(239, 68, 68, 0.5);
+}
+
+.hp-text {
+  font-size: 12dp;
+  text-align: center;
+  color: #d0d0e0;
+  font-weight: 600;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8dp;
+  margin-top: 12dp;
+}
+
+.stat-item {
+  font-size: 11dp;
+  color: #b0b0d0;
+  text-align: center;
+  padding: 6dp;
+  background: rgba(40, 40, 60, 0.6);
+  border-radius: 6dp;
+  border: 1dp solid rgba(80, 80, 120, 0.3);
+}
+
+.vs-indicator {
+  font-size: 32dp;
+  font-weight: 900;
+  color: #fbbf24;
+  text-shadow: 0dp 0dp 20dp rgba(251, 191, 36, 0.8), 0dp 0dp 40dp rgba(251, 191, 36, 0.4);
+  flex-shrink: 0;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.1);
+    opacity: 0.8;
+  }
+}
+
+.combat-status {
+  text-align: center;
+  margin-bottom: 20dp;
+  padding: 12dp;
+  background: linear-gradient(135deg, rgba(30, 30, 50, 0.7) 0%, rgba(40, 30, 60, 0.7) 100%);
+  border-radius: 8dp;
+  border: 1dp solid rgba(139, 92, 246, 0.3);
+}
+
+.status-text {
+  font-size: 16dp;
+  font-weight: 600;
+  color: #e0e0ff;
+  text-transform: uppercase;
+  letter-spacing: 1dp;
+}
+
+.combat-actions {
+  display: flex;
+  justify-content: center;
+  gap: 12dp;
+  margin-bottom: 20dp;
+  flex-wrap: wrap;
+}
+
+.combat-actions button {
+  min-width: 120dp;
+}
+
+.combat-controls {
+  display: flex;
+  justify-content: center;
+  gap: 12dp;
+  margin-bottom: 20dp;
+}
+
+.combat-log {
+  max-height: 200dp;
+  background: linear-gradient(135deg, rgba(10, 10, 25, 0.8) 0%, rgba(20, 10, 35, 0.8) 100%);
+  border-radius: 8dp;
+  border: 1dp solid rgba(100, 100, 150, 0.3);
+  padding: 12dp;
+}
+
+.log-title {
+  font-size: 14dp;
+  font-weight: 600;
+  color: #c0c0e0;
+  margin: 0dp 0dp 8dp 0dp;
+  text-transform: uppercase;
+  letter-spacing: 1dp;
+}
+
+.log-entries {
+  max-height: 150dp;
+  overflow-y: auto;
+  padding-right: 4dp;
+}
+
+.log-entry {
+  font-size: 11dp;
+  padding: 4dp 8dp;
+  margin-bottom: 2dp;
+  border-radius: 4dp;
+  background: rgba(30, 30, 50, 0.4);
+  border-left: 2dp solid rgba(100, 100, 150, 0.5);
+}
+
+.log-entry.player-action {
+  border-left-color: #3b82f6;
+  color: #93c5fd;
+}
+
+.log-entry.enemy-action {
+  border-left-color: #ef4444;
+  color: #fca5a5;
+}
+
+.log-entry.system {
+  border-left-color: #fbbf24;
+  color: #fcd34d;
+}
+
+.log-entry.victory {
+  border-left-color: #10b981;
+  color: #6ee7b7;
+  font-weight: 600;
+}
+
+.log-entry.defeat {
+  border-left-color: #ef4444;
+  color: #fca5a5;
+  font-weight: 600;
+}

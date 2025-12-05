@@ -76,8 +76,71 @@
 
           <!-- Combat View -->
           <div id="view-combat" class="view-panel">
-            <h2 class="view-title">Combat</h2>
-            <p class="placeholder-text">Combat UI will be implemented here</p>
+            <h2 class="view-title">Combat System</h2>
+
+            <!-- Combat Arena -->
+            <div class="combat-arena">
+              <!-- Player Section -->
+              <div class="combatant-card player">
+                <h3 class="combatant-name">Player Ship</h3>
+                <div class="combatant-level">Level <span data-bind="player-level">1</span></div>
+                <div class="hp-bar-container">
+                  <div class="hp-bar">
+                    <div class="hp-fill player-hp" style="width: 100%;"></div>
+                  </div>
+                  <div class="hp-text"><span data-bind="player-hp">100</span> / <span data-bind="player-max-hp">100</span> HP</div>
+                </div>
+                <div class="stats-grid">
+                  <div class="stat-item">⚔️ ATK: <span data-bind="player-attack">10</span></div>
+                  <div class="stat-item">🛡️ DEF: <span data-bind="player-defense">5</span></div>
+                  <div class="stat-item">⚡ SPD: <span data-bind="player-speed">15</span></div>
+                </div>
+              </div>
+
+              <!-- VS Indicator -->
+              <div class="vs-indicator">VS</div>
+
+              <!-- Enemy Section -->
+              <div class="combatant-card enemy">
+                <h3 class="combatant-name" data-bind="enemy-name">No Enemy</h3>
+                <div class="combatant-level">Level <span data-bind="enemy-level">-</span></div>
+                <div class="hp-bar-container">
+                  <div class="hp-bar">
+                    <div class="hp-fill enemy-hp" style="width: 100%;"></div>
+                  </div>
+                  <div class="hp-text"><span data-bind="enemy-hp">-</span> / <span data-bind="enemy-max-hp">-</span> HP</div>
+                </div>
+                <div class="stats-grid">
+                  <div class="stat-item">⚔️ ATK: <span data-bind="enemy-attack">-</span></div>
+                  <div class="stat-item">🛡️ DEF: <span data-bind="enemy-defense">-</span></div>
+                  <div class="stat-item">⚡ SPD: <span data-bind="enemy-speed">-</span></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Combat Status -->
+            <div class="combat-status">
+              <div class="status-text" data-bind="combat-status">Not in combat</div>
+            </div>
+
+            <!-- Combat Actions -->
+            <div class="combat-actions">
+              <!-- Action buttons will be dynamically generated here -->
+            </div>
+
+            <!-- Combat Controls -->
+            <div class="combat-controls">
+              <button class="btn-secondary" data-action="toggle-auto">Auto-Battle: <span data-bind="auto-battle">OFF</span></button>
+              <button class="btn-secondary" data-action="battle-speed">Speed: <span data-bind="battle-speed">1x</span></button>
+            </div>
+
+            <!-- Combat Log -->
+            <div class="combat-log">
+              <h3 class="log-title">Combat Log</h3>
+              <div class="log-entries">
+                <!-- Log entries will be dynamically generated here -->
+              </div>
+            </div>
           </div>
 
           <!-- Menu View -->
