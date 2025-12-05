@@ -1,0 +1,55 @@
+<rml>
+  <head>
+    <title>Quantum Idle Panels</title>
+    <link type="text/rcss" href="panels.rcss" />
+  </head>
+  <body>
+    <div id="panels-root">
+      <div id="panel-achievements" class="panel-card hidden">
+        <div class="panel-header">
+          <h2>Achievements</h2>
+          <p class="panel-subtitle">Track milestones and claim rewards</p>
+        </div>
+        <div id="achievements-list" class="panel-content stack" data-bind="achievements">
+          <!-- Populated by RmlUiSystem -->
+        </div>
+      </div>
+
+      <div id="panel-statistics" class="panel-card hidden">
+        <div class="panel-header">
+          <h2>Statistics</h2>
+          <p class="panel-subtitle">Lifetime and session performance</p>
+        </div>
+        <div class="panel-content">
+          <div class="stats-grid" id="statistics-list" data-bind="statistics"></div>
+        </div>
+      </div>
+
+      <div id="panel-singularity" class="panel-card hidden">
+        <div class="panel-header">
+          <h2>Singularity Shop</h2>
+          <p class="panel-subtitle">Spend singularities on powerful upgrades</p>
+        </div>
+        <div class="panel-content stack" id="singularity-upgrades" data-bind="singularity-upgrades"></div>
+      </div>
+
+      <div id="panel-spaceship" class="panel-card hidden">
+        <div class="panel-header">
+          <h2>Spaceship</h2>
+          <p class="panel-subtitle">Repair the vessel and manage expedition parts</p>
+        </div>
+        <div class="panel-content">
+          <div class="ship-status">
+            <div class="status-label">Repair Progress</div>
+            <div class="progress-bar">
+              <div class="progress-fill" id="ship-repair" data-bind="ship-repair" style="width: 0%;"></div>
+            </div>
+            <div class="status-value" id="ship-repair-text" data-bind="ship-repair-text">0%</div>
+          </div>
+          <div class="ship-stats" id="ship-stats" data-bind="ship-stats"></div>
+          <div class="inventory" id="ship-inventory" data-bind="ship-inventory"></div>
+        </div>
+      </div>
+    </div>
+  </body>
+</rml>
