@@ -815,7 +815,7 @@ void GatchaSystem::HandleClick(f32 mouseX, f32 mouseY, bool mousePressed, GameSt
     // This avoids accidental double-adds or out-of-sync state changes.
 }
 
-void GatchaSystem::SaveToJson(std::ofstream& file) const {
+void GatchaSystem::SaveToJson(std::ostream& file) const {
     file << "\"stellarShards\":" << m_StellarShards << ",\n";
     file << "\"summonTickets\":" << m_SummonTickets << ",\n";
     file << "\"totalSummons\":" << m_TotalSummons << ",\n";

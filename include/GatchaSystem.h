@@ -97,7 +97,7 @@ public:
     void HandleClick(f32 mouseX, f32 mouseY, bool mousePressed, GameState* state);
 
     // Save/Load
-    void SaveToJson(std::ofstream& file) const;
+    void SaveToJson(std::ostream& file) const;
     void LoadFromJson(const std::string& line);
 
 private:
