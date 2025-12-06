@@ -1521,8 +1521,8 @@ void RmlUiSystem::UpdateCollection(GameState* gameState) {
 
 // ========== Event Listener Installation ==========
 
-#ifdef RMLUI_ENABLED
 void RmlUiSystem::InstallEventListeners() {
+#ifdef RMLUI_ENABLED
     if (!m_Initialized || !m_Backend || !m_Backend->context) return;
 
     Rml::ElementDocument* document = m_Backend->context->GetDocument(0);
@@ -1577,6 +1577,10 @@ void RmlUiSystem::InstallEventListeners() {
         m_Backend->collectionActionListener = CreateScope<CollectionActionListener>(this, m_GameState);
         Log::Info("Game action listeners created (stations, research, buyables, combat, menu, collection)");
     }
+#else
+    (void)m_Initialized;
+    (void)m_Backend;
+#endif
 }
 
 void RmlUiSystem::UpdateAchievements(GameState* gameState) {
@@ -1739,5 +1743,5 @@ void RmlUiSystem::SyncPanels(GameState* gameState) {
     (void)gameState;
 #endif
 }
-#endif
+
 
