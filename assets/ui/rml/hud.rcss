@@ -19,7 +19,7 @@ body {
 }
 
 /* Fixed HUD Resource Bar */
-#resource-hud {
+#top-bar.resource-hud {
   position: fixed;
   top: 16dp;
   left: 50%;

@@ -267,6 +267,12 @@ GameState::GameState()
 GameState::~GameState() {
 }
 
+void GameState::BindUiSystem(RmlUiSystem* uiSystem) {
+    if (m_UIManager) {
+        m_UIManager->SetRmlSystem(uiSystem);
+    }
+}
+
 void GameState::Initialize() {
     Log::Info("Initializing game state...");
 
@@ -1022,10 +1028,13 @@ void GameState::Render(Renderer* renderer) {
         bg_draw_list->AddRectFilled(barPos, barFillEnd, ToImU32(comboColor));
     }
 
-    // --- RENDER IMGUI WINDOWS ---
-    // Phase 1.1: GuiLayer now handles all UI rendering (decoupled from GameState logic)
-#ifndef RMLUI_ENABLED
-    // ImGui UI is hidden when RmlUi is enabled (Phase 4: UI Migration)
+    // --- RENDER UI LAYER ---
+#ifdef RMLUI_ENABLED
+    if (m_UIManager) {
+        m_UIManager->Render(renderer);
+    }
+#else
+    // Phase 1.1: GuiLayer handles ImGui rendering when RmlUi is not available
     if (m_GuiLayer) {
         m_GuiLayer->Render(this, renderer);
     } else if (m_UIManager) {

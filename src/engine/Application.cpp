@@ -141,6 +141,9 @@ bool Application::Initialize() {
     m_RmlUi->SetGameState(m_GameState.get());
     m_RmlUi->Initialize(m_Window, m_Renderer.get());
 
+    // Bridge the legacy UI manager to the RmlUi document system.
+    m_GameState->BindUiSystem(m_RmlUi.get());
+
     // Populate initial game data in UI
     m_RmlUi->UpdateStations(m_GameState.get());
     m_RmlUi->UpdateResearch(m_GameState.get());

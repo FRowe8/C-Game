@@ -6,7 +6,7 @@
   <body>
     <div id="hud-root">
       <!-- Fixed HUD Resource Bar -->
-      <div id="resource-hud" class="hud-card">
+      <div id="top-bar" class="hud-card resource-hud">
         <div class="resource-row">
           <div class="resource-chip" data-tooltip="Primary currency. Earned by observing quantum states.">
             <div class="resource-label">Qubits</div>

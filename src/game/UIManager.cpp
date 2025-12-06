@@ -1,470 +1,151 @@
 #include "UIManager.h"
-#include "ImGuiUtils.h"
-#include "imgui.h"
 #include "GameUtils.h"
-#include "GameState.h"
-#include "Research.h"
-#include "CombatSystem.h"
-#include "Spaceship.h"
-#include "GatchaSystem.h"
-#include "Challenges.h"
-#include "SkillTree.h"
-#include "EnhancementSystem.h"
-#include "Platform.h"
-#include "Logger.h"
+#include "RmlUiSystem.h"
 #include <string>
-
-#include "imgui_internal.h"
-
-// NOTE: This implementation assumes the UIManager.h DrawNavButton signature
-// has been updated to include width and height parameters.
 
 UIManager::UIManager(GameState* state) : m_GameState(state) {}
 
 void UIManager::Initialize() {
-    // Check if the UITheme header is included in the project's include path
-    UITheme::SetupStyle();
+    // All styling now lives in RCSS; no ImGui style configuration required.
 }
 
 void UIManager::Render(Renderer* renderer) {
-    // 1. Setup Main Layout Window (Invisible container covering the entire viewport)
-    ImGuiViewport* viewport = ImGui::GetMainViewport();
-    ImGui::SetNextWindowPos(viewport->Pos);
-    ImGui::SetNextWindowSize(viewport->Size);
+    (void)renderer;
 
-    // ImGui::SetNextWindowViewport(viewport->ID); <-- REMOVED (Docking feature)
+    // When running without the RmlUi backend there is nothing to render.
+    if (!m_RmlSystem || !m_RmlSystem->IsInitialized() || !m_GameState) {
+        return;
+    }
 
-    // Removed ImGuiWindowFlags_NoDocking
-    ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoTitleBar |
-                                    ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize |
-                                    ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoBringToFrontOnFocus |
-                                    ImGuiWindowFlags_NoNavFocus | ImGuiWindowFlags_NoBackground;
+    // Keep HUD resource counters in sync with the current game state.
+    SyncResources();
 
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
-    if (ImGui::Begin("MainLayout", nullptr, window_flags)) {
-        ImGui::PopStyleVar(); // Pop for MainLayout
+    // Activate the correct view panel and refresh any data-driven content.
+    SyncActiveView();
+    SyncPanels(renderer);
+}
 
-        // 2. Render Components
-        RenderTopBar();
-        RenderMainContent();
-        RenderBottomNavigation();
-        RenderOverlays(renderer);
+void UIManager::SyncResources() {
+    // Raw values
+    m_RmlSystem->UpdateUIResource("qubits", m_GameState->GetResource(QuantumResource::Qubits));
+    m_RmlSystem->UpdateUIResource("coherence", m_GameState->GetCoherence());
+    m_RmlSystem->UpdateUIResource("entanglement", m_GameState->GetResource(QuantumResource::Entanglement));
+    m_RmlSystem->UpdateUIResource("photons", static_cast<f64>(m_GameState->GetTimeline().photons));
+    m_RmlSystem->UpdateUIResource("singularities", static_cast<f64>(m_GameState->GetTimeline().singularities));
 
-        ImGui::End();
-    } else {
-        ImGui::PopStyleVar(); // Pop if Begin fails
+    // Formatted labels for the HUD chips
+    m_RmlSystem->UpdateUIResourceFormatted("qubits", FormatValue(m_GameState->GetResource(QuantumResource::Qubits)));
+    m_RmlSystem->UpdateUIResourceFormatted("coherence", FormatValue(m_GameState->GetCoherence()));
+    m_RmlSystem->UpdateUIResourceFormatted("entanglement", FormatValue(m_GameState->GetResource(QuantumResource::Entanglement)));
+    m_RmlSystem->UpdateUIResourceFormatted("photons", FormatValue(static_cast<f64>(m_GameState->GetTimeline().photons)));
+    m_RmlSystem->UpdateUIResourceFormatted("singularities", FormatValue(static_cast<f64>(m_GameState->GetTimeline().singularities)));
+
+    // Coherence progress bar and percentage text
+    double maxCoherence = m_GameState->GetMaxCoherence();
+    double coherence = m_GameState->GetCoherence();
+    float coherenceRatio = (maxCoherence > 0.0) ? static_cast<float>(coherence / maxCoherence) : 0.0f;
+    float coherencePercent = coherenceRatio * 100.0f;
+
+    m_RmlSystem->UpdateUIProgress("coherence-progress", coherenceRatio);
+    m_RmlSystem->UpdateUIResourceFormatted("coherence-percent", std::to_string(static_cast<int>(coherencePercent)) + "%");
+}
+
+void UIManager::SyncActiveView() {
+    ActiveModal activeModal = m_GameState->GetActiveModal();
+    if (activeModal == m_LastModal) {
+        return;
+    }
+
+    m_LastModal = activeModal;
+
+    auto setView = [&](const std::string& viewId) {
+        if (!viewId.empty()) {
+            m_RmlSystem->ActivateView(viewId);
+        }
+    };
+
+    switch (activeModal) {
+        case ActiveModal::None:
+            setView("view-stations");
+            break;
+        case ActiveModal::Research:
+            setView("view-research");
+            break;
+        case ActiveModal::Buyables:
+            setView("view-upgrades");
+            break;
+        case ActiveModal::Combat:
+            setView("view-combat");
+            break;
+        case ActiveModal::Spaceship:
+            setView("view-collection");
+            break;
+        case ActiveModal::Skills:
+        case ActiveModal::SpecializedSkills:
+            setView("view-collection");
+            break;
+        case ActiveModal::Gatcha:
+            setView("view-collection");
+            break;
+        case ActiveModal::Achievements:
+        case ActiveModal::Statistics:
+        case ActiveModal::Milestones:
+        case ActiveModal::Challenges:
+        case ActiveModal::EssenceShop:
+        case ActiveModal::SingularityShop:
+        case ActiveModal::Enhancement:
+        case ActiveModal::MoreMenu:
+        default:
+            setView("view-menu");
+            break;
     }
 }
 
-void UIManager::RenderTopBar() {
-    ImGuiViewport* viewport = ImGui::GetMainViewport();
-    ImGui::SetNextWindowPos(viewport->Pos);
-    ImGui::SetNextWindowSize(ImVec2(viewport->Size.x, UITheme::TopBarHeight()));
+void UIManager::SyncPanels(Renderer* renderer) {
+    (void)renderer;
 
-    ImGui::PushStyleColor(ImGuiCol_WindowBg, UITheme::ColorPanelBg);
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, UITheme::BorderThickness());
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(UITheme::SafeAreaPadding(), UITheme::SafeAreaPadding() * 0.5f));
-
-    // Removed ImGuiWindowFlags_NoDocking
-    if (ImGui::Begin("TopBar", nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove)) {
-
-        // Draw Bottom Border Glow
-        auto* drawList = ImGui::GetWindowDrawList();
-        ImVec2 p0 = ImGui::GetWindowPos();
-        p0.y += UITheme::TopBarHeight() - 2.0f;
-        ImVec2 p1 = ImVec2(p0.x + viewport->Size.x, p0.y + 2.0f);
-        drawList->AddRectFilled(p0, p1, ImGui::GetColorU32(UITheme::ColorAccent));
-
-        const ImVec2 cellPadding(UITheme::FramePadding().x * 0.6f, UITheme::FramePadding().y * 0.45f);
-        ImGui::PushStyleVar(ImGuiStyleVar_CellPadding, cellPadding);
-        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(UITheme::ItemSpacing() * 0.4f, UITheme::ItemSpacing() * 0.4f));
-
-        if (ImGui::BeginTable("ResTable", 5, ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_NoBordersInBody)) {
-            ImGui::TableSetupColumn("Q", ImGuiTableColumnFlags_WidthFixed, UITheme::TouchMinSize());
-            ImGui::TableSetupColumn("C", ImGuiTableColumnFlags_WidthFixed, UITheme::TouchMinSize());
-            ImGui::TableSetupColumn("E", ImGuiTableColumnFlags_WidthFixed, UITheme::TouchMinSize());
-            ImGui::TableSetupColumn("P", ImGuiTableColumnFlags_WidthFixed, UITheme::TouchMinSize());
-            ImGui::TableSetupColumn("S", ImGuiTableColumnFlags_WidthFixed, UITheme::TouchMinSize());
-
-            ImGui::TableNextRow(ImGuiTableRowFlags_None, UITheme::TouchMinSize());
-
-            ImGui::TableSetColumnIndex(0);
-            DrawResourceCounter("[Q]", m_GameState->GetResource(QuantumResource::Qubits), ToImVec4(Color::QuantumBlue()));
-
-            ImGui::TableSetColumnIndex(1);
-            DrawResourceCounter("[C]", m_GameState->m_Coherence, ToImVec4(Color::CoherenceGreen()));
-
-            ImGui::TableSetColumnIndex(2);
-            DrawResourceCounter("[E]", m_GameState->GetResource(QuantumResource::Entanglement), ToImVec4(Color::EntanglementOrange()));
-
-            ImGui::TableSetColumnIndex(3);
-            DrawResourceCounter("[P]", m_GameState->GetTimeline().photons, UITheme::ColorPrimary);
-
-            ImGui::TableSetColumnIndex(4);
-            DrawResourceCounter("[S]", m_GameState->GetTimeline().singularities, UITheme::ColorAccent);
-
-            ImGui::EndTable();
-        }
-
-        ImGui::PopStyleVar(2);
+    // Update view-specific panels so dynamic content matches the selected modal.
+    switch (m_LastModal) {
+        case ActiveModal::None:
+            m_RmlSystem->UpdateStations(m_GameState);
+            break;
+        case ActiveModal::Research:
+            m_RmlSystem->UpdateResearch(m_GameState);
+            break;
+        case ActiveModal::Buyables:
+            m_RmlSystem->UpdateBuyables(m_GameState);
+            break;
+        case ActiveModal::Combat:
+            m_RmlSystem->UpdateCombat(m_GameState);
+            break;
+        case ActiveModal::Spaceship:
+            m_RmlSystem->UpdateSpaceship(m_GameState);
+            break;
+        case ActiveModal::Skills:
+        case ActiveModal::SpecializedSkills:
+            m_RmlSystem->UpdateCollection(m_GameState);
+            break;
+        case ActiveModal::Gatcha:
+            m_RmlSystem->UpdateCollection(m_GameState);
+            break;
+        case ActiveModal::Achievements:
+            m_RmlSystem->UpdateAchievements(m_GameState);
+            break;
+        case ActiveModal::Statistics:
+            m_RmlSystem->UpdateStatistics(m_GameState);
+            break;
+        case ActiveModal::Milestones:
+        case ActiveModal::Challenges:
+        case ActiveModal::EssenceShop:
+        case ActiveModal::SingularityShop:
+        case ActiveModal::Enhancement:
+        case ActiveModal::MoreMenu:
+        default:
+            m_RmlSystem->UpdateMenu(m_GameState);
+            break;
     }
-    ImGui::End();
-    ImGui::PopStyleVar();
-    ImGui::PopStyleVar();
-    ImGui::PopStyleColor();
 }
-
-void UIManager::RenderBottomNavigation() {
-    ImGuiViewport* viewport = ImGui::GetMainViewport();
-    ImGui::SetNextWindowPos(ImVec2(viewport->Pos.x, viewport->Pos.y + viewport->Size.y - UITheme::BottomBarHeight()));
-    ImGui::SetNextWindowSize(ImVec2(viewport->Size.x, UITheme::BottomBarHeight()));
-
-    ImGui::PushStyleColor(ImGuiCol_WindowBg, UITheme::ColorPanelBg);
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, UITheme::BorderThickness());
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(UITheme::SafeAreaPadding(), UITheme::SafeAreaPadding() * 0.75f));
-
-    // Removed ImGuiWindowFlags_NoDocking
-    if (ImGui::Begin("BottomNav", nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove)) {
-
-        // Draw Top Border Glow
-        auto* drawList = ImGui::GetWindowDrawList();
-        ImVec2 p0 = ImGui::GetWindowPos();
-        ImVec2 p1 = ImVec2(p0.x + viewport->Size.x, p0.y + 2.0f);
-        drawList->AddRectFilled(p0, p1, ImGui::GetColorU32(UITheme::ColorAccent));
-
-        // Navigation Buttons
-        float width = ImGui::GetContentRegionAvail().x;
-        int btnCount = 5; // Stations, Research, Upgrades, Combat, Menu
-        float btnHeight = UITheme::NavigationButtonHeight();
-
-        // Calculate dynamic button width, accounting for spacing
-        float btnWidth = (width - (UITheme::ItemSpacing() * static_cast<float>(btnCount - 1))) / static_cast<float>(btnCount);
-
-        ImGui::SetCursorPosY(UITheme::SafeAreaPadding());
-
-        // 1. Stations (Home)
-        bool isBaseState = (m_GameState->GetActiveModal() == ActiveModal::None);
-        if (DrawNavButton("STATIONS", isBaseState, UITheme::ColorAccent, btnWidth, btnHeight)) {
-            // Close all overlays - return to base state
-            m_GameState->SetActiveModal(ActiveModal::None);
-        }
-        ImGui::SameLine(0.0f, UITheme::ItemSpacing());
-
-        // 2. Research
-        bool showingResearch = (m_GameState->GetActiveModal() == ActiveModal::Research);
-        if (DrawNavButton("RESEARCH", showingResearch, UITheme::ColorPrimary, btnWidth, btnHeight)) {
-            m_GameState->SetActiveModal(showingResearch ? ActiveModal::None : ActiveModal::Research);
-        }
-        ImGui::SameLine(0.0f, UITheme::ItemSpacing());
-
-        // 3. Upgrades (Buyables)
-        bool showingBuyables = (m_GameState->GetActiveModal() == ActiveModal::Buyables);
-        if (DrawNavButton("UPGRADES", showingBuyables, UITheme::ColorSuccess, btnWidth, btnHeight)) {
-            m_GameState->SetActiveModal(showingBuyables ? ActiveModal::None : ActiveModal::Buyables);
-        }
-        ImGui::SameLine(0.0f, UITheme::ItemSpacing());
-
-        // 4. Combat/Map
-        bool showingCombat = (m_GameState->GetActiveModal() == ActiveModal::Combat);
-        if (DrawNavButton("COMBAT", showingCombat, UITheme::ColorDanger, btnWidth, btnHeight)) {
-            if(!showingCombat) m_GameState->StartRandomCombat();
-            m_GameState->SetActiveModal(showingCombat ? ActiveModal::None : ActiveModal::Combat);
-        }
-        ImGui::SameLine(0.0f, UITheme::ItemSpacing());
-
-        // 5. Menu (More)
-        bool showingMenu = (m_GameState->GetActiveModal() == ActiveModal::MoreMenu);
-        if (DrawNavButton("MENU", showingMenu, UITheme::ColorText, btnWidth, btnHeight)) {
-            m_GameState->SetActiveModal(showingMenu ? ActiveModal::None : ActiveModal::MoreMenu);
-        }
-    }
-    ImGui::End();
-    ImGui::PopStyleVar();
-    ImGui::PopStyleVar();
-    ImGui::PopStyleColor();
-}
-
-void UIManager::RenderMainContent() {
-    ImGuiViewport* viewport = ImGui::GetMainViewport();
-    float topY = viewport->Pos.y + UITheme::TopBarHeight();
-    float bottomY = viewport->Pos.y + viewport->Size.y - UITheme::BottomBarHeight();
-    float height = bottomY - topY;
-
-    ImGui::SetNextWindowPos(ImVec2(viewport->Pos.x, topY));
-    ImGui::SetNextWindowSize(ImVec2(viewport->Size.x, height));
-
-    // Transparent background for content area to see game particles
-    ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0,0,0,0));
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(UITheme::ContentPadding(), UITheme::ContentPadding()));
-
-    if (ImGui::Begin("MainContent", nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove)) {
-        // Render content based on active modal (tab-based navigation)
-        ActiveModal activeModal = m_GameState->GetActiveModal();
-
-        if (ImGui::BeginChild("ScrollContent", ImVec2(0, 0), false, ImGuiWindowFlags_AlwaysVerticalScrollbar)) {
-            switch(activeModal) {
-                case ActiveModal::None:
-                    // Default: Stations view
-                    m_GameState->RenderStationsContent();
-                    break;
-
-                case ActiveModal::Research:
-                    // Research Tree (full screen in content area)
-                    // FIX: RenderResearchTree is in GameState, not ResearchTree
-                    m_GameState->RenderResearchTree(nullptr);
-                    break;
-
-                case ActiveModal::Buyables:
-                    // Upgrades/Buyables (full screen in content area)
-                    m_GameState->RenderBuyables(nullptr);
-                    break;
-
-                case ActiveModal::Combat:
-                    // Combat view (full screen in content area)
-                    if (m_GameState->GetCombatSystem().IsInCombat()) {
-                        m_GameState->GetCombatSystem().RenderCombatUI(nullptr);
-                    } else {
-                        ImGui::TextColored(ImVec4(1, 1, 0, 1), "No active combat");
-                        ImGui::Text("Click COMBAT button to start a random encounter");
-                    }
-                    break;
-
-                case ActiveModal::Spaceship:
-                    // Ship panel (full screen in content area)
-                    m_GameState->GetSpaceship().RenderShipPanel();
-                    ImGui::Separator();
-                    m_GameState->GetSpaceship().RenderInventoryPanel();
-                    break;
-
-                case ActiveModal::Skills:
-                    // Skill Tree (full screen in content area)
-                    m_GameState->GetSkillTree().RenderSkillTree(nullptr, m_GameState);
-                    break;
-
-                case ActiveModal::Gatcha:
-                    // Gatcha system (full screen in content area)
-                    m_GameState->GetGatchaSystem().RenderSummonUI(nullptr, m_GameState);
-                    break;
-
-                case ActiveModal::Achievements:
-                    // Achievements (full screen in content area)
-                    m_GameState->RenderAchievements(nullptr);
-                    break;
-
-                case ActiveModal::Statistics:
-                    // Statistics (full screen in content area)
-                    m_GameState->RenderStatistics(nullptr);
-                    break;
-
-                case ActiveModal::Milestones:
-                    // Milestones (full screen in content area)
-                    m_GameState->RenderMilestones(nullptr);
-                    break;
-
-                case ActiveModal::Challenges:
-                    // Challenges (full screen in content area)
-                    // FIX: RenderChallenges is in GameState, not ChallengeManager
-                    m_GameState->RenderChallenges(nullptr);
-                    break;
-
-                case ActiveModal::EssenceShop:
-                    // Essence Shop (full screen in content area)
-                    m_GameState->RenderEssenceShop(nullptr);
-                    break;
-
-                case ActiveModal::SingularityShop:
-                    // Singularity Shop (full screen in content area)
-                    m_GameState->RenderSingularityShop(nullptr);
-                    break;
-
-                case ActiveModal::Enhancement:
-                    // Enhancement system (full screen in content area)
-                    m_GameState->GetEnhancementSystem().RenderEnhancementUI(nullptr, m_GameState);
-                    break;
-
-                case ActiveModal::SpecializedSkills:
-                    // Specialized skills progression (full screen in content area)
-                    m_GameState->RenderSpecializedSkills(nullptr);
-                    break;
-
-                case ActiveModal::MoreMenu:
-                default:
-                    // Fallback: show stations
-                    m_GameState->RenderStationsContent();
-                    break;
-            }
-
-            ImGui::EndChild();
-        }
-    }
-    ImGui::End();
-    ImGui::PopStyleVar();
-    ImGui::PopStyleColor();
-}
-
-void UIManager::RenderOverlays(Renderer* renderer) {
-    // Render popups and notifications on top of everything
-    // Main modal windows are now rendered in the content area (tab-based navigation)
-
-    // Handle "More" menu as a popup
-    if (m_GameState->m_ShowMoreMenu) {
-        ImGui::OpenPopup("MoreMenuPopup");
-    }
-
-    if (ImGui::BeginPopup("MoreMenuPopup")) {
-        // Menu items switch to different tabs
-        if (ImGui::MenuItem("Achievements")) {
-            m_GameState->SetActiveModal(ActiveModal::Achievements);
-            m_GameState->m_ShowMoreMenu = false;
-        }
-        if (ImGui::MenuItem("Statistics")) {
-            m_GameState->SetActiveModal(ActiveModal::Statistics);
-            m_GameState->m_ShowMoreMenu = false;
-        }
-        if (ImGui::MenuItem("Milestones")) {
-            m_GameState->SetActiveModal(ActiveModal::Milestones);
-            m_GameState->m_ShowMoreMenu = false;
-        }
-        if (ImGui::MenuItem("Challenges")) {
-            m_GameState->SetActiveModal(ActiveModal::Challenges);
-            m_GameState->m_ShowMoreMenu = false;
-        }
-        if (ImGui::MenuItem("Essence Shop")) {
-            m_GameState->SetActiveModal(ActiveModal::EssenceShop);
-            m_GameState->m_ShowMoreMenu = false;
-        }
-        if (ImGui::MenuItem("Singularity Shop")) {
-            m_GameState->SetActiveModal(ActiveModal::SingularityShop);
-            m_GameState->m_ShowMoreMenu = false;
-        }
-        if (ImGui::MenuItem("Spaceship")) {
-            m_GameState->SetActiveModal(ActiveModal::Spaceship);
-            m_GameState->m_ShowMoreMenu = false;
-        }
-        if (ImGui::MenuItem("Gatcha")) {
-            m_GameState->SetActiveModal(ActiveModal::Gatcha);
-            m_GameState->m_ShowMoreMenu = false;
-        }
-        if (ImGui::MenuItem("Skills")) {
-            m_GameState->SetActiveModal(ActiveModal::Skills);
-            m_GameState->m_ShowMoreMenu = false;
-        }
-        if (ImGui::MenuItem("Specialized Skills")) {
-            m_GameState->SetActiveModal(ActiveModal::SpecializedSkills);
-            m_GameState->m_ShowMoreMenu = false;
-        }
-        if (ImGui::MenuItem("Enhancement")) {
-            m_GameState->SetActiveModal(ActiveModal::Enhancement);
-            m_GameState->m_ShowMoreMenu = false;
-        }
-
-        auto openFeedbackLink = [this](const char* label, const char* url) {
-            if (ImGui::MenuItem(label)) {
-                if (!Platform::OpenURL(url)) {
-                    Log::Warningf("Failed to open feedback link: ", url);
-                }
-                m_GameState->m_ShowMoreMenu = false;
-            }
-        };
-
-        ImGui::Separator();
-        ImGui::TextDisabled("Community & Feedback");
-        openFeedbackLink("Discord Feedback Hub", "https://discord.gg/quantumidle");
-        openFeedbackLink("Report a Bug (GitHub)", "https://github.com/FRowe8/C-Game/issues/new/choose");
-        openFeedbackLink("Feature Survey", "https://forms.gle/quantumidle-feedback");
-        ImGui::Separator();
-        if (ImGui::MenuItem("Close")) {
-            m_GameState->m_ShowMoreMenu = false;
-        }
-        ImGui::EndPopup();
-    }
-
-    // Render active event (if any) - this can stay as an overlay
-    RenderActiveEvent();
-
-    // Render notifications (always on top)
-    RenderAchievementNotifications();
-    RenderMilestoneNotifications();
-    m_GameState->GetUnlockManager().RenderNotifications(renderer);
-}
-
-// --- Helpers ---
 
 std::string UIManager::FormatValue(double value) const {
     return GameUtils::FormatNumber(value, m_GameState->m_NumberFormat);
-}
-
-void UIManager::DrawResourceCounter(const char* label, double value, const ImVec4& color) const {
-    const float desiredHeight = UITheme::TouchMinSize();
-    const float labelHeight = ImGui::GetTextLineHeight();
-    const float verticalOffset = ImMax(0.0f, (desiredHeight - labelHeight) * 0.5f);
-    const ImVec2 badgePadding(UITheme::FramePadding().x * 0.35f, UITheme::FramePadding().y * 0.25f);
-
-    ImVec2 startScreenPos = ImGui::GetCursorScreenPos();
-    float columnWidth = ImGui::GetColumnWidth();
-
-    ImVec2 bgMin = ImVec2(startScreenPos.x - badgePadding.x, startScreenPos.y);
-    ImVec2 bgMax = ImVec2(startScreenPos.x + columnWidth - badgePadding.x, startScreenPos.y + desiredHeight + badgePadding.y);
-
-    ImDrawList* drawList = ImGui::GetWindowDrawList();
-    drawList->AddRectFilled(bgMin, bgMax, ImGui::GetColorU32(ImVec4(UITheme::ColorCardBg.x, UITheme::ColorCardBg.y, UITheme::ColorCardBg.z, 0.9f)), UITheme::CardRounding());
-    drawList->AddRect(bgMin, bgMax, ImGui::GetColorU32(UITheme::ColorCardBorder), UITheme::CardRounding(), 0, UITheme::BorderThickness() * 0.75f);
-
-    ImGui::BeginGroup();
-    ImGui::SetCursorScreenPos(ImVec2(startScreenPos.x, startScreenPos.y + verticalOffset));
-
-    ImGui::PushStyleColor(ImGuiCol_Text, color);
-    ImGui::Text("%s", label);
-    ImGui::PopStyleColor();
-
-    ImGui::SameLine(0.0f, UITheme::ItemSpacing() * 0.35f);
-    ImGui::AlignTextToFramePadding();
-    ImGui::PushStyleColor(ImGuiCol_Text, UITheme::ColorText);
-    ImGui::Text("%s", FormatValue(value).c_str());
-    ImGui::PopStyleColor();
-
-    ImGui::EndGroup();
-
-    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-        ImGui::SetTooltip("%s\nCurrent: %s", label, FormatValue(value).c_str());
-    }
-}
-
-bool UIManager::DrawNavButton(const char* label, bool isActive, const ImVec4& activeColor, float width, float height) {
-    ImVec4 btnColor = isActive ? activeColor : ImVec4(0.2f, 0.2f, 0.2f, 0.5f);
-    ImGui::PushStyleColor(ImGuiCol_Button, btnColor);
-    ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, UITheme::NavigationButtonRounding());
-    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, UITheme::FramePadding());
-    ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, UITheme::BorderThickness());
-
-    bool clicked = ImGui::Button(label, ImVec2(width, height));
-
-    ImGui::PopStyleVar(3);
-    ImGui::PopStyleColor();
-
-    // Active Indicator Line (Draw glow/line at the bottom of the button)
-    if (isActive) {
-        ImVec2 p_min = ImGui::GetItemRectMin();
-        ImVec2 p_max = ImGui::GetItemRectMax();
-
-        ImVec2 line_p0 = ImVec2(p_min.x, p_max.y - 2.0f);
-        ImVec2 line_p1 = ImVec2(p_max.x, p_max.y);
-
-        ImGui::GetWindowDrawList()->AddRectFilled(line_p0, line_p1, ImGui::GetColorU32(activeColor));
-    }
-
-    return clicked;
-}
-// --- Notification Overlays ---
-
-void UIManager::RenderActiveEvent() const {
-    m_GameState->RenderActiveEvent(nullptr);
-}
-
-void UIManager::RenderAchievementNotifications() const {
-    m_GameState->RenderAchievementNotifications(nullptr);
-}
-
-void UIManager::RenderMilestoneNotifications() const {
-    m_GameState->RenderMilestoneNotifications(nullptr);
 }
