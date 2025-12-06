@@ -29,6 +29,7 @@ class Renderer;
 class Input;
 class ResearchTree;
 class UIManager; // Forward declare
+class RmlUiSystem;
 
 // Forward declarations for GuiLayer
 namespace UI {
@@ -235,6 +236,9 @@ public:
     void Initialize();
     void Update(f64 deltaTime, Input* input, Renderer* renderer);
     void Render(Renderer* renderer);
+
+    // Connect the RmlUi bridge so UIManager can drive RML documents instead of ImGui widgets.
+    void BindUiSystem(RmlUiSystem* uiSystem);
 
     // Resource management
     void AddResource(QuantumResource type, f64 amount, bool showFloatingText = true);
