@@ -4,9 +4,13 @@
 #include <vector>
 #include <string>
 
-// Forward declarations for SDL/ImGui
+// Forward declarations for SDL/RmlUi
 struct SDL_Window;
 typedef void* SDL_GLContext;
+namespace Rml {
+    class Context;
+    class RenderInterface;
+}
 
 class Renderer {
 public:
@@ -38,6 +42,8 @@ public:
     void UpdateParticles(f64 deltaTime);
     void RenderParticles(); // This will now use ImGui::GetBackgroundDrawList
 
+    void SetRmlUiContext(Rml::Context* context, Rml::RenderInterface* renderInterface);
+
     int GetWidth() const { return m_Width; }
     int GetHeight() const { return m_Height; }
 
@@ -45,9 +51,6 @@ public:
     SDL_GLContext GetGLContext() const { return m_GLContext; }
 
 private:
-    void InitializeImGui();
-    void ShutdownImGui();
-
     SDL_Window* m_Window = nullptr;
     SDL_GLContext m_GLContext = nullptr;
 
@@ -55,6 +58,9 @@ private:
     int m_Height = 0;
 
     std::vector<Particle> m_Particles;
+
+    Rml::Context* m_RmlContext = nullptr;
+    Rml::RenderInterface* m_RmlRenderInterface = nullptr;
 
     // Legacy projection matrix removed
     // f32 m_ProjectionMatrix[16];

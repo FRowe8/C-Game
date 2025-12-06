@@ -4,7 +4,6 @@
 #include "GameState.h"
 #include "Logger.h"
 #include "RmlUiSystem.h"
-#include "imgui_impl_sdl2.h"  // For ImGui SDL2 event processing
 #include "Platform.h"
 #include "SteamIntegration.h"
 #include <SDL.h>
@@ -225,10 +224,8 @@ void Application::ProcessEvents() {
 
     SDL_Event event;
     while (SDL_PollEvent(&event)) {
-        // Let ImGui process the event first
-        bool rmlHandled = m_RmlUi ? m_RmlUi->ProcessEvent(event) : false;
-        if (!rmlHandled) {
-            ImGui_ImplSDL2_ProcessEvent(&event);
+        if (m_RmlUi) {
+            m_RmlUi->ProcessEvent(event);
         }
 
         if (event.type == SDL_QUIT) {
@@ -283,10 +280,6 @@ void Application::Render() {
 
     // Render game
     m_GameState->Render(m_Renderer.get());
-
-    if (m_RmlUi && m_RmlUi->IsInitialized()) {
-        m_RmlUi->Render();
-    }
 
     m_Renderer->EndFrame();
 

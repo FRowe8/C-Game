@@ -65,6 +65,7 @@ private:
     bool m_Initialized = false;
     SDL_Window* m_Window = nullptr;
     class GameState* m_GameState = nullptr;
+    class Renderer* m_Renderer = nullptr;
 
 #ifdef RMLUI_ENABLED
     // Forward declarations to avoid leaking RmlUi headers broadly.
