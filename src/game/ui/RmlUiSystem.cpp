@@ -441,7 +441,7 @@ RmlUiSystem::~RmlUiSystem() { Shutdown(); }
 
 bool RmlUiSystem::Initialize(SDL_Window* window, Renderer* renderer) {
     m_Window = window;
-    (void)renderer;
+    m_Renderer = renderer;
 
 #ifdef RMLUI_ENABLED
     Log::Info("Initializing RmlUi runtime");
@@ -479,6 +479,11 @@ bool RmlUiSystem::Initialize(SDL_Window* window, Renderer* renderer) {
         Log::Error("Failed to create RmlUi context");
         Rml::Shutdown();
         return false;
+    }
+
+    // Expose the context to the renderer so it can drive presentation
+    if (m_Renderer) {
+        m_Renderer->SetRmlUiContext(m_Backend->context, m_Backend->renderInterface.get());
     }
 
     // Initialize debugger
@@ -541,6 +546,11 @@ void RmlUiSystem::Shutdown() {
 #endif
     m_Initialized = false;
     m_Window = nullptr;
+    if (m_Renderer) {
+        m_Renderer->SetRmlUiContext(nullptr, nullptr);
+    }
+
+    m_Renderer = nullptr;
 }
 
 void RmlUiSystem::BeginFrame() {
